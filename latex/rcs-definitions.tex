@@ -592,6 +592,81 @@ variables, penalizing worst-case degradation:
 
 
 % =============================================================================
+\section{Self-Referential Closure}
+\label{sec:closure}
+% =============================================================================
+
+The RCS hierarchy possesses a fixed-point property: Level~3 (governance) includes
+the formalization itself.  The CLAUDE.md invariants, AGENTS.md operational rules,
+METALAYER.md control manifest, and this very document are not external to the
+system --- they \emph{are} the Level~3 controller $\ctrl_3$.  This section makes
+the self-referential structure precise and verifies that it does not break
+stability.
+
+\begin{definition}[Self-referential RCS]
+\label{def:self-ref}
+An RCS hierarchy $\rcs_0, \ldots, \rcs_N$ has \emph{self-referential closure}
+if the Level~$N$ controller $\ctrl_N$ includes a model of the complete hierarchy
+$\{\rcs_0, \ldots, \rcs_N\}$.  That is, the governance rules, documentation,
+and formalization at $\Li{N}$ \emph{are} the controller $\ctrl_N$:
+\begin{equation}
+  \ctrl_N \supseteq \text{Model}(\rcs_0, \ldots, \rcs_N).
+\end{equation}
+\end{definition}
+
+\begin{proposition}[Governance stability]
+\label{prop:governance}
+Under the standard assumptions (Assumptions~\ref{ass:per-level}--\ref{ass:jump}),
+Level~3 of the Life Agent OS satisfies $\stab_3 > 0$ with the following
+concrete parameter estimates:
+\begin{center}
+\begin{tabular}{@{}cp{6.5cm}c@{}}
+  \toprule
+  \textbf{Parameter} & \textbf{Interpretation} & \textbf{Value} \\
+  \midrule
+  $\decay_3$ & Nominal decay --- policy crystallization rate
+    ${\sim}\,1/100$ days & $0.010$ \\
+  $L_{\param,3} \rho_3$ & Setpoint adjustment rate
+    ${\leq}\,1/\text{month}$ & $0.001$ \\
+  $L_{d,3} \eta_3$ & Structural changes ${\sim}\,1/\text{quarter}$
+    (new primitives, gates) & $0.0005$ \\
+  $\beta_3 \taubar_3$ & Human review delay (hours--days for
+    policy changes) & $0.002$ \\
+  $\frac{\ln \nu_3}{\taua[3]}$ & Profile switches (extremely rare)
+    & $0.0001$ \\
+  \midrule
+  $\stab_3$ & Stability budget at Level~3
+    & $0.0064 > 0\;\checkmark$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\end{proposition}
+
+\begin{remark}[Narrowest margin]
+\label{rem:narrowest}
+Level~3 has the narrowest stability margin in the hierarchy
+($\stab_3 = 0.0064$ vs.\ $\stab_0 = 1.455$, $\stab_1 = 0.411$,
+$\stab_2 = 0.069$).  This is expected from the time-scale separation:
+governance operates on the slowest time scale (days--weeks), so $\decay_3$ is
+smallest.  The system is most fragile at its highest level --- rapid governance
+changes would violate stability.  This matches the design intent: policy changes
+should be rare and deliberate.
+\end{remark}
+
+\begin{remark}[Executable witnesses]
+\label{rem:witnesses}
+The Rust traits \texttt{RecursiveControlledSystem\textless L\textgreater},
+\texttt{LyapunovCandidate\textless L\textgreater}, and
+\texttt{StabilityBudget} in the \texttt{aios-protocol} crate serve as
+executable witnesses of Definitions~\ref{def:cs}--\ref{def:budget}.  The
+Python tests verify the concrete parameter values in
+Proposition~\ref{prop:governance}.  The agreement between the mathematical
+proof (this document), the Rust types, and the numerical tests constitutes
+a three-layer soundness guarantee.
+\end{remark}
+
+
+% =============================================================================
 % BIBLIOGRAPHY
 % =============================================================================
 \bibliographystyle{plainnat}

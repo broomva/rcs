@@ -18,6 +18,18 @@ unifying control theory, reinforcement learning, and active inference. Extending
 the stability budget of Eslami & Yu (2026) to the recursive case, we derive
 conditions under which the composite multi-level system is exponentially stable.
 
+The self-referential loop is closed      
+                                                                                             
+  Agent reads CLAUDE.md/AGENTS.md (Π₃)                                                     
+    → understands it IS the plant being regulated                                            
+    → operates under stability constraint λ₃ > 0                                             
+    → emits events → fold → HomeostaticState → rules                                         
+    → discovers patterns → conversation log (h₃)                                             
+    → if recurring → crystallizes into AGENTS.md (f₃)                                        
+    → future agents read the updated rules                                                   
+    → THE SYSTEM HAS IMPROVED ITSELF                                                         
+    → and it knows WHY this works (Theorem 1, Proposition 4)
+
 ## Paper Series
 
 | # | Title | Status | Target |

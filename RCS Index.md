@@ -25,6 +25,7 @@ Formal control-theoretic foundation for autonomous AI agents, where the agent it
 
 - [[life-rcs-mapping]] — Life Agent OS → RCS mapping table with Rust types, file paths, line numbers (BRO-704)
 - [[framework-unification]] — Framework unification: Eslami/Ashby/Beer/Active Inference → RCS (BRO-705)
+- [[self-referential-closure]] — Self-referential closure: the RCS paper IS a Level 3 artifact (Proposition 4)
 
 ## Papers
 
