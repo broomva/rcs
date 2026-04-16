@@ -1,0 +1,47 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-latex:
+    name: Build LaTeX
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tectonic
+        uses: wtfjoke/setup-tectonic@v3
+        with:
+          tectonic-version: 0.16.8
+
+      - name: Build article format
+        run: cd latex && tectonic rcs-definitions.tex
+
+      - name: Build IEEE format
+        run: cd latex && tectonic rcs-definitions-ieee.tex
+
+      - name: Upload PDFs
+        uses: actions/upload-artifact@v4
+        with:
+          name: rcs-papers
+          path: latex/*.pdf
+
+  test-proofs:
+    name: Test Proofs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test stability budget
+        run: python3 tests/test_stability_budget.py
+
+      - name: Test Lyapunov simulation
+        run: python3 tests/test_lyapunov_simulation.py
