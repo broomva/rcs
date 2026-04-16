@@ -1,0 +1,95 @@
+% =============================================================================
+% RCS — Shared LaTeX Preamble
+% Used by all papers in the Recursive Controlled Systems series
+% =============================================================================
+
+% --- Math ---
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}              % Bold math symbols
+
+% --- Theorem environments ---
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{assumption}[theorem]{Assumption}
+\newtheorem{law}{Law}
+
+% --- RCS notation macros ---
+
+% Sets and spaces
+\newcommand{\X}{\mathcal{X}}           % State space
+\newcommand{\Y}{\mathcal{Y}}           % Observation space
+\newcommand{\U}{\mathcal{U}}           % Control input space
+\newcommand{\M}{\mathcal{M}}           % Mutation operator set
+\newcommand{\setR}{\mathbb{R}}         % Real numbers
+\newcommand{\setN}{\mathbb{N}}         % Natural numbers
+\newcommand{\setZ}{\mathbb{Z}}         % Integers
+
+% RCS 7-tuple
+\newcommand{\rcs}{\Sigma}              % A Recursive Controlled System
+\newcommand{\plant}{\rcs}              % Alias: plant
+\newcommand{\dyn}{f}                   % Dynamics function
+\newcommand{\obs}{h}                   % Observation map
+\newcommand{\shield}{S}                % Safety shield
+\newcommand{\ctrl}{\Pi}                % Controller
+
+% Levels
+\newcommand{\Li}[1]{L_{#1}}           % Level i: \Li{0}, \Li{1}, etc.
+
+% Stability budget
+\newcommand{\stab}{\lambda}            % Stability margin
+\newcommand{\decay}{\gamma}            % Nominal decay rate
+\newcommand{\adapt}{L_\theta \rho}     % Adaptation cost
+\newcommand{\design}{L_d \eta}         % Design evolution cost
+\newcommand{\delay}{\beta \bar{\tau}}  % Delay cost
+\newcommand{\switch}{\frac{\ln \nu}{\tau_a}} % Switching cost
+
+% Homeostatic drive
+\newcommand{\drive}[1]{D_{#1}}         % Drive at level i: \drive{i}
+\newcommand{\setpoint}[1]{x^*_{#1}}   % Setpoint at level i
+\newcommand{\homostate}{\xi}           % Homeostatic state vector
+
+% Lyapunov
+\newcommand{\lyap}[1]{V_{#1}}         % Lyapunov function at level i
+\newcommand{\dlyap}{\dot{V}}          % Time derivative of V
+
+% EGRI
+\newcommand{\egri}{\Pi_{\text{EGRI}}}  % EGRI meta-controller
+\newcommand{\budget}{B}                % Budget
+\newcommand{\score}{J}                 % Evaluator/score function
+\newcommand{\trial}{\mathcal{T}}       % Trial record
+
+% Agents and information state
+\newcommand{\info}{I}                  % Information state (Eslami)
+\newcommand{\mem}{m}                   % Memory state
+\newcommand{\toolout}{z}               % Tool output
+\newcommand{\interact}{r}              % Interaction signal
+\newcommand{\param}{\theta}            % Adaptable parameters
+\newcommand{\goal}{\zeta}              % Goal descriptor
+\newcommand{\mode}{\sigma}             % Mode/strategy index
+\newcommand{\arch}{c}                  % Architecture/workflow config
+
+% Eslami delays
+\newcommand{\taubar}{\bar{\tau}}       % Supremal total delay
+\newcommand{\tauu}{\tau_u}             % Control computation delay
+\newcommand{\tauth}{\tau_\theta}       % Adaptation update delay
+\newcommand{\tauz}{\tau_z}             % Tool/retrieval delay
+\newcommand{\taus}{\tau_\sigma}        % Switching decision delay
+\newcommand{\tauc}{\tau_c}             % Reconfiguration delay
+\newcommand{\taua}[1][]{\tau_{a\ifx\\#1\\\else,#1\fi}} % Average dwell time: \taua = tau_a, \taua[i] = tau_{a,i}
+
+% Norms
+\newcommand{\norm}[1]{\left\| #1 \right\|}
+\newcommand{\abs}[1]{\left| #1 \right|}
+
+% Operators
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}

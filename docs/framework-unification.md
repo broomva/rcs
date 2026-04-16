@@ -1,0 +1,272 @@
+---
+title: "Framework Unification Table: Eslami / Ashby / Beer / Active Inference → RCS"
+tags:
+  - rcs
+  - control-theory
+  - framework-comparison
+  - unification
+aliases:
+  - RCS Framework Unification
+  - Framework Comparison Table
+created: "2026-04-16"
+updated: "2026-04-16"
+status: draft
+linear: BRO-705
+related:
+  - "[[RCS Index]]"
+  - "[[2026-04-16-rcs-formalization-design]]"
+  - "[[life-rcs-mapping]]"
+---
+
+# Framework Unification Table
+
+**Linear:** BRO-705 (parent: BRO-697)
+**Purpose:** Show that four major frameworks each instantiate the RCS 7-tuple `Σ = (X, Y, U, f, h, S, Π)` as special cases, and identify what RCS adds beyond each.
+
+---
+
+## 1. Master Comparison Table
+
+| RCS Component | Eslami & Yu (2026) | Ashby (1952) | Beer (1972) VSM | Active Inference |
+|---------------|-------------------|--------------|-----------------|------------------|
+| **X** — State | Augmented state `ξ = (x, θ, σ, c, ζ, m)` distributed across L0–L2 | Essential variables (must stay in bounds) | S1 Operations state | Generative model hidden states `μ` |
+| **Y** — Observation | Sensor outputs `y`, reward `r`, tool outputs `z` | Step function outputs (random triggers) | S4 Intelligence (environmental monitoring) | Sensory observations `o` |
+| **U** — Control | Control law `u = π_σ(I; θ, ζ)` parameterized by mode, params, goal | Homeostat dial settings (continuous parameters) | S3 Optimization directives | Actions `a = argmin_a G(π, a)` minimizing expected free energy |
+| **f** — Dynamics | `ẋ = f(x, u, w)` augmented with `θ̇, σ̇, ṁ` | Step function (state jump when essential variables leave bounds) | S1 primary activities (operational dynamics) | Generative process: `x_{t+1} = f(x_t, a_t) + w` |
+| **h** — Observer | Observation `y = h(x)` + memory `ṁ = Φ_m(m, y, z, r)` | Identity (direct observation of essential variables) | S4 Intelligence + S2 Coordination (info aggregation) | Perception: `μ* = argmin_μ F(o, μ)` (minimize prediction error) |
+| **S** — Shield | CBF-QP: `S(u) = argmin ‖u − ũ‖²` s.t. barrier constraints | Implicit: essential variables define viable region (homeostatic bounds) | S5 Policy (identity constraints, purpose) | Prior preferences `p(o)` constrain action space |
+| **Π** — Controller | 5-level hierarchy (L1 reflex → L5 design) | Two-loop: homeostat (inner) + ultrastability (outer) | S3 + S5 recursive viable system | Active inference agent: perception + action loop |
+| **D** — Lyapunov | Theorem 2 stability budget `λ > 0` | Stability = essential variables in bounds (qualitative) | Viability = recursive autonomy (organizational) | Free energy `F = D_{KL}[q(x) ‖ p(x|o)] − ln p(o)` |
+| **Recursion** | Single agent, 5 levels within one entity | Two loops (inner/outer), not explicitly recursive | Explicit: each S1 is itself a viable system | Single level (perception-action at one scale) |
+
+---
+
+## 2. Detailed Framework Analyses
+
+### 2.1 Eslami & Yu (2026) → RCS
+
+**Source:** "A Control-Theoretic Foundation for Agentic Systems," arXiv:2603.10779
+
+**State decomposition:**
+
+| Eslami Variable | RCS Level | RCS Component | Life Implementation |
+|-----------------|-----------|---------------|---------------------|
+| `x` — plant state | L0 | X₀ | External system (microgrid, codebase) |
+| `θ` — controller parameters | L1 | X₁ (part) | Autonomic rule thresholds |
+| `σ` — operating mode | L1 | U₁ (part) | `OperatingMode` enum |
+| `c` — context/goal | L0–L1 | X₁ (part) | Task context, `AgentStateVector.progress` |
+| `ζ` — meta-parameters | L2 | X₂ | EGRI artifact state |
+| `m` — memory | L1 | X₁ | `HomeostaticState` (fold output) |
+
+**Agency hierarchy mapping:**
+
+| Eslami Level | Name | RCS Mapping | Key Mechanism |
+|-------------|------|-------------|---------------|
+| L1 | Reflex | L0 controller (direct response) | Tool call → immediate output |
+| L2 | Modulated reflex | L0 + L1 shield | Autonomic gating constrains reflexes |
+| L3 | Model-based planning | L0 with internal model | LLM as implicit world model |
+| L4 | Parameter adaptation | L1 → L2 boundary | EGRI tunes autonomic parameters |
+| L5 | Architecture design | L2 | EGRI mutates controller structure |
+
+**Stability budget isomorphism:**
+
+| Eslami (Theorem 2, Eq. 51) | RCS (Definition 6, Eq. 8) |
+|---------------------------|--------------------------|
+| `γ` (nominal decay) | `γᵢ` at each level |
+| `L_θ·ρ` (adaptation penalty) | `L_θᵢ·ρᵢ` (L{i+1} tuning Lᵢ) |
+| `L_d·η` (design penalty) | `L_dᵢ·ηᵢ` (L{i+1} redesigning Lᵢ) |
+| `β·τ̄` (delay penalty) | `βᵢ·τ̄ᵢ` (inference/tool/communication) |
+| `(ln ν)/τ_a` (switching penalty) | `(ln νᵢ)/τ_{a,i}` (mode transitions) |
+
+**Hysteresis (Eslami Proposition 2):**
+
+| Eslami | RCS | Life Rust |
+|--------|-----|-----------|
+| State-dependent hysteresis with deadband `h̲` and bound `M̄` | Shield S₁ at Level 1 | `HysteresisGate` { enter_threshold, exit_threshold, min_hold_ms } |
+| Dwell time `τ_h ≥ 2h̲/M̄` | Switching constraint in budget | `min_hold_ms` parameter |
+
+**What RCS adds beyond Eslami:**
+1. **Recursion.** Eslami analyzes a single agent with 5 internal levels. RCS shows the *same* stability budget applies at every level of a recursive hierarchy, including meta-control (EGRI) and governance (bstack) — levels Eslami doesn't model.
+2. **Algebraic vocabulary.** Eslami uses differential equations. RCS adds categorical primitives (Mealy coalgebra, lens, trace, decorated cospan, fixed point) that formalize composition and self-similarity.
+3. **Executable types.** Eslami is purely mathematical. RCS maps every component to Rust types, making the formalism machine-checkable.
+
+---
+
+### 2.2 Ashby (1952) → RCS
+
+**Source:** *Design for a Brain*, Chapman & Hall.
+
+| Ashby Concept | RCS Equivalent | Formalization Gain |
+|---------------|---------------|-------------------|
+| Essential variables | Y₁ (observation at L1) — the variables that must stay in bounds for the organism to survive | Typed as `HomeostaticState` with explicit bounds |
+| Homeostat (inner loop) | Π₁ (L1 controller) — the autonomic rule engine that adjusts behavior to keep essential variables in range | 7 rule modules with formal merge policy |
+| Ultrastability (outer loop) | Π₂ (L2 controller) — EGRI performs random search in parameter space until a stable configuration is found | Budget-bounded with Lyapunov guarantee |
+| Step function | S₁ (L1 shield) — HysteresisGate triggers mode change when essential variables leave bounds | Explicit deadband + dwell time |
+| Requisite Variety | At each level: `|Πᵢ| ≥ |disturbance variety|` — controller variety must match disturbance variety | Formalizable as `Score::Vector` dimensionality vs mutation operator count |
+| Good Regulator Theorem | At each level: Πᵢ contains a model of Xᵢ (the observer) | fold() as sufficient statistic; Proposition 3 (sufficiency) |
+
+**Ashby's two-loop architecture mapped to RCS:**
+
+```
+Ashby                          RCS
+┌─────────────────┐           ┌─────────────────┐
+│ Inner loop:     │           │ Level 1:        │
+│ Homeostat       │──────────▶│ Autonomic Π₁    │
+│ (fast, reflex)  │           │ (evaluate + fold)│
+└────────┬────────┘           └────────┬────────┘
+         │ failure                     │ D₁ not decreasing
+         ▼                             ▼
+┌─────────────────┐           ┌─────────────────┐
+│ Outer loop:     │           │ Level 2:        │
+│ Ultrastability  │──────────▶│ EGRI Π₂         │
+│ (slow, random)  │           │ (propose+select) │
+└─────────────────┘           └─────────────────┘
+```
+
+**What RCS adds beyond Ashby:**
+1. **Quantitative stability conditions.** Ashby's formalism is purely qualitative ("essential variables stay in bounds"). RCS provides the stability budget `λᵢ > 0` with explicit coupling terms.
+2. **Typed interfaces.** Ashby's 7-tuple equivalent is implicit. RCS makes state/observation/control spaces explicit and typed.
+3. **More than two loops.** Ashby has inner (homeostat) and outer (ultrastability). RCS supports arbitrary nesting depth — L0 through L3 in practice, with coupling analysis at each boundary.
+4. **Composition.** Ashby considers single organisms. RCS provides fleet composition via decorated cospans (Section 7 of the design spec).
+
+---
+
+### 2.3 Beer (1972) → RCS
+
+**Source:** *Brain of the Firm*, Allen Lane. Viable System Model (VSM).
+
+| Beer VSM System | RCS Equivalent | Mapping Detail |
+|-----------------|---------------|----------------|
+| **S1** Operations | L0 plant | Primary activities (the work being done) |
+| **S2** Coordination | S₁ shield at L1 | Anti-flapping, conflict resolution between S1 units → `HysteresisGate` |
+| **S3** Optimization | Π₁ controller at L1 | Internal regulation, resource allocation → `evaluate()` + `merge_decisions()` |
+| **S3*** Audit | h₁ observer at L1 | Sporadic investigation → `fold()` with evaluation events |
+| **S4** Intelligence | h₁ + h₃ observers | Environmental monitoring → event stream + audit metrics |
+| **S5** Policy | Π₃ controller at L3 | Identity, purpose, existential rules → `CLAUDE.md` invariants |
+
+**Recursive viability → RCS self-similarity:**
+
+Beer's key insight: each S1 operation is itself a viable system with its own S1–S5. This maps directly to the RCS fixed-point property:
+
+```
+Beer: VSM ≅ {S1: VSM, S2, S3, S4, S5}
+RCS:  RCS ≅ F(RCS) = (X, Y, U, f, h, S, RCS)
+```
+
+Both are recursive structures. The difference is formalization: Beer describes organizational functions, RCS defines mathematical objects with stability guarantees.
+
+**VSM channel mapping:**
+
+| Beer Channel | RCS Data Flow | Life Implementation |
+|-------------|---------------|---------------------|
+| S3–S1 command | U₁ → L0 | `AutonomicGatingProfile` constraining agent behavior |
+| S1–S3 reporting | Y₁ from L0 | `EventKind` stream from agent loop to autonomic |
+| S4–S3 intelligence | Y₃ → Π₂ | Audit metrics informing EGRI mutation strategy |
+| S5–S3 policy | U₃ → L2 | `policy.yaml` setpoints constraining EGRI |
+| S2–S1 coordination | S₁ at L1 | `HysteresisGate` preventing mode flapping between S1 units |
+| Algedonic signal | Emergency escalation | `EgriError::EscalationRequired`, `OperatingMode::AskHuman` |
+
+**What RCS adds beyond Beer:**
+1. **Mathematical formalism.** Beer's model is organizational, not mathematical. RCS provides state-space formalism amenable to stability analysis (`λᵢ > 0`).
+2. **Typed implementation.** VSM is a conceptual model. RCS maps to Rust types, making viability machine-checkable.
+3. **Stability coupling analysis.** Beer doesn't quantify how S3 optimization perturbs S1 operations. RCS captures this via `L_θ₁·ρ₁` (adaptation cost from L2 tuning L1).
+4. **Shield formalization.** Beer's S2 coordination is loosely defined. RCS formalizes it as the safety shield `S` with CBF-QP semantics.
+
+---
+
+### 2.4 Active Inference → RCS
+
+**Sources:** Friston (2009), Baltieri & Buckley (2019), Mineault et al. (2024)
+
+| Active Inference | RCS Equivalent | Mapping Detail |
+|-----------------|---------------|----------------|
+| Free energy `F` | Lyapunov function `D` at each level | Both are scalar functions that decrease → stability |
+| Perception `μ* = argmin_μ F` | Observer `h` | Minimize prediction error → estimate state |
+| Action `a* = argmin_a G(π, a)` | Controller `Π` | Minimize expected free energy → select action |
+| Prior preferences `p(o)` | Setpoints `x*` | Desired observations = desired equilibrium |
+| Generative model `p(o, x)` | System model in `Π` | Internal model of plant dynamics |
+| Prediction error | Homeostatic drive deviation | `D(x) = ‖x − x*‖² > 0` means prediction violated |
+
+**PID-as-Active-Inference (Baltieri & Buckley 2019):**
+
+| PID Component | Active Inference | RCS Level 1 |
+|--------------|-----------------|--------------|
+| Proportional gain `Kp` | Precision on sensory prediction error | Rule threshold magnitude |
+| Integral gain `Ki` | Precision on accumulated error | Economic burn-rate tracking |
+| Derivative gain `Kd` | Precision on rate of change | Error streak rate detection |
+| Setpoint `r` | Prior preference `p(o)` | `x*` in homeostatic drive |
+
+**Triple equivalence (Proposition 1 in LaTeX):**
+
+```
+                    Lyapunov function
+                   ╱
+D(x) = ‖x − x*‖²  ── Reward signal (r = D(xₜ) − D(xₜ₊₁))
+                   ╲
+                    Free energy bound
+```
+
+This is a mathematical identity, not an analogy:
+- **Lyapunov:** `dD/dt < 0 ⟹ stability` (control theory)
+- **Reward:** `r = ΔD > 0 ⟹ reinforcement` (RL, Keramati & Gutkin 2014)
+- **Free energy:** `D ≥ F ⟹ surprise bound` (active inference, Friston 2009)
+
+**Allostasis (predictive regulation):**
+
+| Active Inference | RCS | Life Implementation |
+|-----------------|-----|---------------------|
+| Allostasis: predict future needs, pre-adjust | MPC at L0: receding-horizon optimization | LLM as implicit planner (multi-step reasoning) |
+| Interoceptive inference | L1 self-observation | `fold()` processing internal events |
+| Expected free energy `G` | Anticipated drive reduction | Agent planning to reduce future `D₁` |
+
+**What RCS adds beyond Active Inference:**
+1. **Recursion across levels.** Active inference is fundamentally a single-level framework (perception-action at one scale). RCS shows the same free-energy-minimization structure recurses across L0–L3, with explicit coupling analysis between levels.
+2. **Switched-system stability.** Active inference lacks analysis for mode-switching agents. RCS inherits Eslami's stability budget with switching cost `(ln ν)/τ_a`, covering `OperatingMode` and `EconomicMode` transitions.
+3. **Safety shields.** Active inference has no explicit safety mechanism. RCS formalizes the shield `S` as a CBF-QP that projects unsafe actions to the safe set, with `HysteresisGate` preventing oscillation.
+4. **Meta-control.** Active inference doesn't address who tunes the precision parameters. RCS Level 2 (EGRI) fills this role, with budget-bounded optimization of Level 1 parameters.
+5. **Governance.** Active inference has no governance layer. RCS Level 3 (bstack) constrains what the meta-controller can mutate.
+
+---
+
+## 3. Unified Vocabulary Table
+
+A single RCS concept expressed in each framework's language:
+
+| RCS Concept | Eslami | Ashby | Beer | Active Inference |
+|-------------|--------|-------|------|------------------|
+| Setpoint `x*` | Desired state/goal `ζ` | Essential variable bounds | Policy (S5 purpose) | Prior preference `p(o)` |
+| Homeostatic drive `D` | (implicit in Lyapunov `V`) | Distance from essential bounds | Distance from viability | Free energy `F` |
+| Stability budget `λ` | Theorem 2, Eq. 51 | (qualitative: "stable or not") | (qualitative: "viable or not") | (no equivalent) |
+| Mode switching | Operating mode `σ` with dwell time | Step function trigger | Algedonic signal | (not modeled) |
+| Shield `S` | CBF-QP (Remark 1) | Essential variable bounds (implicit) | S2 Coordination | Prior preferences (soft) |
+| Observer `h` | Memory `ṁ = Φ_m(·)` | Direct observation | S4 Intelligence | Perception `argmin_μ F` |
+| Recursion | 5 levels within one agent | 2 loops (homeostat + ultrastability) | Recursive viable system | Single level |
+| Composition | (single agent) | (single organism) | VSM nesting | (single agent) |
+| Meta-control | L4–L5 (adaptation + design) | Ultrastability (outer loop) | S3 Optimization + S3* Audit | (not modeled) |
+
+---
+
+## 4. What Each Framework Contributes to RCS
+
+| Framework | Key Contribution to RCS | Citation |
+|-----------|------------------------|----------|
+| **Eslami & Yu** | Stability budget equation, switched-system analysis, CBF-QP shields, hysteresis dwell time | arXiv:2603.10779, Theorem 2 |
+| **Ashby** | Requisite variety (controller must match disturbance complexity), ultrastability pattern, good regulator theorem | Design for a Brain (1952) |
+| **Beer** | Recursive viability (each subsystem is itself viable), organizational function decomposition (S1–S5) | Brain of the Firm (1972) |
+| **Active Inference** | Free energy = Lyapunov = reward identity, perception-action duality, precision as gain, allostasis as MPC | Friston (2009), Baltieri & Buckley (2019) |
+| **Keramati & Gutkin** | Homeostatic drive as Lyapunov function that simultaneously serves as reward signal | eLife (2014) |
+| **Quijano et al.** | Population dynamics for multi-agent coordination, passivity-based stability of evolutionary games | IEEE CSM (2017) |
+| **Chacon-Chamorro et al.** | Cooperative resilience metric for fleet performance under disruption | IEEE Trans. AI (2025) |
+
+---
+
+## 5. Gaps and Open Questions
+
+| Gap | Which Frameworks Address It | RCS Status |
+|-----|---------------------------|------------|
+| Self-observation cost | None directly (reflexive monitoring is implicit) | Modeled as `β_self·τ̄_self` in stability budget (Remark 7 in LaTeX) |
+| Compaction bounds | None (rate-distortion for finite context) | Identified (MHE connection, Section 6.2 of design spec) — needs formal bound |
+| Fleet stability | Quijano (passivity), Chacon-Chamorro (resilience metric) | Paper 4 target — RCS composition via decorated cospans |
+| Learning dynamics | Eslami (parameter adaptation), Active Inference (belief updating) | Needs formal treatment of `ρ` dynamics (how fast should L2 adapt?) |
+| Observer design | Active Inference (variational inference), Eslami (memory update) | Current: fold-as-sufficient-statistic. Future: learned observers with uncertainty |
+| Bounded objectives | Mineault et al. (NeuroAI safety), Keramati (homeostatic saturation) | D saturates at 0 — inherent safety against unbounded optimization |

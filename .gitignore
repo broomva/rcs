@@ -1,0 +1,53 @@
+# =============================================================================
+# RCS Research — .gitignore
+# =============================================================================
+
+# --- LaTeX build artifacts ---
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.nav
+*.snm
+*.vrb
+*.dvi
+*.xdv
+
+# Keep compiled PDFs in latex/ (they're the build output we want to share)
+# But ignore PDFs in references/ (those are third-party papers, not ours)
+references/**/*.pdf
+
+# --- Tectonic cache ---
+.tectonic/
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- Editor files ---
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# --- Obsidian ---
+.obsidian/
+
+# --- Secrets / PII ---
+.secrets/
+*.env
+.env.*
+
+# --- Node (if any tooling is added later) ---
+node_modules/
+
+# --- Python (if any tooling is added later) ---
+__pycache__/
+*.pyc
+.venv/

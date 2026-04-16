@@ -1,0 +1,600 @@
+% =============================================================================
+% RCS --- Formal Definitions
+% Recursive Controlled Systems: Core mathematical framework
+% =============================================================================
+\documentclass[11pt,a4paper]{article}
+
+% --- Encoding and fonts ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% --- Language ---
+\usepackage[english]{babel}
+
+% --- Page geometry ---
+\usepackage[margin=2.5cm]{geometry}
+
+% --- Colors (must load before hyperref for color mixing) ---
+\usepackage{xcolor}
+
+% --- Hyperlinks ---
+\usepackage[colorlinks=true,linkcolor=blue!70!black,citecolor=blue!70!black,urlcolor=blue!70!black]{hyperref}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{array}
+
+% --- Paragraph spacing ---
+\usepackage{parskip}
+
+% --- Micro-typography ---
+\usepackage{microtype}
+
+% --- Shared RCS preamble ---
+\input{preamble}
+
+% --- Bibliography ---
+\usepackage[numbers,sort&compress]{natbib}
+
+% =============================================================================
+\title{Recursive Controlled Systems:\\
+Formal Definitions and Core Theorems}
+\author{Carlos D.\ Escobar-Valbuena}
+\date{April 2026 --- Working Draft}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We introduce the \emph{Recursive Controlled System} (RCS), a self-similar
+formalization of autonomous AI agents grounded in control theory.  An RCS is a
+7-tuple $\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$ whose controller
+$\ctrl$ is itself an RCS at the next hierarchical level.  We define the
+homeostatic drive as a Lyapunov candidate unifying stability analysis,
+reinforcement learning, and active inference.  Extending the stability budget
+of Eslami \& Yu~\cite{eslami2026control} to the recursive case, we state
+conditions under which the composite multi-level system is exponentially
+stable.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Preliminaries}
+% =============================================================================
+
+We recall standard definitions from nonlinear systems theory, following
+Khalil~\cite{khalil2002nonlinear} and Liberzon~\cite{liberzon2003switching}.
+
+\begin{definition}[Discrete-time dynamical system]
+A \emph{discrete-time dynamical system} is a triple $(\X, \U, \dyn)$ where
+$\X \subseteq \setR^n$ is the state space, $\U \subseteq \setR^m$ is the
+input space, and $\dyn : \X \times \U \to \X$ is the state transition map:
+\begin{equation}
+  x_{k+1} = \dyn(x_k, u_k).
+\end{equation}
+\end{definition}
+
+\begin{definition}[Lyapunov stability]
+An equilibrium $x^*$ of $x_{k+1} = \dyn(x_k, 0)$ is \emph{exponentially
+stable} if there exist constants $K > 0$ and $0 < \omega < 1$ such that
+\begin{equation}
+  \norm{x_k - x^*} \leq K \, \omega^k \, \norm{x_0 - x^*}
+  \quad \forall\, k \geq 0.
+\end{equation}
+\end{definition}
+
+\begin{definition}[Average dwell time~{\cite{hespanha1999stability}}]
+\label{def:dwell-time}
+A switching signal $\mode(t)$ has \emph{average dwell time} $\taua$ if
+\begin{equation}
+  N_\mode(t, t+T) \leq N_0 + \frac{T}{\taua}
+  \quad \forall\, t \geq 0,\; T \geq 0,
+\end{equation}
+where $N_\mode(t, t+T)$ is the number of switches in $[t, t+T]$.
+\end{definition}
+
+
+% =============================================================================
+\section{Controlled System}
+\label{sec:controlled-system}
+% =============================================================================
+
+\begin{definition}[Controlled System]
+\label{def:cs}
+A \emph{Controlled System} is a 7-tuple
+\begin{equation}
+  \rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)
+\end{equation}
+where:
+\begin{itemize}
+  \item $\X$ is the \emph{state space} --- the set of possible internal states;
+  \item $\Y$ is the \emph{observation space} --- the set of possible measurements;
+  \item $\U$ is the \emph{control input space} --- the set of possible actions;
+  \item $\dyn : \X \times \U \to \X$ is the \emph{dynamics} --- the state
+        transition function;
+  \item $\obs : \X \to \Y$ is the \emph{observation map} --- how state becomes
+        measurement;
+  \item $\shield : \U \times \X \to \U$ is the \emph{safety shield} --- a map
+        that filters any proposed control input to a safe one:
+        \begin{equation}
+          u_{\text{safe}} = \shield(\tilde{u}, x)
+          = \argmin_{u \in \U_{\text{safe}}(x)} \norm{u - \tilde{u}}^2;
+        \end{equation}
+  \item $\ctrl : \Y^* \to \U$ is the \emph{controller} --- a map from
+        observation histories to control inputs.
+\end{itemize}
+
+Here $\Y^* = \bigcup_{k=0}^{\infty} \Y^k$ denotes the set of finite
+observation sequences.  In practice, $\ctrl$ maintains internal state --- this
+is formalized in the recursive definition below.
+\end{definition}
+
+\begin{remark}[Shield as CBF-QP]
+When $\U_{\text{safe}}(x) = \{u \in \U : \nabla_x h(x) \cdot \dyn(x, u)
++ \alpha(h(x)) \geq 0\}$ for a control barrier function $h : \X \to \setR$
+with class-$\mathcal{K}$ function $\alpha$, the shield reduces to the
+standard CBF-QP formulation~\cite{eslami2026control}.
+\end{remark}
+
+
+% =============================================================================
+\section{Recursive Controlled System}
+\label{sec:rcs}
+% =============================================================================
+
+\begin{definition}[Recursive Controlled System]
+\label{def:rcs}
+A \emph{Recursive Controlled System} (RCS) is a Controlled System
+$\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$ where the controller
+$\ctrl$ is itself a Controlled System at the next hierarchical level:
+\begin{equation}
+  \ctrl = \rcs' = (\X', \Y', \U', \dyn', \obs', \shield', \ctrl').
+\end{equation}
+
+This produces a hierarchy of levels $\Li{0}, \Li{1}, \Li{2}, \ldots$ where:
+\begin{enumerate}
+  \item Level $\Li{i}$ is a Controlled System whose controller is $\Li{i+1}$.
+  \item The state $\X_{i+1}$ includes the parameters and configuration of
+        $\Li{i}$'s controller.
+  \item The observation $\Y_{i+1}$ is derived from the performance metrics of
+        $\Li{i}$.
+  \item The control output $\U_{i+1}$ modifies the behavior of $\Li{i}$.
+\end{enumerate}
+
+We write $\rcs_i = (\X_i, \Y_i, \U_i, \dyn_i, \obs_i, \shield_i, \ctrl_i)$
+for the Controlled System at level $\Li{i}$.
+\end{definition}
+
+\begin{remark}[Self-similarity as fixed point]
+The RCS hierarchy is a fixed point of the endofunctor
+$F(\ctrl) = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$:
+\begin{equation}
+  \text{RCS} \cong F(\text{RCS}).
+\end{equation}
+The initial algebra gives a \emph{finite} hierarchy (in practice, four levels
+suffice).  The final coalgebra gives the infinite hierarchy~--- the limit of
+all possible nesting depths.
+\end{remark}
+
+
+% =============================================================================
+\section{Homeostatic Drive as Lyapunov Function}
+\label{sec:drive}
+% =============================================================================
+
+\begin{definition}[Homeostatic drive]
+\label{def:drive}
+At each level $\Li{i}$, the \emph{homeostatic drive} is:
+\begin{equation}
+  \drive{i}(x) = \norm{x - \setpoint{i}}^2, \quad x \in \X_i,
+\end{equation}
+where $\setpoint{i} \in \X_i$ is the \emph{setpoint} (desired equilibrium) at
+level $i$.
+\end{definition}
+
+\begin{proposition}[Triple equivalence]
+\label{prop:triple}
+Under appropriate mappings, $\drive{i}$ serves simultaneously as:
+\begin{enumerate}
+  \item \textbf{Lyapunov function:} If $\drive{i}(x_{k+1}) < \drive{i}(x_k)$
+        for all $x_k \neq \setpoint{i}$, then $\setpoint{i}$ is asymptotically
+        stable.
+  \item \textbf{Reward signal:} The reward at time $k$ is the drive reduction
+        $r_k = \drive{i}(x_k) - \drive{i}(x_{k+1})$, recovering homeostatic
+        reinforcement learning~\cite{keramati2014homeostatic}.
+  \item \textbf{Free energy bound:} Under a linear generative model with
+        prior preferences at $\setpoint{i}$, $\drive{i}$ upper-bounds the
+        variational free energy, recovering active
+        inference~\cite{friston2009reinforcement, baltieri2019pid}.
+\end{enumerate}
+\end{proposition}
+
+\begin{remark}[Bounded objectives and safety]
+Unlike unbounded reward maximization, the homeostatic drive saturates at
+$\drive{i}(\setpoint{i}) = 0$.  Once equilibrium is reached, there is no
+incentive to acquire additional resources, providing inherent safety
+guarantees against catastrophic optimization~\cite{mineault2024neuroai}.
+\end{remark}
+
+
+% =============================================================================
+\section{Recursive Stability Budget}
+\label{sec:stability}
+% =============================================================================
+
+We extend the stability budget of Eslami \& Yu~\cite{eslami2026control}
+(Theorem~2) to the recursive setting.
+
+\begin{assumption}[Per-level Lyapunov functions]
+\label{ass:per-level}
+For each level $\Li{i}$, there exists a continuously differentiable Lyapunov
+function $\lyap{i} : \X_i \to \setR_{\geq 0}$ and constants
+$\underline{\alpha}_i, \bar{\alpha}_i > 0$ such that:
+\begin{equation}
+  \underline{\alpha}_i \norm{x}^2
+  \leq \lyap{i}(x)
+  \leq \bar{\alpha}_i \norm{x}^2
+  \quad \forall\, x \in \X_i.
+\end{equation}
+\end{assumption}
+
+\begin{assumption}[Frozen decay]
+\label{ass:decay}
+Along any flow interval in which all higher-level variables are held constant,
+the dynamics at level $\Li{i}$ satisfy:
+\begin{equation}
+  \lyap{i}(x_{k+1}) - \lyap{i}(x_k) \leq -\decay_i \, \lyap{i}(x_k)
+\end{equation}
+for some $\decay_i > 0$.
+\end{assumption}
+
+\begin{assumption}[Adaptation sensitivity]
+\label{ass:adapt}
+There exist constants $L_{\param,i}, \rho_i \geq 0$ such that the perturbation
+from level $\Li{i+1}$ adjusting parameters $\param_i$ satisfies:
+\begin{equation}
+  \abs{\frac{\partial \lyap{i}}{\partial \param} \cdot \dot{\param}_i}
+  \leq L_{\param,i} \, \rho_i \, \lyap{i}(x_k),
+  \quad
+  \norm{\dot{\param}_i} \leq \rho_i.
+\end{equation}
+\end{assumption}
+
+\begin{assumption}[Design evolution sensitivity]
+\label{ass:design}
+There exist constants $L_{d,i}, \eta_i \geq 0$ such that the perturbation from
+level $\Li{i+1}$ changing architecture/design variables $d_i$ satisfies:
+\begin{equation}
+  \abs{\frac{\partial \lyap{i}}{\partial d} \cdot \dot{d}_i}
+  \leq L_{d,i} \, \eta_i \, \lyap{i}(x_k),
+  \quad
+  \norm{\dot{d}_i} \leq \eta_i.
+\end{equation}
+\end{assumption}
+
+\begin{assumption}[Delay penalty]
+\label{ass:delay}
+The total effective delay $\tau_{\text{tot},i} \leq \taubar_i$ introduces a
+Lyapunov decrease penalty bounded by:
+\begin{equation}
+  \Delta_\tau \lyap{i} \leq \beta_i \, \taubar_i \, \lyap{i}(x_k)
+\end{equation}
+for some $\beta_i \geq 0$.
+\end{assumption}
+
+\begin{assumption}[Jump comparability]
+\label{ass:jump}
+At each mode-switching instant at level $\Li{i}$, there exists $\nu_i \geq 1$
+such that:
+\begin{equation}
+  \lyap{i}(x_k^+) \leq \nu_i \, \lyap{i}(x_k^-).
+\end{equation}
+\end{assumption}
+
+\begin{definition}[Stability budget at level $\Li{i}$]
+\label{def:budget}
+The \emph{stability budget} at level $\Li{i}$ is:
+\begin{equation}
+  \boxed{
+  \stab_i
+  = \decay_i
+  - L_{\param,i} \, \rho_i
+  - L_{d,i} \, \eta_i
+  - \beta_i \, \taubar_i
+  - \frac{\ln \nu_i}{\taua[i]}
+  }
+  \label{eq:budget}
+\end{equation}
+where:
+\begin{center}
+\begin{tabular}{@{}cll@{}}
+  \toprule
+  \textbf{Term} & \textbf{Name} & \textbf{Source} \\
+  \midrule
+  $\decay_i$ & Nominal decay rate & Plant dynamics at level $i$ \\
+  $L_{\param,i} \rho_i$ & Adaptation cost & Level $i{+}1$ tuning level $i$ parameters \\
+  $L_{d,i} \eta_i$ & Design cost & Level $i{+}1$ changing level $i$ architecture \\
+  $\beta_i \taubar_i$ & Delay cost & Inference, tool, communication latency \\
+  $\frac{\ln \nu_i}{\taua[i]}$ & Switching cost & Mode transitions at level $i$ \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\end{definition}
+
+\begin{theorem}[Recursive stability]
+\label{thm:recursive}
+Consider a finite RCS hierarchy $\rcs_0, \rcs_1, \ldots, \rcs_N$.  Suppose
+Assumptions~\ref{ass:per-level}--\ref{ass:jump} hold at every level, and
+suppose a \emph{time-scale separation} condition holds: level $\Li{i+1}$
+operates at least an order of magnitude slower than level $\Li{i}$.
+
+If the stability budget is positive at every level:
+\begin{equation}
+  \stab_i > 0 \quad \forall\, i \in \{0, 1, \ldots, N\},
+  \label{eq:stability-condition}
+\end{equation}
+then there exist constants $K > 0$ and $\omega > 0$ such that the composite
+state $\chi = (x_0, x_1, \ldots, x_N)$ satisfies:
+\begin{equation}
+  \norm{\chi(t)} \leq K \, e^{-\omega t} \, \norm{\chi(0)}.
+\end{equation}
+That is, the composite system is \emph{exponentially stable}.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By time-scale separation, the singular perturbation argument applies: each
+level sees levels above it as quasi-static parameters and levels below it as
+fast inner loops that have already converged.
+
+At each level $\Li{i}$, the Lyapunov derivative satisfies:
+\begin{align}
+  \Delta \lyap{i}
+  &= \underbrace{-\decay_i \lyap{i}}_{\text{frozen decay}}
+  + \underbrace{L_{\param,i} \rho_i \lyap{i}}_{\text{adaptation}}
+  + \underbrace{L_{d,i} \eta_i \lyap{i}}_{\text{design}}
+  + \underbrace{\beta_i \taubar_i \lyap{i}}_{\text{delay}} \\
+  &= -\left(\decay_i - L_{\param,i}\rho_i - L_{d,i}\eta_i
+  - \beta_i \taubar_i\right) \lyap{i} \\
+  &= -(\stab_i + \tfrac{\ln\nu_i}{\taua[i]}) \, \lyap{i}.
+\end{align}
+
+Combining flow decay and jump growth (factor $\nu_i$ at each switch)
+over interval $[0, T]$:
+\begin{equation}
+  \lyap{i}(T) \leq \nu_i^{N_0}
+  \exp\!\left(-\left(\stab_i + \tfrac{\ln\nu_i}{\taua[i]}
+  - \tfrac{\ln\nu_i}{\taua[i]}\right) T\right) \lyap{i}(0)
+  = \nu_i^{N_0} e^{-\stab_i T} \lyap{i}(0).
+\end{equation}
+
+Under~\eqref{eq:stability-condition}, $\stab_i > 0$, giving exponential
+decay at each level.  The composite Lyapunov function
+$V = \sum_{i=0}^{N} \alpha_i \lyap{i}$ inherits exponential decay with rate
+$\omega = \min_i \stab_i > 0$.  Full proof via Tikhonov's theorem for
+singularly perturbed systems applied level-by-level.
+\end{proof}
+
+
+% =============================================================================
+\section{Self-Similar Hierarchy}
+\label{sec:self-similar}
+% =============================================================================
+
+\begin{definition}[RCS endofunctor]
+\label{def:endofunctor}
+Let $\mathbf{CS}$ be the category of Controlled Systems with morphisms given
+by simulation relations.  The \emph{RCS endofunctor}
+$F : \mathbf{CS} \to \mathbf{CS}$ acts on objects as:
+\begin{equation}
+  F(\ctrl) = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)
+\end{equation}
+and on morphisms by composition with the controller embedding.
+
+A \emph{Recursive Controlled System} is a fixed point of $F$:
+\begin{equation}
+  \text{RCS} \cong F(\text{RCS}).
+\end{equation}
+\end{definition}
+
+\begin{definition}[Mealy coalgebra representation]
+\label{def:mealy}
+Each level $\Li{i}$ of an RCS is equivalently described as a \emph{Mealy
+coalgebra}:
+\begin{equation}
+  \delta_i : \X_i \to (\Y_i \to \U_i \times \X_i),
+\end{equation}
+where $\delta_i(x)(y) = (u, x')$ produces a control output $u$ and a
+successor state $x'$ given current state $x$ and observation $y$.
+
+The fold operation (deterministic reducer) over an event stream
+$y_0, y_1, \ldots$ is the unique coalgebra homomorphism to the final
+coalgebra, classifying the agent's behavior up to bisimulation.
+\end{definition}
+
+\begin{definition}[Observer-controller lens]
+\label{def:lens}
+The interface between a plant and its controller at each level is a
+\emph{lens}:
+\begin{equation}
+  \ell_i = (\text{get}_i, \text{put}_i)
+  = (\obs_i : \X_i \to \Y_i, \quad
+     \text{apply}_i : \U_i \times \X_i \to \X_i).
+\end{equation}
+The lens laws (get-put, put-get) formalize the requirement that observation
+and control are consistent:
+\begin{align}
+  \text{put}(\text{get}(x), x) &= x
+  & &\text{(get-put: no-op control preserves state)} \\
+  \text{get}(\text{put}(u, x)) &= \obs(\dyn(x, u))
+  & &\text{(put-get: effect is observable)}
+\end{align}
+\end{definition}
+
+
+% =============================================================================
+\section{EGRI as Level~2 Meta-Controller}
+\label{sec:egri}
+% =============================================================================
+
+\begin{definition}[EGRI 9-tuple as $\rcs_2$]
+\label{def:egri}
+The Evaluator-Governed Recursive Improvement (EGRI) framework instantiates
+$\rcs_2$ with:
+\begin{equation}
+  \rcs_2 = (\X_2, \Y_2, \U_2, \dyn_2, \obs_2, \shield_2, \ctrl_2)
+\end{equation}
+where:
+\begin{center}
+\begin{tabular}{@{}cll@{}}
+  \toprule
+  \textbf{RCS} & \textbf{EGRI} & \textbf{Meaning} \\
+  \midrule
+  $\X_2$ & Artifact state space $X$ & Controller parameters, architecture \\
+  $\Y_2$ & Outcome $(\score, C)$ & Score vector + constraint satisfaction \\
+  $\U_2$ & Mutation operators $\M$ & Proposed changes to $\X_2$ \\
+  $\dyn_2$ & Trial execution & propose $\to$ execute $\to$ evaluate $\to$ select \\
+  $\obs_2$ & Evaluator $\score$ & $\score : \text{traces} \to \setR^d$ \\
+  $\shield_2$ & Budget $+$ rollback $+$ immutable evaluator & Laws 3, 4, 5 \\
+  $\ctrl_2$ & Proposer $+$ selector & Mutation strategy \\
+  \bottomrule
+\end{tabular}
+\end{center}
+\end{definition}
+
+\begin{law}[Evaluator supremacy]
+An optimization loop is only as safe as the evaluator that governs it.
+\end{law}
+
+\begin{law}[Mutation-evaluation proportionality]
+Do not grant an agent more mutation freedom than its evaluator can reliably
+judge.  Formally: $\abs{\M} \leq \text{capacity}(\score)$ (Ashby's Law of
+Requisite Variety~\cite{ashby1956introduction}).
+\end{law}
+
+\begin{law}[Immutability of the evaluator]
+Never mutate evaluator and artifact in the same trial.  This preserves the
+separation principle: the observer ($\score$) is independent of the plant
+($\X_2$).
+\end{law}
+
+\begin{law}[Budget closure]
+The loop must fail closed when budget is exhausted.  Formally, the budget
+$\budget(t)$ is a Lyapunov function:
+\begin{equation}
+  \budget(t_{k+1}) < \budget(t_k)
+  \quad \text{and} \quad
+  \budget(t_k) = 0 \implies \text{halt}.
+\end{equation}
+\end{law}
+
+\begin{law}[Rollback guarantee]
+Every promoted state must be recoverable.  The set of promoted states forms
+a forward-invariant set under the rollback operation.
+\end{law}
+
+\begin{proposition}[EGRI stability coupling]
+\label{prop:egri-coupling}
+When EGRI ($\rcs_2$) mutates the parameters of the autonomic controller
+($\rcs_1$), the perturbation enters the Level~1 stability budget
+via the design evolution term $L_{d,1} \, \eta_1$, where
+$\eta_1 = \sup_k \norm{\Delta \param_{1,k}}$ is the maximum per-trial
+parameter change.
+
+For $\stab_1 > 0$ to hold, the EGRI mutation magnitude must satisfy:
+\begin{equation}
+  \eta_1 < \frac{\decay_1 - L_{\param,1}\rho_1 - \beta_1\taubar_1
+  - \frac{\ln\nu_1}{\taua[1]}}{L_{d,1}}.
+\end{equation}
+\end{proposition}
+
+
+% =============================================================================
+\section{Observer: Fold as Sufficient Statistic}
+\label{sec:observer}
+% =============================================================================
+
+\begin{definition}[Fold observer]
+\label{def:fold}
+At level $\Li{1}$, the \emph{fold observer} is a deterministic reducer over
+the event stream:
+\begin{equation}
+  \homostate_{k+1} = \text{fold}(\homostate_k, y_k),
+\end{equation}
+where $\homostate \in \X_1$ is the homeostatic state and $y_k \in \Y_1$ is
+the $k$-th event.  This is a Mealy machine with state $\homostate$ and no
+autonomous dynamics between events (equivalently, a Luenberger observer with
+$A = I$ and full gain on measurements).
+\end{definition}
+
+\begin{proposition}[Sufficiency]
+\label{prop:sufficient}
+If the controller $\ctrl_1$ at level $\Li{1}$ depends on the event history
+$y_0, \ldots, y_k$ only through $\homostate_k$:
+\begin{equation}
+  \ctrl_1(y_0, \ldots, y_k) = \ctrl_1(\homostate_k),
+\end{equation}
+then $\homostate_k$ is a \emph{sufficient statistic} for regulation decisions
+at level $\Li{1}$ with respect to the observation history.
+\end{proposition}
+
+\begin{remark}[Self-observation cost]
+The agent measuring its own state consumes resources (tokens, context window
+space), introducing a reflexive delay $\taubar_{\text{self}}$ that enters the
+stability budget at level $\Li{1}$:
+\begin{equation}
+  \stab_1 = \decay_1 - L_{\param,1}\rho_1 - L_{d,1}\eta_1
+  - \beta_1(\taubar_1 + \taubar_{\text{self}})
+  - \frac{\ln\nu_1}{\taua[1]}.
+\end{equation}
+The hysteresis gate (deadband between activation and deactivation thresholds
+with minimum dwell time) prevents self-referential oscillation by ensuring
+small perturbations from introspection do not trigger state transitions.
+\end{remark}
+
+
+% =============================================================================
+\section{Multi-Agent Extension}
+\label{sec:fleet}
+% =============================================================================
+
+\begin{definition}[Fleet RCS]
+\label{def:fleet}
+A \emph{fleet} of $N$ agents is a composition of RCS instances sharing a
+communication graph $G = (V, E)$:
+\begin{equation}
+  \rcs_{\text{fleet}} = \bigotimes_{G} \rcs^{(j)},
+  \quad j = 1, \ldots, N,
+\end{equation}
+where $\otimes_G$ denotes composition with information exchange along edges
+of $G$.  Each $\rcs^{(j)}$ is a full RCS hierarchy ($\Li{0}$ through
+$\Li{3}$); the fleet adds a coordination layer governed by population
+dynamics~\cite{quijano2017population}.
+\end{definition}
+
+\begin{definition}[Cooperative resilience~{\cite{chacon2025cooperative}}]
+\label{def:resilience}
+The \emph{cooperative resilience score} for variable $j$ under disruption $l$
+is:
+\begin{equation}
+  J_{jl} = \frac{t_i + F_{jl} \cdot \Delta t_f + G_{jl} \cdot \Delta t_r}
+  {t_i + \Delta t_f + \Delta t_r},
+\end{equation}
+where $F_{jl}$ and $G_{jl}$ are the failure and recovery profile integrals
+respectively.  Fleet resilience is the \emph{harmonic mean} across all
+variables, penalizing worst-case degradation:
+\begin{equation}
+  J_{\text{fleet}} = \left(\frac{1}{K} \sum_{j=1}^{K} J_j^{-1}\right)^{-1}.
+\end{equation}
+\end{definition}
+
+
+% =============================================================================
+% BIBLIOGRAPHY
+% =============================================================================
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}
