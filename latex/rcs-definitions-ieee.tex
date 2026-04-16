@@ -1,0 +1,351 @@
+% =============================================================================
+% RCS --- Formal Definitions (IEEE Conference Format)
+% Recursive Controlled Systems: Core mathematical framework
+% Compile: tectonic rcs-definitions-ieee.tex
+% =============================================================================
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% --- Encoding and fonts ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+% --- Colors (must load before hyperref) ---
+\usepackage{xcolor}
+
+% --- Hyperlinks ---
+\usepackage[colorlinks=true,linkcolor=blue!70!black,citecolor=blue!70!black,urlcolor=blue!70!black]{hyperref}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{array}
+
+% --- Micro-typography ---
+\usepackage{microtype}
+
+% --- Algorithms (if needed later) ---
+\usepackage{cite}
+
+% --- Shared RCS preamble (math, theorems, macros) ---
+\input{preamble}
+
+% =============================================================================
+\title{Recursive Controlled Systems:\\
+A Self-Similar Formalization for\\Autonomous AI Agents}
+
+\author{
+  \IEEEauthorblockN{Carlos D. Escobar-Valbuena}
+  \IEEEauthorblockA{
+    Maestr\'ia en Inteligencia Artificial (MAIA)\\
+    Universidad de los Andes\\
+    Bogot\'a, Colombia\\
+    carlosdavidescobar@gmail.com
+  }
+}
+
+% =============================================================================
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We introduce the Recursive Controlled System (RCS), a self-similar
+formalization of autonomous AI agents grounded in control theory.  An RCS is a
+7-tuple $\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$ whose controller
+$\ctrl$ is itself an RCS at the next hierarchical level.  We define the
+homeostatic drive as a Lyapunov candidate unifying stability analysis,
+reinforcement learning, and active inference.  Extending the stability budget
+of Eslami \& Yu~\cite{eslami2026control} to the recursive case, we state
+conditions under which the composite multi-level system is exponentially
+stable.  The formalization subsumes four major frameworks---Eslami's
+agency hierarchy, Ashby's ultrastability, Beer's Viable System Model,
+and active inference---under a single recursive definition with quantitative
+stability conditions.
+\end{abstract}
+
+\begin{IEEEkeywords}
+  control systems, Lyapunov stability, multi-agent systems, autonomous agents,
+  homeostatic regulation, switched systems, AI safety
+\end{IEEEkeywords}
+
+% =============================================================================
+\section{Introduction}
+% =============================================================================
+
+Autonomous AI agents increasingly operate as controllers of complex systems,
+from energy microgrids to software infrastructure.  Yet the agent itself---its
+internal state, cognitive resources, and economic constraints---is a dynamical
+system that must also be regulated.  This creates a recursive structure: the
+agent controls a plant, a regulator controls the agent, an optimizer tunes the
+regulator, and a governance layer constrains the optimizer.
+
+We formalize this structure as a \emph{Recursive Controlled System} (RCS): a
+7-tuple $\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$ whose controller
+$\ctrl$ is itself an RCS at the next hierarchical level.  The same
+state-space formalism---state, observation, control, dynamics, safety shield,
+controller---applies at every level, producing a self-similar hierarchy.
+
+Our main contributions are:
+\begin{enumerate}
+  \item The RCS definition with self-similar recursion (Section~\ref{sec:rcs}).
+  \item The homeostatic drive as a unified Lyapunov function, reward signal,
+        and free energy bound (Section~\ref{sec:drive}).
+  \item A recursive stability budget extending Eslami \& Yu's
+        Theorem~2~\cite{eslami2026control} to multi-level hierarchies
+        (Section~\ref{sec:stability}).
+  \item The EGRI meta-controller formalized as Level~2 of the hierarchy,
+        with Five Laws mapped to stability conditions
+        (Section~\ref{sec:egri}).
+\end{enumerate}
+
+% =============================================================================
+\section{Preliminaries}
+\label{sec:prelim}
+% =============================================================================
+
+We recall standard definitions following
+Khalil~\cite{khalil2002nonlinear} and
+Liberzon~\cite{liberzon2003switching}.
+
+\begin{definition}[Discrete-time dynamical system]
+A \emph{discrete-time dynamical system} is a triple $(\X, \U, \dyn)$ where
+$\X \subseteq \setR^n$, $\U \subseteq \setR^m$, and
+$\dyn : \X \times \U \to \X$:
+\begin{equation}
+  x_{k+1} = \dyn(x_k, u_k).
+\end{equation}
+\end{definition}
+
+\begin{definition}[Average dwell time~{\cite{hespanha1999stability}}]
+\label{def:dwell-time}
+A switching signal $\mode(t)$ has \emph{average dwell time} $\taua$ if
+$N_\mode(t, t{+}T) \leq N_0 + T/\taua$ for all $t, T \geq 0$.
+\end{definition}
+
+% =============================================================================
+\section{Controlled System}
+\label{sec:controlled-system}
+% =============================================================================
+
+\begin{definition}[Controlled System]
+\label{def:cs}
+A \emph{Controlled System} is a 7-tuple
+$\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$
+where $\X$ is the state space, $\Y$ the observation space, $\U$ the
+control input space, $\dyn : \X \times \U \to \X$ the dynamics,
+$\obs : \X \to \Y$ the observation map, $\shield : \U \times \X \to \U$
+the safety shield, and $\ctrl : \Y^* \to \U$ the controller.
+
+The shield filters unsafe actions via:
+\begin{equation}
+  u_{\text{safe}} = \shield(\tilde{u}, x)
+  = \argmin_{u \in \U_{\text{safe}}(x)} \norm{u - \tilde{u}}^2.
+\end{equation}
+\end{definition}
+
+% =============================================================================
+\section{Recursive Controlled System}
+\label{sec:rcs}
+% =============================================================================
+
+\begin{definition}[Recursive Controlled System]
+\label{def:rcs}
+A \emph{Recursive Controlled System} (RCS) is a Controlled System
+$\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$ where
+$\ctrl = \rcs' = (\X', \Y', \U', \dyn', \obs', \shield', \ctrl')$.
+
+This produces a hierarchy $\Li{0}, \Li{1}, \Li{2}, \ldots$ where level
+$\Li{i}$ has controller $\Li{i+1}$, state $\X_{i+1}$ includes the
+parameters of $\Li{i}$'s controller, observation $\Y_{i+1}$ derives from
+$\Li{i}$'s performance, and control $\U_{i+1}$ modifies $\Li{i}$'s behavior.
+The hierarchy is a fixed point: $\text{RCS} \cong F(\text{RCS})$.
+\end{definition}
+
+% =============================================================================
+\section{Homeostatic Drive as Lyapunov Function}
+\label{sec:drive}
+% =============================================================================
+
+\begin{definition}[Homeostatic drive]
+\label{def:drive}
+At level $\Li{i}$, the \emph{homeostatic drive} is
+$\drive{i}(x) = \norm{x - \setpoint{i}}^2$,
+where $\setpoint{i}$ is the setpoint at level $i$.
+\end{definition}
+
+\begin{proposition}[Triple equivalence]
+\label{prop:triple}
+Under appropriate mappings, $\drive{i}$ serves simultaneously as:
+(1)~a \textbf{Lyapunov function} certifying asymptotic stability;
+(2)~a \textbf{reward signal} via drive reduction $r_k = \drive{i}(x_k) -
+\drive{i}(x_{k+1})$~\cite{keramati2014homeostatic};
+(3)~a \textbf{free energy bound} under linear generative
+models~\cite{baltieri2019pid, friston2009reinforcement}.
+\end{proposition}
+
+Unlike unbounded reward maximization, $\drive{i}$ saturates at
+$\drive{i}(\setpoint{i}) = 0$, providing inherent safety
+guarantees~\cite{mineault2024neuroai}.
+
+% =============================================================================
+\section{Recursive Stability Budget}
+\label{sec:stability}
+% =============================================================================
+
+We extend Eslami \& Yu's stability budget~\cite{eslami2026control} to the
+recursive case.
+
+\begin{assumption}[Per-level Lyapunov functions]
+\label{ass:per-level}
+For each $\Li{i}$, there exists $\lyap{i} : \X_i \to \setR_{\geq 0}$ with
+$\underline{\alpha}_i \norm{x}^2 \leq \lyap{i}(x)
+\leq \bar{\alpha}_i \norm{x}^2$.
+\end{assumption}
+
+\begin{assumption}[Frozen decay]
+\label{ass:decay}
+With higher-level variables held constant:
+$\lyap{i}(x_{k+1}) - \lyap{i}(x_k) \leq -\decay_i \lyap{i}(x_k)$
+for some $\decay_i > 0$.
+\end{assumption}
+
+\begin{assumption}[Coupling bounds]
+\label{ass:coupling}
+Adaptation: $|\partial \lyap{i}/\partial\param \cdot \dot\param_i|
+\leq L_{\param,i}\rho_i\lyap{i}$.
+Design: $|\partial \lyap{i}/\partial d \cdot \dot d_i|
+\leq L_{d,i}\eta_i\lyap{i}$.
+Delay: $\Delta_\tau \lyap{i} \leq \beta_i\taubar_i\lyap{i}$.
+Jumps: $\lyap{i}(x_k^+) \leq \nu_i\lyap{i}(x_k^-)$.
+\end{assumption}
+
+\begin{definition}[Stability budget]
+\label{def:budget}
+The \emph{stability budget} at level $\Li{i}$ is:
+\begin{equation}
+  \boxed{
+  \stab_i = \decay_i - L_{\param,i}\rho_i - L_{d,i}\eta_i
+  - \beta_i\taubar_i - \frac{\ln\nu_i}{\taua[i]}
+  }
+  \label{eq:budget}
+\end{equation}
+\end{definition}
+
+\begin{theorem}[Recursive stability]
+\label{thm:recursive}
+Consider an RCS hierarchy $\rcs_0, \ldots, \rcs_N$ satisfying
+Assumptions~\ref{ass:per-level}--\ref{ass:coupling} with time-scale
+separation between levels.  If $\stab_i > 0$ for all $i$,
+then the composite state $\chi = (x_0, \ldots, x_N)$ converges
+exponentially:
+\begin{equation}
+  \norm{\chi(t)} \leq K e^{-\omega t} \norm{\chi(0)},
+  \quad \omega = \min_i \stab_i.
+\end{equation}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By singular perturbation, each level sees higher levels as quasi-static.
+The per-level Lyapunov derivative is
+$\Delta\lyap{i} \leq -(\stab_i + \ln\nu_i/\taua[i])\lyap{i}$.
+Combining with jump growth and applying the average dwell-time
+condition~\cite{hespanha1999stability} yields
+$\lyap{i}(T) \leq \nu_i^{N_0} e^{-\stab_i T}\lyap{i}(0)$.
+The composite $V = \sum_i \alpha_i\lyap{i}$ decays at rate
+$\omega = \min_i \stab_i$.
+\end{proof}
+
+% =============================================================================
+\section{EGRI as Level~2 Meta-Controller}
+\label{sec:egri}
+% =============================================================================
+
+The Evaluator-Governed Recursive Improvement (EGRI) framework instantiates
+$\rcs_2$ with artifact state as $\X_2$, evaluator scores as $\Y_2$, mutation
+operators as $\U_2$, and budget closure + rollback as $\shield_2$.
+
+Five laws govern safe meta-control:
+\begin{law}[Evaluator supremacy]
+Loop safety $\leq$ evaluator quality.
+\end{law}
+\begin{law}[Mutation-evaluation proportionality]
+$|\M| \leq \text{capacity}(\score)$ (Ashby~\cite{ashby1956introduction}).
+\end{law}
+\begin{law}[Evaluator immutability]
+Never mutate evaluator and artifact in the same trial.
+\end{law}
+\begin{law}[Budget closure]
+$\budget(t_{k+1}) < \budget(t_k)$; $\budget = 0 \Rightarrow$ halt.
+\end{law}
+\begin{law}[Rollback guarantee]
+Promoted states form a forward-invariant set.
+\end{law}
+
+\begin{proposition}[EGRI--stability coupling]
+For $\stab_1 > 0$, the EGRI mutation magnitude must satisfy:
+\begin{equation}
+  \eta_1 < \frac{\decay_1 - L_{\param,1}\rho_1 - \beta_1\taubar_1
+  - \ln\nu_1/\taua[1]}{L_{d,1}}.
+\end{equation}
+\end{proposition}
+
+% =============================================================================
+\section{Observer: Fold as Sufficient Statistic}
+\label{sec:observer}
+% =============================================================================
+
+\begin{definition}[Fold observer]
+At level $\Li{1}$, the \emph{fold observer} computes
+$\homostate_{k+1} = \text{fold}(\homostate_k, y_k)$---a Mealy machine
+equivalent to a Luenberger observer with $A = I$.
+\end{definition}
+
+\begin{proposition}[Sufficiency]
+If $\ctrl_1(y_0, \ldots, y_k) = \ctrl_1(\homostate_k)$, then $\homostate_k$
+is a sufficient statistic for regulation decisions.
+\end{proposition}
+
+Self-observation consumes resources, adding a reflexive delay
+$\taubar_{\text{self}}$ to the budget.  Hysteresis gates (deadband + dwell
+time) prevent self-referential oscillation.
+
+% =============================================================================
+\section{Multi-Agent Extension}
+\label{sec:fleet}
+% =============================================================================
+
+A fleet of $N$ agents composes RCS instances over a communication graph
+$G$: $\rcs_{\text{fleet}} = \bigotimes_G \rcs^{(j)}$.  Coordination uses
+population dynamics~\cite{quijano2017population}, and fleet performance under
+disruption is measured via cooperative
+resilience~\cite{chacon2025cooperative}:
+\begin{equation}
+  J_{jl} = \frac{t_i + F_{jl}\Delta t_f + G_{jl}\Delta t_r}
+  {t_i + \Delta t_f + \Delta t_r}.
+\end{equation}
+
+% =============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =============================================================================
+
+We introduced the Recursive Controlled System, a self-similar formalization
+where the same 7-tuple structure applies at every level of the agent
+hierarchy.  The recursive stability budget~\eqref{eq:budget} provides
+quantitative conditions for composite stability, unifying adaptation rate,
+switching frequency, delay, and design evolution costs.  The homeostatic
+drive serves as a triple-purpose Lyapunov function, and the EGRI meta-controller's
+Five Laws map to necessary stability conditions.
+
+Future work includes full proofs under weaker time-scale separation
+assumptions, empirical validation on the Life Agent OS~\cite{eslami2026control},
+and extension to fleet cooperative resilience in Colombian non-interconnected
+energy zones.
+
+% =============================================================================
+% BIBLIOGRAPHY
+% =============================================================================
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
