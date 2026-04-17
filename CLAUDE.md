@@ -160,15 +160,33 @@ Python 3.11+ required (uses `tomllib` stdlib). No third-party deps. CI is Python
 
 ## Landed infrastructure (reference for future agents)
 
-| PR | What | File |
-|---|---|---|
-| #1 | RK4 integrator, real assertions in Lyapunov tests | `tests/test_lyapunov_simulation.py` |
-| #2 | `parameters.toml` + generator + drift check + CI job | `latex/parameters.toml`, `scripts/gen_parameters_tex.py`, `.github/workflows/ci.yml` |
-| #3 | `rem:context-collapse` tying ACE to Assumption 3 | `latex/rcs-definitions.tex` |
-| #4 | `*Disp` display macros + governance table reconciliation | `latex/parameters.toml`, `scripts/gen_parameters_tex.py`, `latex/rcs-definitions.tex` |
+| PR | Repo | What | Key files |
+|---|---|---|---|
+| #1 | rcs | RK4 integrator, real assertions in Lyapunov tests | `tests/test_lyapunov_simulation.py` |
+| #2 | rcs | `parameters.toml` + generator + drift check + CI job | `latex/parameters.toml`, `scripts/gen_parameters_tex.py`, `.github/workflows/ci.yml` |
+| #3 | rcs | `rem:context-collapse` tying ACE to Assumption 3 | `latex/rcs-definitions.tex` |
+| #4 | rcs | `*Disp` display macros + governance table reconciliation | `latex/parameters.toml`, `scripts/gen_parameters_tex.py`, `latex/rcs-definitions.tex` |
+| #5 | rcs | CLAUDE.md + README workflow documentation | `CLAUDE.md`, `README.md` |
+| life#802 | life | F2 Rust instrumentation: `StabilityBudget`, `MarginEstimator`, vigil OTel gauges, mirror of `parameters.toml` | `crates/autonomic/autonomic-core/src/rcs_budget.rs`, `crates/autonomic/autonomic-core/data/rcs-parameters.toml`, `crates/vigil/life-vigil/src/metrics.rs`, `scripts/sync-rcs-parameters.sh` |
 
-Forthcoming:
-- **F2**: `core/life/crates/autonomic/autonomic-core/src/rcs_budget.rs` + `arcand/tests/rcs_validation.rs` + 3 vigil OTel instruments. Reads the same `parameters.toml` via serde. Validates measured `lambda_i > 0` against real Life agent traces.
+## Cross-repo mirror contract (`parameters.toml`)
+
+**Single source of truth stays in this repo** (`~/broomva/research/rcs/latex/parameters.toml`). The Life repo (`~/broomva/core/life`) needs compile-time access for its Rust `rcs_budget` module via `include_str!`, and cross-repo absolute paths break hermetic builds. The resolution:
+
+- **Mirror location:** `~/broomva/core/life/crates/autonomic/autonomic-core/data/rcs-parameters.toml`
+- **Authoritative source:** `~/broomva/research/rcs/latex/parameters.toml` (this repo)
+- **Sync script:** `~/broomva/core/life/scripts/sync-rcs-parameters.sh` — rewrites the mirror header and copies the paper body verbatim
+- **Drift policy:**
+  - After editing this repo's `parameters.toml`, run `bash ~/broomva/core/life/scripts/sync-rcs-parameters.sh` and commit the mirror update in a separate life-repo PR.
+  - The Rust test `rcs_canonical_parameters_reproduce_paper_lambdas` (in `autonomic-core`) verifies the mirror's computed λᵢ match the paper's `[derived.lambda]` values to <1e-3. Numeric drift fails that test.
+  - **Structural drift** (new fields, removed levels) is NOT auto-caught — the sync script is run manually. If you add fields to the TOML schema, update `CanonicalLevel` in `rcs_budget.rs` and re-run sync in the same Life PR.
+
+Never edit the mirror by hand. If CI in life reports canonical-parameter test failures, the fix is almost always "re-run the sync script on the life side."
+
+## Forthcoming
+
+- **Integration test end-to-end strengthening** (life-repo follow-up): replace the current reconstruction-style test in `rcs_validation.rs` with one that observes the actual autonomic daemon's `HomeostaticState` and asserts `lambda_1 > 0` against real runtime state. Work in progress.
+- **L0 and L2 estimators** (life-repo): `MarginEstimator::for_l0` (hooking `aios_runtime` tick stats) and `MarginEstimator::for_l2` (bridging `autoany-core::loop_engine`). Not yet implemented — scope of the F2 PR was L1 only (the only level with direct `HomeostaticState` observability).
 
 ## Key References
 
