@@ -44,60 +44,64 @@ schema_version = 1
 # The Life integration harness (F2) will validate these against real traces.
 
 [[levels]]
-id         = "L0"
-name       = "plant"
-system     = "Arcan agent loop (shell.rs)"
-gamma      = 2.0         # nominal decay rate (fast inner loop)
-L_theta    = 0.3         # adaptation sensitivity
-rho        = 0.5         # adaptation rate bound
-L_d        = 0.1         # design sensitivity
-eta        = 0.2         # design evolution rate bound
-beta       = 1.0         # delay sensitivity
-tau_bar    = 0.01        # supremal delay (seconds)
-nu         = 1.2         # jump comparability factor (>= 1)
-tau_a      = 0.5         # average dwell time (seconds)
+id             = "L0"
+name           = "plant"
+system         = "Arcan agent loop (shell.rs)"
+gamma          = 2.0         # nominal decay rate (fast inner loop)
+L_theta        = 0.3         # adaptation sensitivity
+rho            = 0.5         # adaptation rate bound
+L_d            = 0.1         # design sensitivity
+eta            = 0.2         # design evolution rate bound
+beta           = 1.0         # delay sensitivity
+tau_bar        = 0.01        # supremal delay (seconds)
+nu             = 1.2         # jump comparability factor (>= 1)
+tau_a          = 0.5         # average dwell time (seconds)
+display_digits = 3           # paper shows 1.455 -> 3 digits after decimal point
 
 [[levels]]
-id         = "L1"
-name       = "autonomic"
-system     = "Autonomic (engine.rs, HysteresisGate)"
-gamma      = 0.5
-L_theta    = 0.2
-rho        = 0.1
-L_d        = 0.1
-eta        = 0.05
-beta       = 0.5
-tau_bar    = 0.1         # seconds
-nu         = 1.5
-tau_a      = 30.0        # 30s dwell (economic HysteresisGate default)
+id             = "L1"
+name           = "autonomic"
+system         = "Autonomic (engine.rs, HysteresisGate)"
+gamma          = 0.5
+L_theta        = 0.2
+rho            = 0.1
+L_d            = 0.1
+eta            = 0.05
+beta           = 0.5
+tau_bar        = 0.1         # seconds
+nu             = 1.5
+tau_a          = 30.0        # 30s dwell (economic HysteresisGate default)
+display_digits = 3           # paper shows 0.411
 
 [[levels]]
-id         = "L2"
-name       = "EGRI"
-system     = "EGRI (loop_engine.rs)"
-gamma      = 0.1
-L_theta    = 0.05
-rho        = 0.01
-L_d        = 0.02
-eta        = 0.01
-beta       = 0.0005      # small: delay is expected at this scale
-tau_bar    = 60.0        # seconds (minute-scale EGRI trial duration)
-nu         = 1.1
-tau_a      = 3600.0      # hours between promotions
+id             = "L2"
+name           = "EGRI"
+system         = "EGRI (loop_engine.rs)"
+gamma          = 0.1
+L_theta        = 0.05
+rho            = 0.01
+L_d            = 0.02
+eta            = 0.01
+beta           = 0.0005      # small: delay is expected at this scale
+tau_bar        = 60.0        # seconds (minute-scale EGRI trial duration)
+nu             = 1.1
+tau_a          = 3600.0      # hours between promotions
+display_digits = 3           # paper shows 0.069
 
 [[levels]]
-id         = "L3"
-name       = "governance"
-system     = "CLAUDE.md + AGENTS.md + policy.yaml"
-gamma      = 0.01
-L_theta    = 0.001
-rho        = 0.001
-L_d        = 0.001
-eta        = 0.0005
-beta       = 0.000001    # approximately 0: delay is the norm at day scale
-tau_bar    = 3600.0      # seconds (hour-scale review latency)
-nu         = 1.05
-tau_a      = 86400.0     # days between policy changes
+id             = "L3"
+name           = "governance"
+system         = "CLAUDE.md + AGENTS.md + policy.yaml"
+gamma          = 0.01
+L_theta        = 0.001
+rho            = 0.001
+L_d            = 0.001
+eta            = 0.0005
+beta           = 0.000001    # approximately 0: delay is the norm at day scale
+tau_bar        = 3600.0      # seconds (hour-scale review latency)
+nu             = 1.05
+tau_a          = 86400.0     # days between policy changes
+display_digits = 4           # paper shows 0.0064 -> 4 digits for the tiny margin
 
 # -----------------------------------------------------------------------------
 # Eslami & Yu (2026) reproduction parameters — faithful citation, DO NOT EDIT

@@ -644,38 +644,48 @@ and formalization at $\Li{N}$ \emph{are} the controller $\ctrl_N$:
 \label{prop:governance}
 Under the standard assumptions (Assumptions~\ref{ass:per-level}--\ref{ass:jump}),
 Level~3 of the Life Agent OS satisfies $\stab_3 > 0$ with the following
-concrete parameter estimates:
+concrete parameter values, derived from the Life runtime defaults and
+cached in \texttt{latex/parameters.toml} (the canonical source for all
+numerics in this paper):
 \begin{center}
-\begin{tabular}{@{}cp{6.5cm}c@{}}
+\begin{tabular}{@{}cp{6.8cm}c@{}}
   \toprule
   \textbf{Parameter} & \textbf{Interpretation} & \textbf{Value} \\
   \midrule
-  $\decay_3$ & Nominal decay --- policy crystallization rate
-    ${\sim}\,1/100$ days & $0.010$ \\
-  $L_{\param,3} \rho_3$ & Setpoint adjustment rate
-    ${\leq}\,1/\text{month}$ & $0.001$ \\
-  $L_{d,3} \eta_3$ & Structural changes ${\sim}\,1/\text{quarter}$
-    (new primitives, gates) & $0.0005$ \\
-  $\beta_3 \taubar_3$ & Human review delay (hours--days for
-    policy changes) & $0.002$ \\
-  $\frac{\ln \nu_3}{\taua[3]}$ & Profile switches (extremely rare)
-    & $0.0001$ \\
+  $\decay_3$ & Nominal decay --- policy crystallization
+    (${\sim}\,1/100$ days) & $\rcsgammaLthreeDisp$ \\
+  $L_{\param,3} \rho_3$ & Adaptation cost --- setpoint adjustment
+    effectively zero at day scale & $\rcsadaptcostLthreeDisp$ \\
+  $L_{d,3} \eta_3$ & Design cost --- structural changes
+    (${\lesssim}\,1/\text{quarter}$) & $\rcsdesigncostLthreeDisp$ \\
+  $\beta_3 \taubar_3$ & Delay cost --- human review latency
+    (${\sim}\,1\,\text{hour}$) \textbf{dominates} & $\rcsdelaycostLthreeDisp$ \\
+  $\frac{\ln \nu_3}{\taua[3]}$ & Switching cost --- profile switches
+    once per day & $\rcsswitchcostLthreeDisp$ \\
   \midrule
   $\stab_3$ & Stability budget at Level~3
-    & $0.0064 > 0\;\checkmark$ \\
+    & $\rcsmarginLthreeDisp > 0\;\checkmark$ \\
   \bottomrule
 \end{tabular}
 \end{center}
+The governance margin is \emph{delay-dominated}: $\beta_3 \taubar_3$
+accounts for ${\sim}56\%$ of the total cost, while the other three
+perturbations are four orders of magnitude smaller.  This is the expected
+regime at the top of the hierarchy --- governance operates on a day
+scale, so adaptation, design evolution, and switching are effectively
+static.  Stability is determined almost entirely by whether policy
+crystallization ($\decay_3$) outpaces human review latency.
 \end{proposition}
 
 \begin{remark}[Narrowest margin]
 \label{rem:narrowest}
 Level~3 has the narrowest stability margin in the hierarchy
-($\stab_3 = 0.0064$ vs.\ $\stab_0 = 1.455$, $\stab_1 = 0.411$,
-$\stab_2 = 0.069$).  This is expected from the time-scale separation:
-governance operates on the slowest time scale (days--weeks), so $\decay_3$ is
-smallest.  The system is most fragile at its highest level --- rapid governance
-changes would violate stability.  This matches the design intent: policy changes
+($\stab_3 = \rcsmarginLthreeDisp$ vs.\ $\stab_0 = \rcsmarginLzeroDisp$,
+$\stab_1 = \rcsmarginLoneDisp$, $\stab_2 = \rcsmarginLtwoDisp$).
+This is expected from the time-scale separation: governance operates on
+the slowest time scale (days--weeks), so $\decay_3$ is smallest.  The
+system is most fragile at its highest level --- rapid governance changes
+would violate stability.  This matches the design intent: policy changes
 should be rare and deliberate.
 \end{remark}
 
