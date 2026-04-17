@@ -15,6 +15,31 @@ Tests:
 
 import math
 import sys
+import tomllib
+from pathlib import Path
+
+PARAMETERS_TOML = Path(__file__).resolve().parents[1] / "latex" / "parameters.toml"
+
+
+def _load_parameters() -> dict:
+    """Load the canonical parameter file. Single source of truth for paper + tests."""
+    with PARAMETERS_TOML.open("rb") as f:
+        return tomllib.load(f)
+
+
+def _budget_from(entry: dict) -> "StabilityBudget":
+    """Construct a StabilityBudget from a TOML entry (level or Eslami case)."""
+    return StabilityBudget(
+        gamma=entry["gamma"],
+        L_theta=entry["L_theta"],
+        rho=entry["rho"],
+        L_d=entry["L_d"],
+        eta=entry["eta"],
+        beta=entry["beta"],
+        tau_bar=entry["tau_bar"],
+        nu=entry["nu"],
+        tau_a=entry["tau_a"],
+    )
 
 
 class StabilityBudget:
@@ -91,38 +116,30 @@ class StabilityBudget:
 def test_eslami_stable_case():
     """Reproduce Eslami & Yu (2026) stable simulation parameters.
 
-    From the paper (Section V):
-    γ = 0.609, ν = 2.2, L_θ = 0.8, β = 2.5
-    ρ = 0.15, τ_a = 4.0, τ̄ = 0.03
-    Expected λ = 0.609 - 0.120 - 0.075 - 0.197 = +0.217
+    Parameters loaded from latex/parameters.toml::[eslami_2026.stable].
+    Expected λ ≈ +0.217 per Section V of arXiv:2603.10779.
     """
-    b = StabilityBudget(
-        gamma=0.609,
-        L_theta=0.8, rho=0.15,
-        L_d=0.0, eta=0.0,          # no design evolution in their example
-        beta=2.5, tau_bar=0.03,
-        nu=2.2, tau_a=4.0,
-    )
+    case = _load_parameters()["eslami_2026"]["stable"]
+    b = _budget_from(case)
     assert b.is_stable, f"Eslami stable case should be stable, got λ={b.margin:.4f}"
-    assert abs(b.margin - 0.217) < 0.01, f"Expected λ≈0.217, got {b.margin:.4f}"
+    assert abs(b.margin - case["expected_lambda"]) < 0.01, (
+        f"Expected λ≈{case['expected_lambda']}, got {b.margin:.4f}"
+    )
     print(f"  PASS  Eslami stable case: λ = {b.margin:.4f}")
 
 
 def test_eslami_unstable_case():
     """Reproduce Eslami & Yu (2026) unstable simulation parameters.
 
-    ρ = 3.5, τ_a = 0.4, τ̄ = 0.20
-    Expected λ = 0.609 - 2.800 - 0.500 - 1.971 = -4.662
+    Parameters loaded from latex/parameters.toml::[eslami_2026.unstable].
+    Expected λ ≈ -4.662 per Section V of arXiv:2603.10779.
     """
-    b = StabilityBudget(
-        gamma=0.609,
-        L_theta=0.8, rho=3.5,
-        L_d=0.0, eta=0.0,
-        beta=2.5, tau_bar=0.20,
-        nu=2.2, tau_a=0.4,
-    )
+    case = _load_parameters()["eslami_2026"]["unstable"]
+    b = _budget_from(case)
     assert not b.is_stable, f"Eslami unstable case should be unstable, got λ={b.margin:.4f}"
-    assert abs(b.margin - (-4.662)) < 0.01, f"Expected λ≈-4.662, got {b.margin:.4f}"
+    assert abs(b.margin - case["expected_lambda"]) < 0.01, (
+        f"Expected λ≈{case['expected_lambda']}, got {b.margin:.4f}"
+    )
     print(f"  PASS  Eslami unstable case: λ = {b.margin:.4f}")
 
 
@@ -242,47 +259,59 @@ def test_hysteresis_dwell_time():
 
 
 def test_recursive_all_levels_stable():
-    """A 4-level RCS hierarchy (L0-L3) with realistic parameters.
+    """4-level RCS hierarchy (L0-L3) loaded from the canonical parameter file.
 
-    Time-scale separation: each level ~10x slower than the one below.
+    Parameters come from latex/parameters.toml::[[levels]] — the single source
+    of truth shared with the paper (via latex/parameters.tex macros) and the
+    future Life integration harness. Time-scale separation: each level is
+    ~10x slower than the one below.
+
+    This test also verifies the [derived.lambda] and [derived.omega] caches
+    in the TOML match the computed values, catching drift between the
+    parameters and their cached downstream summaries.
     """
+    config = _load_parameters()
+    assert config["schema_version"] == 1, (
+        f"Unsupported schema_version {config['schema_version']} — this test "
+        f"was written for v1. Update the test when bumping the schema."
+    )
+
     levels = {
-        "L0 (plant)": StabilityBudget(
-            gamma=2.0, L_theta=0.3, rho=0.5,
-            L_d=0.1, eta=0.2,
-            beta=1.0, tau_bar=0.01,   # fast inner loop
-            nu=1.2, tau_a=0.5,
-        ),
-        "L1 (autonomic)": StabilityBudget(
-            gamma=0.5, L_theta=0.2, rho=0.1,
-            L_d=0.1, eta=0.05,
-            beta=0.5, tau_bar=0.1,    # seconds
-            nu=1.5, tau_a=30.0,       # 30s dwell (hysteresis gate)
-        ),
-        "L2 (EGRI)": StabilityBudget(
-            gamma=0.1, L_theta=0.05, rho=0.01,
-            L_d=0.02, eta=0.01,
-            beta=0.0005, tau_bar=60.0,  # β is small: delay is expected at this scale
-            nu=1.1, tau_a=3600.0,       # hours between promotions
-        ),
-        "L3 (governance)": StabilityBudget(
-            gamma=0.01, L_theta=0.001, rho=0.001,
-            L_d=0.001, eta=0.0005,
-            beta=0.000001, tau_bar=3600.0,  # β ≈ 0: delay is the norm, not a perturbation
-            nu=1.05, tau_a=86400.0,         # days between policy changes
-        ),
+        f"{lvl['id']} ({lvl['name']})": (lvl["id"], _budget_from(lvl))
+        for lvl in config["levels"]
     }
+    assert {lvl_id for lvl_id, _ in levels.values()} == {"L0", "L1", "L2", "L3"}, (
+        f"Expected exactly L0-L3 in parameters.toml, got "
+        f"{[lvl_id for lvl_id, _ in levels.values()]}"
+    )
+
+    cached_lambdas = config["derived"]["lambda"]
+    cached_omega = config["derived"]["omega"]
 
     all_stable = True
-    for name, b in levels.items():
+    for name, (lvl_id, b) in levels.items():
         status = "STABLE" if b.is_stable else "UNSTABLE"
         if not b.is_stable:
             all_stable = False
         print(f"         {name}: λ = {b.margin:.6f} ({status})")
+        assert abs(b.margin - cached_lambdas[lvl_id]) < 1e-6, (
+            f"drift: [derived.lambda].{lvl_id} = {cached_lambdas[lvl_id]} in TOML "
+            f"but recomputed = {b.margin:.9f}. Run scripts/gen_parameters_tex.py."
+        )
 
     assert all_stable, "All levels must be stable for composite stability"
-    omega = min(b.margin for b in levels.values())
-    print(f"  PASS  4-level hierarchy stable, ω = min λ = {omega:.6f}")
+
+    omega_value = min(b.margin for _, b in levels.values())
+    omega_level = min(levels.items(), key=lambda kv: kv[1][1].margin)[1][0]
+    assert abs(omega_value - cached_omega["value"]) < 1e-6, (
+        f"drift: [derived.omega].value = {cached_omega['value']} in TOML but "
+        f"recomputed = {omega_value:.9f}."
+    )
+    assert omega_level == cached_omega["level"], (
+        f"drift: [derived.omega].level = {cached_omega['level']!r} in TOML but "
+        f"argmin is {omega_level!r}."
+    )
+    print(f"  PASS  4-level hierarchy stable, ω = min λ = {omega_value:.6f} at {omega_level}")
 
 
 def test_budget_is_lyapunov():

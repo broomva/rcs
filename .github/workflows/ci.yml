@@ -7,8 +7,22 @@ on:
     branches: [main]
 
 jobs:
+  params-drift-check:
+    name: Parameters Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify latex/parameters.tex matches latex/parameters.toml
+        run: python3 scripts/gen_parameters_tex.py --check
+
   build-latex:
     name: Build LaTeX
+    needs: params-drift-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +46,7 @@ jobs:
 
   test-proofs:
     name: Test Proofs
+    needs: params-drift-check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
