@@ -242,10 +242,33 @@ def test_exponential_decay_rate():
 def test_homeostatic_drive_decreases():
     """Homeostatic drive D(x) = ||x - x*||^2 is a Lyapunov function (Prop. 4.2).
 
-    With setpoint at origin, D(x) = V(x) = ||x||^2 and must decrease under
-    stable dynamics. Total "reward" = D(0) - D(T) > 0.
+    With setpoint at origin, D(x) = V(x) = ||x||^2. The per-step monotonicity
+    check below relies on dV/dt = x^T (A + A^T) x <= 0 — i.e., the SYMMETRIC
+    part of A is negative semidefinite, not just that A is Hurwitz. A matrix
+    can be Hurwitz (all eigenvalues have negative real parts) while A + A^T
+    has a positive eigenvalue, in which case V can *transiently* grow even
+    though x eventually converges (e.g., A = [[-1, 5], [-5, -1]]).
+
+    We therefore explicitly guard on A + A^T being negative definite at the
+    top of the test, so a future matrix change fails fast here instead of
+    producing a confusing non-monotonicity error.
     """
     A = [[-1.0, 0.3], [-0.3, -1.2]]
+
+    # Guard: A + A^T must be negative definite for V(x)=||x||^2 to be
+    # monotone under x' = A x. For 2x2, this is equivalent to
+    # S_00 < 0 and det(S) > 0, where S = A + A^T.
+    s00 = 2 * A[0][0]
+    s01 = A[0][1] + A[1][0]
+    s11 = 2 * A[1][1]
+    det_s = s00 * s11 - s01 * s01
+    assert s00 < 0 and det_s > 0, (
+        f"A + A^T must be negative definite for this test's monotonicity "
+        f"assertion: A + A^T = [[{s00}, {s01}], [{s01}, {s11}]], "
+        f"det={det_s}. If you changed A, pick one with a symmetric part "
+        f"that is negative definite, or relax the per-step monotonicity "
+        f"check to a windowed-average check."
+    )
 
     traj, _ = simulate_switched_system(
         A_modes=[A],
