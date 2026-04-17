@@ -18,7 +18,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-PARAMETERS_TOML = Path(__file__).resolve().parents[1] / "latex" / "parameters.toml"
+PARAMETERS_TOML = Path(__file__).resolve().parents[1] / "data" / "parameters.toml"
 
 
 def _load_parameters() -> dict:

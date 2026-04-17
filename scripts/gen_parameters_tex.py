@@ -37,7 +37,7 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TOML_PATH = REPO_ROOT / "latex" / "parameters.toml"
+TOML_PATH = REPO_ROOT / "data" / "parameters.toml"
 TEX_PATH = REPO_ROOT / "latex" / "parameters.tex"
 
 LAMBDA_TOLERANCE = 1e-6

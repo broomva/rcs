@@ -95,9 +95,12 @@
 \DeclareMathOperator*{\argmax}{arg\,max}
 
 % --- Canonical parameter values ---
-% parameters.tex is auto-generated from latex/parameters.toml by
+% parameters.tex is auto-generated from data/parameters.toml by
 % scripts/gen_parameters_tex.py. CI verifies the two stay in sync.
 % The macros defined there (\rcsmarginLzero, \rcsgammaLone, etc.) are
 % available here for the paper body to reference by name rather than
 % hard-coded numbers. Edit parameters.toml to change any value.
-\input{parameters}
+%
+% \SHAREDLATEX must be \def'd by the paper's main.tex before \input-ing
+% this preamble so the following line resolves to the shared latex dir.
+\input{\SHAREDLATEX/parameters}
