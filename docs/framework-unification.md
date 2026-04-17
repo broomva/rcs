@@ -228,6 +228,70 @@ This is a mathematical identity, not an analogy:
 
 ---
 
+### 2.5 Context Engineering Lineage → RCS
+
+**Sources:** Reflexion (Shinn et al. 2023), Self-Refine (Madaan et al. 2023), Voyager (Wang et al. 2023), Generative Agents (Park et al. 2023), Dynamic Cheatsheet, Agentic Context Engineering (Zhang et al. 2025, ICLR 2026).
+
+A distinct research lineage has emerged around *adapting LLM agents through structured, evolving context rather than weight updates*. These systems instantiate RCS at Level 1, with the agent's context as the state space `X₁` and the controller `Π₁` realized as a pipeline that distills execution traces into context deltas. ACE is the most recent and most structured of these; it makes explicit what earlier systems did implicitly.
+
+#### 2.5.1 ACE (Zhang et al. 2025) as RCS at L1
+
+ACE's three-role architecture maps to the RCS 7-tuple at Level 1:
+
+| RCS Component | ACE Component | Notes |
+|---------------|---------------|-------|
+| `X₁` — state | Playbook: set of scored bullets `[id] helpful=X harmful=Y :: content`, grouped by section | Plain text file in the reference implementation; typed in principle |
+| `Y₁` — observation | Reasoning trace, bullet IDs used, environment feedback | Input to the Reflector |
+| `U₁` — control | `ADD` operations + counter increments (`helpful/harmful += 1`) | Only `ADD` is operational; `UPDATE`/`MERGE`/`DELETE`/`CREATE_META` are stubbed in the reference code |
+| `f₁` — dynamics | `apply_curator_operations(playbook, ops)` — deterministic text splice | Append-only **by omission**, not by invariant |
+| `h₁` — observer | Reflector LLM call extracting bullet tags | Runs on both correct **and** incorrect traces — key design choice |
+| `S₁` — shield | Token budget passed as Curator prompt text | Advisory only; not enforced in code |
+| `Π₁` — controller | Generator + Reflector + Curator pipeline | Three roles; default config runs all three with the same model (DeepSeek-V3.1) |
+| `D₁` — Lyapunov | Implicit in helpful − harmful counters | No formal drive function defined |
+
+**Implementation finding (from code inspection, `playbook_utils.py`, `ace/core/curator.py`, `ace/core/bulletpoint_analyzer.py`):** the paper's claim of *deterministic curation with de-duplication and pruning* is partially aspirational. Only `ADD` is implemented in the curator merge function. Semantic de-duplication (`BulletpointAnalyzer`) is behind an optional flag (`use_bulletpoint_analyzer`, default `False`) requiring `sentence-transformers` + `faiss-cpu`, and when enabled it performs merges via an LLM call (temperature 0.3) rather than deterministic logic. The token budget is supplied as prompt text (`"Total token budget: {token_budget}"`) but not enforced anywhere in the update path. The invariant that prevents context collapse in ACE is therefore **structural by omission** — the runtime simply lacks the operations that would violate append-only monotonicity.
+
+#### 2.5.2 Lineage mapping
+
+| System | Year | RCS Contribution | RCS Gap |
+|--------|------|------------------|---------|
+| Reflexion (Shinn et al.) | 2023 | Reflector-as-observer; verbal self-critique closes feedback loop | No structured playbook; reflection is ephemeral |
+| Self-Refine (Madaan et al.) | 2023 | Iterative refinement realizes observer → controller → plant trace | Single-task refinement; no cross-sample retained state |
+| Voyager (Wang et al.) | 2023 | Skill library as retained `X₁` with execution-feedback admission | Binary admission (works/doesn't); no helpful/harmful counters |
+| Generative Agents (Park et al.) | 2023 | Memory stream + importance scoring + scheduled reflection | Reflection rewrites are monolithic — vulnerable to collapse |
+| Dynamic Cheatsheet | 2024/25 | Scored playbook entries with monolithic rewrite | The collapse event in ACE Fig. 2 is observed in this class of system |
+| ACE (Zhang et al.) | 2025 | Append-only delta operations; Reflector always runs; separate Curator role | No formal stability guarantee; budget is advisory |
+
+#### 2.5.3 What RCS contributes to this lineage
+
+None of these systems has a formal state-space model, typed controller interface, or stability condition. RCS provides:
+
+1. **Formal characterization of the collapse-avoidance mechanism.** ACE's empirical finding that monolithic rewrites degrade performance below the no-context baseline (Zhang et al. 2025, Fig. 2) is an instance of violating Assumption 4 (design evolution sensitivity) in the stability budget: a single step with `η₁ ≫ (γ₁ − other costs) / L_d₁` is outside the stability region. Append-only updates preserve `λ₁ > 0` by keeping `η₁` bounded at the per-sample admission rate.
+2. **Quantitative bound on admissible rewrite magnitude.** The maximum per-step context mutation admitted by the stability budget is `η₁ < (γ₁ − L_θ·ρ − β·τ̄ − ln(ν)/τ_a) / L_d₁`. ACE's append-only design automatically satisfies this; systems with `UPDATE`/`MERGE`/`DELETE` would need explicit admission control.
+3. **Recursive extension.** Context engineering as described in this lineage is a single-level phenomenon (L1). RCS makes the L2 meta-controller explicit — one that tunes the Reflector's admission policy, the Curator's prompt, or the helpful/harmful threshold for bullet eviction. None of the cited systems addresses this.
+4. **Observer-as-sufficient-statistic.** The helpful/harmful counters are a degenerate Luenberger observer on entry utility: `h(entry) = helpful/(helpful + harmful + 1)` with running-average gain `L = 1/(n+1)`. This extends the fold-as-observer sufficiency theorem (Proposition 3 of the design spec) from unstructured `HomeostaticState` to structured enumerable state.
+5. **Safety shield for context updates.** RCS defines `S₁` as a CBF-QP that projects unsafe controls to the safe set. Applied to context engineering, this becomes an enforced (not advisory) cap on per-step entry churn and a minimum dwell time on admitted entries before eviction.
+
+#### 2.5.4 What this lineage contributes to RCS
+
+The contribution is **empirical validation**, not formalism:
+
+1. Large-scale evidence that incremental context updates preserve knowledge better than monolithic rewrites, across agent tasks (AppWorld) and domain-specific tasks (finance).
+2. Measured latency and cost reductions (ACE: 82.3% latency, 75.1% rollouts vs GEPA) that quantify the cost of violating the stability budget through aggressive rewrites.
+3. An open-source reference implementation that instantiates L1 of an RCS hierarchy — usable as a worked example and reproducibility baseline.
+4. The observation that the Reflector should run on **both** successful and unsuccessful traces, providing a continuous stream of bullet-level feedback rather than only failure-triggered updates. This is a design choice RCS adopts for its L1 observer.
+
+#### 2.5.5 Design choices this lineage motivates avoiding
+
+Inspection of the ACE reference implementation reveals choices that RCS-grounded designs should **not** import:
+
+- Plain-text regex-parsed playbook (use typed state with event-sourcing).
+- LLM-as-curator as the default merge operator (start with deterministic append; introduce an LLM curator only behind an enforced shield).
+- Advisory token budgets stated in prompts (enforce budgets at the context-compiler level).
+- Single-model-three-prompts default (retain the option of genuinely separate Reflector/Evaluator to preserve Evaluator Supremacy — EGRI Law 1, Section 7 of the design spec).
+
+---
+
 ## 3. Unified Vocabulary Table
 
 A single RCS concept expressed in each framework's language:
@@ -257,6 +321,7 @@ A single RCS concept expressed in each framework's language:
 | **Keramati & Gutkin** | Homeostatic drive as Lyapunov function that simultaneously serves as reward signal | eLife (2014) |
 | **Quijano et al.** | Population dynamics for multi-agent coordination, passivity-based stability of evolutionary games | IEEE CSM (2017) |
 | **Chacon-Chamorro et al.** | Cooperative resilience metric for fleet performance under disruption | IEEE Trans. AI (2025) |
+| **Zhang et al. (ACE) + lineage** | Empirical validation of append-only context updates; collapse event as stability-budget violation; reflector-always-runs as continuous `h₁`; scored bullets as observer of entry utility | ICLR 2026 (ACE); NeurIPS 2023 (Reflexion, Self-Refine); UIST 2023 (Generative Agents) |
 
 ---
 
@@ -265,7 +330,8 @@ A single RCS concept expressed in each framework's language:
 | Gap | Which Frameworks Address It | RCS Status |
 |-----|---------------------------|------------|
 | Self-observation cost | None directly (reflexive monitoring is implicit) | Modeled as `β_self·τ̄_self` in stability budget (Remark 7 in LaTeX) |
-| Compaction bounds | None (rate-distortion for finite context) | Identified (MHE connection, Section 6.2 of design spec) — needs formal bound |
+| Compaction bounds | ACE (append-only empirical), Generative Agents (reflection triggers) | Identified (MHE connection, Section 6.2 of design spec). ACE Fig. 2 provides an empirical anchor; formal bound still needed — see Remark on context collapse in `rcs-definitions.tex` |
+| Admission control for context | ACE (implicit via ADD-only), Voyager (binary skill admission) | Shield `S₁` formalization for playbook mutations — enforced per-step entry-churn cap with minimum dwell time (proposed, not yet implemented) |
 | Fleet stability | Quijano (passivity), Chacon-Chamorro (resilience metric) | Paper 4 target — RCS composition via decorated cospans |
 | Learning dynamics | Eslami (parameter adaptation), Active Inference (belief updating) | Needs formal treatment of `ρ` dynamics (how fast should L2 adapt?) |
 | Observer design | Active Inference (variational inference), Eslami (memory update) | Current: fold-as-sufficient-statistic. Future: learned observers with uncertainty |

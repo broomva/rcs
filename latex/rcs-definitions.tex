@@ -324,6 +324,32 @@ where:
 \end{center}
 \end{definition}
 
+\begin{remark}[Context collapse as a design-evolution violation]
+\label{rem:context-collapse}
+Empirical evidence for Assumption~\ref{ass:design} comes from the
+context-engineering literature.  \citet{zhang2025ace} document a
+\emph{context collapse} event in which a monolithic rewrite of an
+accumulated context (their Fig.~2, baseline trajectory) causes a
+single-step drop from $18{,}282$ to $122$ tokens, with accuracy
+falling from $66.7\%$ to $57.1\%$~--- below the no-context baseline
+of $63.7\%$.  This is a design-evolution perturbation with
+$\eta_1$-ratio $\approx 150\times$ in one step, far exceeding the
+admissible bound
+\begin{equation}
+  \eta_1 <
+  \frac{\decay_1 - L_{\param,1}\rho_1 - \beta_1\taubar_1
+        - \ln\nu_1/\taua[1]}{L_{d,1}}
+\end{equation}
+implied by~\eqref{eq:budget}.  Append-only update disciplines
+(Reflexion~\cite{shinn2023reflexion}, Voyager~\cite{wang2023voyager},
+Self-Refine~\cite{madaan2023selfrefine}, ACE~\cite{zhang2025ace})
+automatically satisfy this bound by capping $\eta_1$ at the per-sample
+admission rate; monolithic-rewrite systems do not.  This gives a
+formal explanation for why the empirical trend across this lineage
+converges on incremental, structured updates.
+\end{remark}
+
+
 \begin{theorem}[Recursive stability]
 \label{thm:recursive}
 Consider a finite RCS hierarchy $\rcs_0, \rcs_1, \ldots, \rcs_N$.  Suppose
