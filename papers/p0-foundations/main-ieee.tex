@@ -27,7 +27,11 @@
 \usepackage{cite}
 
 % --- Shared RCS preamble (math, theorems, macros) ---
-\input{preamble}
+% \SHAREDLATEX points at the shared LaTeX assets dir. Each paper in
+% papers/pN-.../ resolves it relative to its own location; preamble.tex
+% uses the macro to reference its own includes (parameters.tex, etc.).
+\def\SHAREDLATEX{../../latex}
+\input{\SHAREDLATEX/preamble}
 
 % =============================================================================
 \title{Recursive Controlled Systems:\\
@@ -346,6 +350,6 @@ energy zones.
 % BIBLIOGRAPHY
 % =============================================================================
 \bibliographystyle{IEEEtran}
-\bibliography{references}
+\bibliography{\SHAREDLATEX/references}
 
 \end{document}

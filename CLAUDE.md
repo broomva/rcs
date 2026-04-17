@@ -15,46 +15,58 @@ Research program formalizing autonomous AI agents as recursive control-theoretic
 
 ```
 rcs/
-├── papers/           # Paper drafts (one folder per paper)
+├── data/             # CANONICAL numeric data — language-agnostic source of truth
+│   └── parameters.toml   # single source of truth (see Canonical parameters)
+│
+├── latex/            # SHARED LaTeX infrastructure (used by every paper)
+│   ├── preamble.tex      # macros, theorems, packages; \input-ed by each paper
+│   ├── references.bib    # master BibTeX
+│   └── parameters.tex    # GENERATED from data/parameters.toml — do NOT edit
+│
+├── papers/           # each paper is a self-contained build target
 │   ├── p0-foundations/
+│   │   ├── main.tex          # article format; resolves \SHAREDLATEX -> ../../latex
+│   │   ├── main-ieee.tex     # IEEE format
+│   │   ├── main.pdf          # built artifact
+│   │   ├── main-ieee.pdf     # built artifact
+│   │   └── README.md         # paper metadata
 │   ├── p1-stability/
 │   ├── p2-egri/
 │   ├── p3-observers/
 │   └── p4-fleet/
-├── latex/            # Formal definitions, proofs, shared macros
-│   ├── parameters.toml   # CANONICAL — single source of truth (see below)
-│   ├── parameters.tex    # GENERATED — do NOT edit by hand
-│   ├── preamble.tex      # \input{parameters} lives here
-│   ├── references.bib    # BibTeX
-│   ├── rcs-definitions.tex        # article-format paper
-│   └── rcs-definitions-ieee.tex   # IEEE-format paper
-├── scripts/          # Build tooling (gen_parameters_tex.py)
-├── tests/            # Proof tests (stability budget + Lyapunov sim)
-├── specs/            # Design specifications
-├── references/       # PDFs + reading notes for cited works
-├── docs/             # Mapping tables, comparison tables, working docs
-│   └── conversations/  # Session logs for this project
+│
+├── tests/            # Python proof tests (pytest-style, runnable standalone)
+├── scripts/          # build tooling (gen_parameters_tex.py, future drift checks)
+├── specs/            # design specifications
+├── refs/             # cited PDFs (gitignored) + reading notes (committed)
+├── docs/             # mapping tables, comparison tables, working docs
+│   └── conversations/
 ├── Makefile          # make test / make build / make params
-└── CLAUDE.md         # This file
+└── CLAUDE.md         # this file
 ```
 
 ## Core Definition
 
 A Recursive Controlled System is a 7-tuple `Sigma = (X, Y, U, f, h, S, Pi)` where the controller `Pi` is itself an RCS at the next level.
 
-## Canonical parameters — `latex/parameters.toml`
+## Canonical parameters — `data/parameters.toml`
 
-**`latex/parameters.toml` is the single source of truth for every numeric value that appears in the paper, the Python proof tests, and the future Rust Life harness.** Three invariants are enforced by CI:
+**`data/parameters.toml` is the single source of truth for every numeric value that appears in the paper, the Python proof tests, and the Rust Life harness.** Three invariants are enforced by CI:
 
-1. Editing `parameters.toml` without regenerating `parameters.tex` → fails `params-drift-check` CI job.
-2. Hand-editing `parameters.tex` → fails `params-drift-check`.
+1. Editing `parameters.toml` without regenerating `latex/parameters.tex` → fails `params-drift-check` CI job.
+2. Hand-editing `latex/parameters.tex` → fails `params-drift-check`.
 3. Bumping a parameter without updating `[derived.lambda]` cache → generator exits 1, CI fails.
+
+Paths:
+- **Authoritative source:** `data/parameters.toml` (human-edited)
+- **Generated LaTeX:** `latex/parameters.tex` (auto-generated; `\input{\SHAREDLATEX/parameters}` from paper preamble)
+- **Rust mirror:** `~/broomva/core/life/crates/autonomic/autonomic-core/data/rcs-parameters.toml` (synced via `life/scripts/sync-rcs-parameters.sh`)
 
 ### When you edit a parameter
 
 ```bash
-# 1. Edit parameters.toml
-$EDITOR latex/parameters.toml
+# 1. Edit the canonical TOML
+$EDITOR data/parameters.toml
 
 # 2. Update the [derived.lambda] cache for any level whose inputs changed.
 #    If you don't know the new lambda, run the generator; it will fail with
@@ -138,13 +150,22 @@ Before F1, the paper's governance table hard-coded cost products (`L_theta*rho =
 ## Working with the paper
 
 ```bash
-make test        # params-check + both proof test suites (9 algebraic + 4 simulation)
-make build       # regenerate parameters.tex + build both PDFs
-make params      # just regenerate parameters.tex
-make params-check   # verify parameters.tex matches parameters.toml
-make all         # build + test
-make clean       # clean LaTeX intermediates
+make test              # params-check + both proof test suites (9 algebraic + 4 simulation)
+make build             # regenerate parameters.tex + build all paper PDFs (currently P0 only)
+make build-p0          # build both formats of P0 (article + IEEE)
+make build-p0-article  # article format only
+make build-p0-ieee     # IEEE format only
+make params            # just regenerate latex/parameters.tex
+make params-check      # verify latex/parameters.tex matches data/parameters.toml
+make all               # build + test
+make clean             # clean LaTeX intermediates under papers/
 ```
+
+When a new paper is drafted, add `build-p1-*`, `build-p2-*`, etc. targets that `cd` into the paper's directory and invoke tectonic on its `main.tex` / `main-ieee.tex`. The `build:` umbrella target should list all paper build targets.
+
+### LaTeX path convention
+
+Each paper's `main.tex` declares `\def\SHAREDLATEX{../../latex}` before `\input`-ing the shared preamble. The preamble and paper body then use `\input{\SHAREDLATEX/...}` and `\bibliography{\SHAREDLATEX/references}` so files resolve regardless of the working directory. This keeps tectonic happy without relying on `TEXINPUTS` (which tectonic doesn't fully honor) and works for any paper depth.
 
 Python 3.11+ required (uses `tomllib` stdlib). No third-party deps. CI is Python 3.12 + tectonic 0.16.8 on `ubuntu-latest`.
 
@@ -163,18 +184,24 @@ Python 3.11+ required (uses `tomllib` stdlib). No third-party deps. CI is Python
 | PR | Repo | What | Key files |
 |---|---|---|---|
 | #1 | rcs | RK4 integrator, real assertions in Lyapunov tests | `tests/test_lyapunov_simulation.py` |
-| #2 | rcs | `parameters.toml` + generator + drift check + CI job | `latex/parameters.toml`, `scripts/gen_parameters_tex.py`, `.github/workflows/ci.yml` |
-| #3 | rcs | `rem:context-collapse` tying ACE to Assumption 3 | `latex/rcs-definitions.tex` |
-| #4 | rcs | `*Disp` display macros + governance table reconciliation | `latex/parameters.toml`, `scripts/gen_parameters_tex.py`, `latex/rcs-definitions.tex` |
+| #2 | rcs | canonical TOML + generator + drift check + CI job | `data/parameters.toml`, `scripts/gen_parameters_tex.py`, `.github/workflows/ci.yml` |
+| #3 | rcs | `rem:context-collapse` tying ACE to Assumption 3 | `papers/p0-foundations/main.tex` |
+| #4 | rcs | `*Disp` display macros + governance table reconciliation | `data/parameters.toml`, `scripts/gen_parameters_tex.py`, `papers/p0-foundations/main.tex` |
 | #5 | rcs | CLAUDE.md + README workflow documentation | `CLAUDE.md`, `README.md` |
+| #6 | rcs | cross-repo mirror contract doc note | `CLAUDE.md` |
+| #7 | rcs | repo layout refactor: `data/` for canonical inputs, `papers/pN/` for papers, `\SHAREDLATEX` macro | `data/`, `papers/`, `latex/`, `Makefile`, CI workflow |
 | life#802 | life | F2 Rust instrumentation: `StabilityBudget`, `MarginEstimator`, vigil OTel gauges, mirror of `parameters.toml` | `crates/autonomic/autonomic-core/src/rcs_budget.rs`, `crates/autonomic/autonomic-core/data/rcs-parameters.toml`, `crates/vigil/life-vigil/src/metrics.rs`, `scripts/sync-rcs-parameters.sh` |
+| life#803 | life | CI/CD cleanup: Rust 1.95 clippy cascade + RUSTSEC-2026-0097/0098/0099 | 10+ files across crates |
+| life#804 | life | end-to-end RCS validation: `RcsObserver`, daemon state observation, production-path test | `crates/arcan/arcand/src/rcs_observer.rs`, `crates/arcan/arcand/tests/rcs_validation.rs` |
+
+Historical PR entries are updated to point at the file's current path (after repo layout refactor in PR #7). The original file locations at PR time were `latex/parameters.toml`, `latex/rcs-definitions.tex`, etc.; `git log --follow` traces the moves.
 
 ## Cross-repo mirror contract (`parameters.toml`)
 
-**Single source of truth stays in this repo** (`~/broomva/research/rcs/latex/parameters.toml`). The Life repo (`~/broomva/core/life`) needs compile-time access for its Rust `rcs_budget` module via `include_str!`, and cross-repo absolute paths break hermetic builds. The resolution:
+**Single source of truth stays in this repo** (`~/broomva/research/rcs/data/parameters.toml`). The Life repo (`~/broomva/core/life`) needs compile-time access for its Rust `rcs_budget` module via `include_str!`, and cross-repo absolute paths break hermetic builds. The resolution:
 
 - **Mirror location:** `~/broomva/core/life/crates/autonomic/autonomic-core/data/rcs-parameters.toml`
-- **Authoritative source:** `~/broomva/research/rcs/latex/parameters.toml` (this repo)
+- **Authoritative source:** `~/broomva/research/rcs/data/parameters.toml` (this repo)
 - **Sync script:** `~/broomva/core/life/scripts/sync-rcs-parameters.sh` — rewrites the mirror header and copies the paper body verbatim
 - **Drift policy:**
   - After editing this repo's `parameters.toml`, run `bash ~/broomva/core/life/scripts/sync-rcs-parameters.sh` and commit the mirror update in a separate life-repo PR.

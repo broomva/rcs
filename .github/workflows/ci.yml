@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify latex/parameters.tex matches latex/parameters.toml
+      - name: Verify latex/parameters.tex matches data/parameters.toml
         run: python3 scripts/gen_parameters_tex.py --check
 
   build-latex:
@@ -32,17 +32,17 @@ jobs:
         with:
           tectonic-version: 0.16.8
 
-      - name: Build article format
-        run: cd latex && tectonic rcs-definitions.tex
+      - name: Build P0 article format
+        run: cd papers/p0-foundations && tectonic main.tex
 
-      - name: Build IEEE format
-        run: cd latex && tectonic rcs-definitions-ieee.tex
+      - name: Build P0 IEEE format
+        run: cd papers/p0-foundations && tectonic main-ieee.tex
 
       - name: Upload PDFs
         uses: actions/upload-artifact@v4
         with:
           name: rcs-papers
-          path: latex/*.pdf
+          path: papers/*/*.pdf
 
   test-proofs:
     name: Test Proofs

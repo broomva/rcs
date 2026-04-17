@@ -18,9 +18,9 @@
 *.dvi
 *.xdv
 
-# Keep compiled PDFs in latex/ (they're the build output we want to share)
-# But ignore PDFs in references/ (those are third-party papers, not ours)
-references/**/*.pdf
+# Keep compiled PDFs in papers/*/ (they're the build output we want to share)
+# But ignore PDFs in refs/ (those are third-party papers, not ours)
+refs/**/*.pdf
 
 # --- Tectonic cache ---
 .tectonic/
