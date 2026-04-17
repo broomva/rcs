@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Regenerate latex/parameters.tex from latex/parameters.toml.
+Regenerate latex/parameters.tex from data/parameters.toml.
 
-The TOML file is the single source of truth for the RCS stability budget
-parameters. This script emits a LaTeX file defining \\newcommand macros for
-every parameter and derived quantity (lambda_i per level, composite omega),
-so the paper can reference them symbolically and the paper/code cannot drift.
+The TOML file at data/parameters.toml is the single source of truth for
+the RCS stability budget parameters. This script emits a LaTeX file
+defining \\newcommand macros for every parameter and derived quantity
+(lambda_i per level, composite omega), so the paper can reference them
+symbolically and the paper/code cannot drift.
 
 Invariants:
   - Every [[levels]] entry produces macros for gamma, L_theta, rho, L_d, eta,
@@ -17,11 +18,11 @@ Invariants:
 
 Usage:
   python3 scripts/gen_parameters_tex.py
-      reads  latex/parameters.toml
+      reads  data/parameters.toml
       writes latex/parameters.tex (overwrite)
 
   python3 scripts/gen_parameters_tex.py --check
-      reads  latex/parameters.toml
+      reads  data/parameters.toml
       writes nothing; exits 1 if latex/parameters.tex would change
 
 The --check mode is used by CI to catch hand-edits to parameters.tex.
@@ -123,7 +124,7 @@ def generate_tex(config: dict[str, Any]) -> str:
         "% RCS — Canonical Parameters (auto-generated — do NOT edit by hand)",
         "% =============================================================================",
         "%",
-        "% This file is regenerated from latex/parameters.toml by",
+        "% This file is regenerated from data/parameters.toml by",
         "% scripts/gen_parameters_tex.py. CI verifies the two stay in sync.",
         "% Edit parameters.toml and re-run the generator instead.",
         "",

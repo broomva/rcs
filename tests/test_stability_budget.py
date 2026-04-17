@@ -116,7 +116,7 @@ class StabilityBudget:
 def test_eslami_stable_case():
     """Reproduce Eslami & Yu (2026) stable simulation parameters.
 
-    Parameters loaded from latex/parameters.toml::[eslami_2026.stable].
+    Parameters loaded from data/parameters.toml::[eslami_2026.stable].
     Expected λ ≈ +0.217 per Section V of arXiv:2603.10779.
     """
     case = _load_parameters()["eslami_2026"]["stable"]
@@ -131,7 +131,7 @@ def test_eslami_stable_case():
 def test_eslami_unstable_case():
     """Reproduce Eslami & Yu (2026) unstable simulation parameters.
 
-    Parameters loaded from latex/parameters.toml::[eslami_2026.unstable].
+    Parameters loaded from data/parameters.toml::[eslami_2026.unstable].
     Expected λ ≈ -4.662 per Section V of arXiv:2603.10779.
     """
     case = _load_parameters()["eslami_2026"]["unstable"]
@@ -261,10 +261,10 @@ def test_hysteresis_dwell_time():
 def test_recursive_all_levels_stable():
     """4-level RCS hierarchy (L0-L3) loaded from the canonical parameter file.
 
-    Parameters come from latex/parameters.toml::[[levels]] — the single source
+    Parameters come from data/parameters.toml::[[levels]] — the single source
     of truth shared with the paper (via latex/parameters.tex macros) and the
-    future Life integration harness. Time-scale separation: each level is
-    ~10x slower than the one below.
+    Rust Life harness (core/life/.../rcs_budget.rs via its mirror).
+    Time-scale separation: each level is ~10x slower than the one below.
 
     This test also verifies the [derived.lambda] and [derived.omega] caches
     in the TOML match the computed values, catching drift between the
