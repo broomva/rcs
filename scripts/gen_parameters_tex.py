@@ -61,13 +61,50 @@ def compute_level_costs(level: dict[str, Any]) -> dict[str, float]:
 
 
 def fmt(x: float) -> str:
-    """Format a float for LaTeX — compact but lossless within 6 decimals."""
+    """Format a float for LaTeX — compact but lossless within 6 decimals.
+
+    Used for the authoritative \\rcs<name> macros. Readers see ugly forms
+    like 1.000000e-06 for very small values; paper body should use the
+    \\rcs<name>Disp companion macros emitted by ``fmt_display``.
+    """
     if x == 0:
         return "0"
     if abs(x) >= 1e-3 and abs(x) < 1e6:
         s = f"{x:.6f}".rstrip("0").rstrip(".")
         return s if s else "0"
     return f"{x:.6e}"
+
+
+def fmt_display(x: float, digits: int) -> str:
+    """Format a float for paper display. Returns LaTeX math-mode content.
+
+    Rules:
+      - |x| within [10^-digits, 10^4): decimal with ``digits`` places,
+        trailing zeros stripped. E.g. 1.455357 with digits=3 -> "1.455".
+      - Smaller or larger: scientific notation "a \\times 10^{b}" with
+        mantissa to 1 decimal place. E.g. 1e-6 -> "1 \\times 10^{-6}".
+
+    Companion macros using this function (\\rcs...Disp) MUST be used
+    inside math mode in the paper body. Callers that need both a numeric
+    value (for comparison) and a displayable form should use the raw
+    \\rcs<name> macro for the former and \\rcs<name>Disp for the latter.
+    """
+    if x == 0:
+        return "0"
+    abs_x = abs(x)
+    threshold = 10 ** (-digits)
+    if threshold <= abs_x < 1e4:
+        s = f"{x:.{digits}f}"
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s if s else "0"
+    # Scientific notation: a \times 10^{b} with 1-decimal mantissa
+    exp = int(math.floor(math.log10(abs_x)))
+    mantissa = x / (10 ** exp)
+    m_str = f"{mantissa:.1f}"
+    if m_str.endswith(".0"):
+        m_str = m_str[:-2]
+    return f"{m_str} \\times 10^{{{exp}}}"
 
 
 def level_macro_suffix(level_id: str) -> str:
@@ -115,11 +152,17 @@ def generate_tex(config: dict[str, Any]) -> str:
             min_lambda = lam
             min_level = level["id"]
 
+        digits = level.get("display_digits", 4)
         for field in ("gamma", "L_theta", "rho", "L_d", "eta", "beta", "tau_bar", "nu", "tau_a"):
-            lines.append(f"\\newcommand{{\\rcs{field.replace('_', '')}{suffix}}}{{{fmt(level[field])}}}")
+            macro = f"rcs{field.replace('_', '')}{suffix}"
+            lines.append(f"\\newcommand{{\\{macro}}}{{{fmt(level[field])}}}")
+            lines.append(f"\\newcommand{{\\{macro}Disp}}{{{fmt_display(level[field], digits)}}}")
         for cost in ("adapt_cost", "design_cost", "delay_cost", "switch_cost"):
-            lines.append(f"\\newcommand{{\\rcs{cost.replace('_', '')}{suffix}}}{{{fmt(costs[cost])}}}")
+            macro = f"rcs{cost.replace('_', '')}{suffix}"
+            lines.append(f"\\newcommand{{\\{macro}}}{{{fmt(costs[cost])}}}")
+            lines.append(f"\\newcommand{{\\{macro}Disp}}{{{fmt_display(costs[cost], digits)}}}")
         lines.append(f"\\newcommand{{\\rcsmargin{suffix}}}{{{fmt(lam)}}}")
+        lines.append(f"\\newcommand{{\\rcsmargin{suffix}Disp}}{{{fmt_display(lam, digits)}}}")
         lines.append("")
 
     cached_omega = derived_omega.get("value")
