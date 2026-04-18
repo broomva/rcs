@@ -957,12 +957,13 @@ LLM-as-controller
 \bottomrule
 \end{tabular}
 \caption{Four instantiations of the RCS type signature.  Each row
-populates the 7-tuple on its own state space; the final column names
-the published witness that produces the per-level decay
-rate~$\decay_i > 0$ required by Assumption~\ref{ass:decay}.  With
-(H1)--(H7) discharged by the witnesses above,
-Theorem~\ref{thm:recursive} then composes levels into a finite-depth
-hierarchy with $\omega_N > 0$.}
+populates the 7-tuple on its own state space; the decay-witness column
+produces (H2).  The remaining per-level hypotheses (H1, H3--H5) follow
+from each row's state-space conventions (sandwich bounds,
+adaptation/design Lipschitz bounds, dwell-time structure); the global
+conditions (H6)--(H7) are imposed on the composed hierarchy.  When (H1,
+H3--H7) also hold, Theorem~\ref{thm:recursive} composes the rows into a
+finite-depth hierarchy with $\omega_N > 0$.}
 \label{tab:instantiations}
 \end{table}
 

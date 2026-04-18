@@ -474,7 +474,7 @@ LQR / classical
   & CBF~\cite{ames2019cbf}
   & Riccati / LMI; quadratic~$V$~\cite{khalil2002nonlinear}\\
 \addlinespace
-Dreamer a--c
+Dreamer actor--critic
   & Latent $z$
   & RSSM (Lip.)
   & Barrier
@@ -493,10 +493,12 @@ LLM ctrl.
   & $\sigma_{\max}$ + lift~\cite{soatto2023taming}\\
 \bottomrule
 \end{tabular}
-\caption{Four instantiations of the RCS type signature, each
-discharging (H1)--(H5) on its own state space via the cited decay
-witness.  Theorem~\ref{thm:recursive} then composes levels into a
-finite-depth hierarchy with $\omega_N > 0$.}
+\caption{Four instantiations of the RCS type signature.  The
+decay-witness column supplies (H2); per-level (H1, H3--H5) follow from
+each row's state-space conventions; the global conditions (H6)--(H7)
+are imposed on the composed hierarchy.  When (H1, H3--H7) also hold,
+Theorem~\ref{thm:recursive} composes levels into a finite-depth
+hierarchy with $\omega_N > 0$.}
 \label{tab:instantiations}
 \end{table}
 
