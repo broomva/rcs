@@ -191,6 +191,7 @@ Python 3.11+ required (uses `tomllib` stdlib). No third-party deps. CI is Python
 | #6 | rcs | cross-repo mirror contract doc note | `CLAUDE.md` |
 | #7 | rcs | repo layout refactor: `data/` for canonical inputs, `papers/pN/` for papers, `\SHAREDLATEX` macro | `data/`, `papers/`, `latex/`, `Makefile`, CI workflow |
 | #9 | rcs | D2 unified reframe: architecture-agnostic foundations + inductive `thm:recursive` + Instantiation Catalogue + 16 verified bib entries | `papers/p0-foundations/main{,-ieee}.tex`, `latex/references.bib`, `docs/research-notes/` |
+| #10 | rcs | D2.1 CodeRabbit review fixes: N₀ standing-max convention + Section VII caption scoping + conclusion sync with regime-restricted prop:triple + EGRI shield_2 row label update | `papers/p0-foundations/main{,-ieee}.tex`, `CLAUDE.md` |
 | life#802 | life | F2 Rust instrumentation: `StabilityBudget`, `MarginEstimator`, vigil OTel gauges, mirror of `parameters.toml` | `crates/autonomic/autonomic-core/src/rcs_budget.rs`, `crates/autonomic/autonomic-core/data/rcs-parameters.toml`, `crates/vigil/life-vigil/src/metrics.rs`, `scripts/sync-rcs-parameters.sh` |
 | life#803 | life | CI/CD cleanup: Rust 1.95 clippy cascade + RUSTSEC-2026-0097/0098/0099 | 10+ files across crates |
 | life#804 | life | end-to-end RCS validation: `RcsObserver`, daemon state observation, production-path test | `crates/arcan/arcand/src/rcs_observer.rs`, `crates/arcan/arcand/tests/rcs_validation.rs` |
