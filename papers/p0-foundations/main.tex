@@ -176,6 +176,16 @@ A switching signal $\mode(t)$ has \emph{average dwell time} $\taua$ if
 where $N_\mode(t, t+T)$ is the number of switches in $[t, t+T]$.
 \end{definition}
 
+\begin{remark}[Standing-max convention for $N_0$ across levels]
+\label{rem:N0-standing-max}
+In the recursive setting (Theorem~\ref{thm:recursive}), we write
+$N_0 := \max_i N_{0,i}$, where $N_{0,i}$ is the chatter bound of
+level~$i$'s switching signal; the hypothesis (H5) is to be read under
+this convention.  Writing the shared constant $N_0$ is then
+mathematically equivalent to taking the (finite) per-level supremum
+and keeps the recursion statement uniform.
+\end{remark}
+
 
 % =============================================================================
 \section{Controlled System}
