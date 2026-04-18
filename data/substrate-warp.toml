@@ -1,0 +1,180 @@
+# =============================================================================
+# RCS — Substrate Warp Coefficients
+# =============================================================================
+#
+# Per-substrate scaling coefficients for deployment planning. The RCS stability
+# theorem is substrate-invariant (λ_i > 0 holds in any medium where f and h
+# are well-defined operators), but deployment efficiency — cost per decision,
+# coordination cost at population N, memory access patterns, branching
+# capability — is substrate-dependent.
+#
+# These coefficients are the *w_x* warp factors from P7 (thermodynamic-limits).
+# They let `bstack plan --depth=N` select a cost-optimal substrate mix for
+# a given workload profile.
+#
+# Editing rules:
+#   - Numbers are empirical estimates; revise as measurements improve
+#   - Bump schema_version when adding fields
+#   - New substrates must include all five warp factors (use placeholder for
+#     unknown values but mark them explicitly)
+
+schema_version = 1
+
+# -----------------------------------------------------------------------------
+# Baseline: classical silicon (GPU inference cluster, NVIDIA H100-class)
+# -----------------------------------------------------------------------------
+# All other substrates express warp factors relative to this baseline.
+
+[substrates.classical_silicon]
+name = "Classical Silicon (GPU)"
+description = "Current AI inference baseline (H100-class GPUs in hyperscale datacenters)"
+time_warp         = 1.0             # baseline tempo
+energy_warp       = 1.0             # baseline energy/op
+coordination_warp = "quadratic"     # O(N²) naive; O(N log N) with gossip protocols
+memory_warp       = 1.0
+branching_warp    = "none"          # classical — no quantum superposition
+cost_per_5kw_yr_usd = 85155.0       # matches depth-0 anchor
+maturity = "production"
+reference_hardware = ["NVIDIA H100", "NVIDIA A100", "Google TPU v5"]
+
+# -----------------------------------------------------------------------------
+# Neuromorphic (event-driven spiking networks)
+# -----------------------------------------------------------------------------
+# Dramatic energy efficiency for sparse/temporal workloads. Limited for
+# dense matrix operations required by transformer attention.
+
+[substrates.neuromorphic]
+name = "Neuromorphic"
+description = "Event-driven spiking neural networks (Intel Loihi, IBM NorthPole, SpiNNaker)"
+time_warp         = 1.0             # comparable raw tempo
+energy_warp       = 0.01            # ~100× less energy per op for sparse workloads
+coordination_warp = "n_log_n"       # better coordination scaling
+memory_warp       = 1.0
+branching_warp    = "none"
+cost_per_5kw_yr_usd = 850.0         # ~100× cheaper raw power
+maturity = "research-to-production"
+reference_hardware = ["Intel Loihi 2", "IBM NorthPole", "BrainChip Akida"]
+notes = "Not suitable for dense transformer inference today; may converge with mixed signal AI chips"
+
+# -----------------------------------------------------------------------------
+# Quantum (superconducting / trapped-ion / photonic)
+# -----------------------------------------------------------------------------
+# Third orthogonal axis: branches in superposition. Exponential advantage
+# for search, sampling, simulation. Useless for general LLM inference.
+
+[substrates.quantum_superconducting]
+name = "Quantum (Superconducting)"
+description = "IBM / Google / Rigetti superconducting qubit processors at millikelvin temperatures"
+time_warp         = 0.1             # for Grover-amplifiable problems: 1/√N speedup ≈ 10× at moderate N
+energy_warp       = 100.0           # cryogenic cooling dominates energy
+coordination_warp = "entangled"     # no classical analog
+memory_warp       = "exponential"   # 2^Q states in superposition
+branching_warp    = 1.0             # reference quantum substrate
+max_qubits_today  = 1121            # IBM Condor (Dec 2023); scaling ~2×/yr
+logical_qubits_equivalent = 30      # after error correction overhead
+coherence_time_us = 100             # T1 / T2 typical
+cost_per_qubit_hour_usd = 1.0       # approximate cloud access pricing
+maturity = "nisq-era"
+reference_hardware = ["IBM Condor", "Google Willow", "IonQ Forte"]
+notes = "Useful for search/sampling/simulation subtasks within hybrid classical-quantum workflows. Not for general inference."
+
+[substrates.quantum_photonic]
+name = "Quantum (Photonic)"
+description = "Room-temperature photonic quantum computers (Xanadu, PsiQuantum)"
+time_warp         = 0.1
+energy_warp       = 5.0             # room-temperature operation
+coordination_warp = "entangled"
+memory_warp       = "exponential"
+branching_warp    = 1.0
+max_qubits_today  = 216             # Xanadu X-Series
+maturity = "research"
+reference_hardware = ["Xanadu Aurora", "PsiQuantum (future)"]
+
+# -----------------------------------------------------------------------------
+# Biological / organoid
+# -----------------------------------------------------------------------------
+# Extreme energy efficiency. Slow absolute tempo. Training is still hard.
+# Cortical Labs (DishBrain) is leading exemplar.
+
+[substrates.biological_organoid]
+name = "Biological (organoid)"
+description = "Cultured neuron networks on silicon interfaces (Cortical Labs DishBrain)"
+time_warp         = 10.0            # slower absolute tempo
+energy_warp       = 0.005           # ~200× more efficient than GPU
+coordination_warp = "linear"        # neuron networks scale well
+memory_warp       = 1.0
+branching_warp    = "none"
+cost_per_5kw_yr_usd = 425.0         # very rough estimate
+maturity = "research"
+reference_hardware = ["Cortical Labs DishBrain", "FinalSpark Neuroplatform"]
+notes = "Biological neurons use ~20W for entire human brain. Long-horizon pattern recognition may become viable."
+
+# -----------------------------------------------------------------------------
+# Hybrid (classical + quantum + neuromorphic)
+# -----------------------------------------------------------------------------
+# Most realistic near-term deployment. Classical orchestrator, quantum subsystems
+# for specific speedups, neuromorphic for sensor processing.
+
+[substrates.hybrid_classical_quantum]
+name = "Hybrid Classical-Quantum"
+description = "Classical orchestrator spawning quantum subsystems for compatible workloads"
+time_warp         = 0.5             # Grover speedup on ~20% of workload
+energy_warp       = 1.5             # quantum overhead partially offset by specialization
+coordination_warp = "quadratic"     # classical side dominates
+memory_warp       = 2.0             # quantum memory helps for specific subtasks
+branching_warp    = 0.3             # partial quantum
+maturity = "emerging"
+notes = "Most likely path to useful quantum-augmented agents in 2025-2030 timeframe"
+
+# -----------------------------------------------------------------------------
+# Workload → substrate preference mapping
+# -----------------------------------------------------------------------------
+# Used by `bstack plan` to pick substrates per task type.
+
+[workload_preferences.reasoning_llm]
+best_substrate = "classical_silicon"
+alternative    = "neuromorphic (future)"
+reason = "Dense matrix operations; transformers don't map to quantum or spiking well yet"
+
+[workload_preferences.search_optimization]
+best_substrate = "hybrid_classical_quantum"
+alternative    = "classical_silicon"
+reason = "Grover amplification for unstructured search; quantum annealing for QUBO formulations"
+
+[workload_preferences.sensor_processing]
+best_substrate = "neuromorphic"
+alternative    = "classical_silicon"
+reason = "Event-driven processing matches sparse sensor data; massive energy savings"
+
+[workload_preferences.population_simulation]
+best_substrate = "classical_silicon"
+alternative    = "quantum_superconducting (for very large N)"
+reason = "Quantum simulation of quantum systems has exponential advantage; classical systems benefit from classical compute"
+
+[workload_preferences.long_horizon_learning]
+best_substrate = "biological_organoid (research)"
+alternative    = "classical_silicon"
+reason = "Biological substrates may be viable for multi-year adaptation; not yet production-ready"
+
+# -----------------------------------------------------------------------------
+# Forecast
+# -----------------------------------------------------------------------------
+# Different substrates compound at different rates. A substrate-aware planner
+# tracks each curve separately.
+
+[forecast.classical_silicon]
+efficiency_yoy_low  = 1.5
+efficiency_yoy_high = 3.0
+rationale = "Moore's law slowing; specialization + memory hierarchy gains"
+
+[forecast.neuromorphic]
+efficiency_yoy_low  = 2.0
+efficiency_yoy_high = 5.0
+rationale = "Earlier curve position; larger headroom per generation"
+
+[forecast.quantum_superconducting]
+qubits_yoy = 2.0
+error_rate_improvement_yoy = 1.5
+rationale = "Exponential qubit scaling + polynomial error correction improvements"
+break_even_logical_qubits = 100
+break_even_year = 2030

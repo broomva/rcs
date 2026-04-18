@@ -1,0 +1,152 @@
+# =============================================================================
+# RCS — Depth/Cost/Cadence Scale Table
+# =============================================================================
+#
+# Canonical mapping: recursion depth → power/cost/cadence, anchored to
+# present-day Claude Opus-class agent economics and extrapolated to the
+# Kardashev scale.
+#
+# Relationship to parameters.toml:
+#   - parameters.toml carries the vertical λ budget (4-level hierarchy)
+#   - depth-cost-scale.toml carries the horizontal economic budget (unbounded depth)
+#   - Both feed P7 (thermodynamic-limits paper).
+#
+# This file is used by:
+#   - Paper 7 (research/rcs/papers/p7-thermodynamic-limits/) for the depth table
+#   - Future `bstack plan --depth=N` CLI for forecast outputs
+#
+# Editing rules:
+#   - Update [anchors.depth_zero] when model pricing changes materially
+#   - Update [scaling] when empirical data changes assumed coefficients
+#   - Bump schema_version when adding/removing fields
+#   - [derived.depth_table] is cache; regenerator verifies
+
+schema_version = 1
+
+# -----------------------------------------------------------------------------
+# Depth-0 anchor: one fully-utilized Claude Opus-class agent
+# -----------------------------------------------------------------------------
+# Sustained (100% duty cycle) numbers. Duty-cycle adjustment is applied
+# downstream by the planner based on workload.
+
+[anchors.depth_zero]
+description     = "One fully-utilized Claude Opus-class agent at current pricing"
+date_anchored   = "2026-04-18"
+power_kw        = 5.0              # datacenter allocation (GPU + cooling + networking)
+tokens_per_sec  = 100.0            # sustained output rate
+tokens_per_day  = 8.64e6           # 24h × 3600s × 100 tok/s
+input_ratio     = 0.8              # 80% of tokens are input (context)
+output_ratio    = 0.2              # 20% of tokens are output
+price_input_per_mtok_usd  = 15.0   # Claude Opus 4.x input pricing
+price_output_per_mtok_usd = 75.0   # Claude Opus 4.x output pricing
+blended_price_per_mtok_usd = 27.0  # weighted: 0.8*15 + 0.2*75
+cost_per_day_usd  = 233.3          # 8.64M tok/day × $27/MTok
+cost_per_year_usd = 85155.0        # 365 × $233/day
+electricity_per_year_usd = 4380.0  # 5 kW × 24 × 365 × $0.10/kWh
+api_markup_factor = 19.4            # blended cost / raw electricity
+
+# -----------------------------------------------------------------------------
+# Scaling coefficients (per recursion depth)
+# -----------------------------------------------------------------------------
+# Every additional depth multiplies agent count by N and compresses decision
+# cadence by κ. Sub-linear coordination penalty η(N) is applied to cost.
+
+[scaling]
+agents_per_depth      = 10         # N (population per level)
+time_dilation_factor  = 10         # κ (≥10 required by singular perturbation)
+coordination_penalty_base = 1.2    # η₀ in η(N) = η₀ · log(N)
+description = "Each depth adds 10× agents and 10× slower cadence"
+
+# -----------------------------------------------------------------------------
+# Kardashev anchors
+# -----------------------------------------------------------------------------
+# Sanity benchmarks for comparing computed depth powers to real-world reference
+# points. Used by P7 narrative and by depth-cost-scale consistency tests.
+
+[kardashev.type_0]
+name = "Current civilization"
+power_w = 1.8e13                   # ~18 TW global average
+corresponds_to_depth = 8.0         # approximate continuous mapping
+
+[kardashev.type_1]
+name = "Planetary civilization"
+power_w_low  = 1.0e13              # 10 TW
+power_w_high = 1.0e17              # 10^17 W
+corresponds_to_depth_low  = 8.0
+corresponds_to_depth_high = 12.0
+
+[kardashev.type_2]
+name = "Stellar civilization"
+power_w = 3.8e26                   # solar output
+corresponds_to_depth = 17.0
+
+[kardashev.type_3]
+name = "Galactic civilization"
+power_w = 1.0e36
+corresponds_to_depth = 23.0
+
+[kardashev.anchors]
+hyperscale_datacenter_today_w = 5.0e8   # 500 MW
+hyperscale_datacenter_depth   = 5.0
+us_electricity_avg_w          = 4.5e11  # 450 GW
+us_electricity_depth          = 7.5
+
+# -----------------------------------------------------------------------------
+# Two ceilings: utility vs thermodynamic
+# -----------------------------------------------------------------------------
+
+[ceilings.utility]
+description = "Max depth at which decision cadence is human-relevant (within civilizational horizons)"
+depth_limit = 5.0
+rationale   = "Beyond depth 4-5, decision cadence exceeds decade-century horizons"
+
+[ceilings.thermodynamic.earth]
+description = "Max depth feasible with global electricity budget"
+depth_limit = 9.0
+rationale   = "Depth 9 ≈ 10^13 W ≈ total current global electricity consumption"
+
+[ceilings.thermodynamic.kardashev_1]
+depth_limit = 10.0
+rationale   = "Full planetary energy capture"
+
+[ceilings.thermodynamic.kardashev_2]
+depth_limit = 17.0
+rationale   = "Stellar-scale energy capture (Dyson sphere territory)"
+
+# -----------------------------------------------------------------------------
+# Derived depth table (cached, regenerator verifies)
+# -----------------------------------------------------------------------------
+
+[derived.depth_table]
+# Each row: [depth, agents_total, power_kw, cost_per_year_usd, l0_tempo_seconds, l3_tempo_seconds]
+# agents_total = N^depth
+# power_kw = N^depth × 5 kW × coordination_penalty
+# cost = N^depth × $85k/year × coordination_penalty
+# l0_tempo = 10 seconds × κ^depth
+# l3_tempo = hour × κ^depth (agent-native L3 assumed)
+
+depth_0 = { name = "Individual",       agents = 1,        power_kw = 5.0,         cost_usd_yr = 85155.0,      l0_tempo_s = 10.0,     l3_tempo_s = 3600.0       }
+depth_1 = { name = "Team",             agents = 10,       power_kw = 50.0,        cost_usd_yr = 851550.0,     l0_tempo_s = 100.0,    l3_tempo_s = 36000.0      }
+depth_2 = { name = "Institution",      agents = 100,      power_kw = 500.0,       cost_usd_yr = 8515500.0,    l0_tempo_s = 1000.0,   l3_tempo_s = 360000.0     }
+depth_3 = { name = "Civilization",     agents = 1000,     power_kw = 5000.0,      cost_usd_yr = 85155000.0,   l0_tempo_s = 10000.0,  l3_tempo_s = 3600000.0    }
+depth_4 = { name = "Species",          agents = 10000,    power_kw = 50000.0,     cost_usd_yr = 851550000.0,  l0_tempo_s = 100000.0, l3_tempo_s = 36000000.0   }
+depth_5 = { name = "Planet",           agents = 100000,   power_kw = 500000.0,    cost_usd_yr = 8.5155e9,     l0_tempo_s = 1.0e6,    l3_tempo_s = 3.6e8        }
+depth_6 = { name = "Solar system",     agents = 1000000,  power_kw = 5000000.0,   cost_usd_yr = 8.5155e10,    l0_tempo_s = 1.0e7,    l3_tempo_s = 3.6e9        }
+depth_7 = { name = "Stellar cluster",  agents = 10000000, power_kw = 50000000.0,  cost_usd_yr = 8.5155e11,    l0_tempo_s = 1.0e8,    l3_tempo_s = 3.6e10       }
+depth_8 = { name = "Galactic arm",     agents = 100000000,power_kw = 500000000.0, cost_usd_yr = 8.5155e12,    l0_tempo_s = 1.0e9,    l3_tempo_s = 3.6e11       }
+
+# -----------------------------------------------------------------------------
+# Forecast coefficients (how depth ceiling rises over time)
+# -----------------------------------------------------------------------------
+
+[forecast]
+compute_efficiency_yoy_low  = 3.0    # 3× per year (conservative)
+compute_efficiency_yoy_high = 10.0   # 10× per year (optimistic)
+description = "Per-year compute efficiency gains; every depth gets cheaper at this rate"
+
+# Example: depth-5 affordability over time
+[forecast.depth_5_affordability]
+today_usd_yr       = 8.5155e9        # $8.5B/yr today
+five_years_5x_yr   = 2.72e6          # $2.7M/yr at 5×/yr compression over 5yrs
+ten_years_5x_yr    = 870.0           # $870/yr at 5×/yr compression over 10yrs
+rationale = "At 5×/yr compute efficiency, planetary-scale depth becomes hobbyist-affordable within a decade"
