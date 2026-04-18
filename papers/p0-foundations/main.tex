@@ -176,6 +176,16 @@ A switching signal $\mode(t)$ has \emph{average dwell time} $\taua$ if
 where $N_\mode(t, t+T)$ is the number of switches in $[t, t+T]$.
 \end{definition}
 
+\begin{remark}[Standing-max convention for $N_0$ across levels]
+\label{rem:N0-standing-max}
+In the recursive setting (Theorem~\ref{thm:recursive}), we write
+$N_0 := \max_i N_{0,i}$, where $N_{0,i}$ is the chatter bound of
+level~$i$'s switching signal; the hypothesis (H5) is to be read under
+this convention.  Writing the shared constant $N_0$ is then
+mathematically equivalent to taking the (finite) per-level supremum
+and keeps the recursion statement uniform.
+\end{remark}
+
 
 % =============================================================================
 \section{Controlled System}
@@ -655,7 +665,7 @@ where:
   $\U_2$ & Mutation operators $\M$ & Proposed changes to $\X_2$ \\
   $\dyn_2$ & Trial execution & propose $\to$ execute $\to$ evaluate $\to$ select \\
   $\obs_2$ & Evaluator $\score$ & $\score : \text{traces} \to \setR^d$ \\
-  $\shield_2$ & Budget $+$ rollback $+$ immutable evaluator & Laws 3, 4, 5 \\
+  $\shield_2$ & Immutable evaluator $+$ budget $+$ rollback & DP2, Law~2, DP3 \\
   $\ctrl_2$ & Proposer $+$ selector & Mutation strategy \\
   \bottomrule
 \end{tabular}
@@ -947,12 +957,13 @@ LLM-as-controller
 \bottomrule
 \end{tabular}
 \caption{Four instantiations of the RCS type signature.  Each row
-populates the 7-tuple on its own state space; the final column names
-the published witness that produces the per-level decay
-rate~$\decay_i > 0$ required by Assumption~\ref{ass:decay}.  With
-(H1)--(H7) discharged by the witnesses above,
-Theorem~\ref{thm:recursive} then composes levels into a finite-depth
-hierarchy with $\omega_N > 0$.}
+populates the 7-tuple on its own state space; the decay-witness column
+produces (H2).  The remaining per-level hypotheses (H1, H3--H5) follow
+from each row's state-space conventions (sandwich bounds,
+adaptation/design Lipschitz bounds, dwell-time structure); the global
+conditions (H6)--(H7) are imposed on the composed hierarchy.  When (H1,
+H3--H7) also hold, Theorem~\ref{thm:recursive} composes the rows into a
+finite-depth hierarchy with $\omega_N > 0$.}
 \label{tab:instantiations}
 \end{table}
 

@@ -160,6 +160,13 @@ A switching signal $\mode(t)$ has \emph{average dwell time} $\taua$ if
 $N_\mode(t, t{+}T) \leq N_0 + T/\taua$ for all $t, T \geq 0$.
 \end{definition}
 
+\begin{remark}[Standing-max convention for $N_0$]
+\label{rem:N0-standing-max}
+In the recursive setting (Theorem~\ref{thm:recursive}), we write
+$N_0 := \max_i N_{0,i}$, where $N_{0,i}$ is the chatter bound of
+level~$i$'s switching signal; (H5) is read under this convention.
+\end{remark}
+
 % =============================================================================
 \section{Controlled System}
 \label{sec:controlled-system}
@@ -467,7 +474,7 @@ LQR / classical
   & CBF~\cite{ames2019cbf}
   & Riccati / LMI; quadratic~$V$~\cite{khalil2002nonlinear}\\
 \addlinespace
-Dreamer a--c
+Dreamer actor--critic
   & Latent $z$
   & RSSM (Lip.)
   & Barrier
@@ -486,10 +493,12 @@ LLM ctrl.
   & $\sigma_{\max}$ + lift~\cite{soatto2023taming}\\
 \bottomrule
 \end{tabular}
-\caption{Four instantiations of the RCS type signature, each
-discharging (H1)--(H5) on its own state space via the cited decay
-witness.  Theorem~\ref{thm:recursive} then composes levels into a
-finite-depth hierarchy with $\omega_N > 0$.}
+\caption{Four instantiations of the RCS type signature.  The
+decay-witness column supplies (H2); per-level (H1, H3--H5) follow from
+each row's state-space conventions; the global conditions (H6)--(H7)
+are imposed on the composed hierarchy.  When (H1, H3--H7) also hold,
+Theorem~\ref{thm:recursive} composes levels into a finite-depth
+hierarchy with $\omega_N > 0$.}
 \label{tab:instantiations}
 \end{table}
 
@@ -512,8 +521,14 @@ where the same 7-tuple structure applies at every level of the agent
 hierarchy.  The recursive stability budget~\eqref{eq:budget} provides
 quantitative conditions for composite stability, unifying adaptation rate,
 switching frequency, delay, and design evolution costs.  The homeostatic
-drive serves as a triple-purpose Lyapunov function, and the EGRI meta-controller's
-Five Laws map to necessary stability conditions.
+drive admits a \emph{regime-restricted triple interpretation} as
+Lyapunov function, reward signal, and negative free energy
+(Proposition~\ref{prop:triple}); each reading holds under stated
+conditions, not universally.  Of EGRI's five statements, two (capacity,
+budget closure) map to stability inequalities used in the budget, while
+the remaining three (DP1--DP3) are design principles that shape the
+meta-controller but do not follow from the budget and are not invoked
+in any proof.
 
 Future work includes full proofs under weaker time-scale separation
 assumptions, empirical validation on the Life Agent OS~\cite{eslami2026control},
