@@ -521,8 +521,14 @@ where the same 7-tuple structure applies at every level of the agent
 hierarchy.  The recursive stability budget~\eqref{eq:budget} provides
 quantitative conditions for composite stability, unifying adaptation rate,
 switching frequency, delay, and design evolution costs.  The homeostatic
-drive serves as a triple-purpose Lyapunov function, and the EGRI meta-controller's
-Five Laws map to necessary stability conditions.
+drive admits a \emph{regime-restricted triple interpretation} as
+Lyapunov function, reward signal, and negative free energy
+(Proposition~\ref{prop:triple}); each reading holds under stated
+conditions, not universally.  Of EGRI's five statements, two (capacity,
+budget closure) map to stability inequalities used in the budget, while
+the remaining three (DP1--DP3) are design principles that shape the
+meta-controller but do not follow from the budget and are not invoked
+in any proof.
 
 Future work includes full proofs under weaker time-scale separation
 assumptions, empirical validation on the Life Agent OS~\cite{eslami2026control},
