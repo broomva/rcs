@@ -53,18 +53,22 @@ A Self-Similar Formalization for\\Autonomous AI Agents}
 \maketitle
 
 \begin{abstract}
-We introduce the Recursive Controlled System (RCS), a self-similar
-formalization of autonomous AI agents grounded in control theory.  An RCS is a
-7-tuple $\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$ whose controller
-$\ctrl$ is itself an RCS at the next hierarchical level.  We define the
-homeostatic drive as a Lyapunov candidate unifying stability analysis,
-reinforcement learning, and active inference.  Extending the stability budget
-of Eslami \& Yu~\cite{eslami2026control} to the recursive case, we state
-conditions under which the composite multi-level system is exponentially
-stable.  The formalization subsumes four major frameworks---Eslami's
-agency hierarchy, Ashby's ultrastability, Beer's Viable System Model,
-and active inference---under a single recursive definition with quantitative
-stability conditions.
+We introduce the Recursive Controlled System (RCS), a control-theoretic
+\emph{type signature} $\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$
+whose controller~$\ctrl$ is itself an RCS at the next hierarchical
+level.  The formalization is agnostic with respect to the controller
+class: classical regulators, latent world models, JEPA-family
+predictors, and LLM-based policies each enter as instantiations that
+discharge the same assumptions on their own state space.  We define the
+homeostatic drive as a common notation covering Lyapunov, reward, and
+free-energy interpretations in their respective regimes.  Extending the
+stability budget of Eslami \& Yu~\cite{eslami2026control} to
+finite-depth hierarchies, we prove by induction on depth~$N$ that if
+the per-level stability budget is positive and a time-scale-separation
+bound holds, the composite state decays exponentially at rate
+$\omega_N = \min_i \stab_i$.  An instantiation catalogue illustrates
+how LQR, Dreamer, V-JEPA~2, and LLM controllers populate the type
+signature.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -76,29 +80,59 @@ stability conditions.
 \section{Introduction}
 % =============================================================================
 
-Autonomous AI agents increasingly operate as controllers of complex systems,
-from energy microgrids to software infrastructure.  Yet the agent itself---its
-internal state, cognitive resources, and economic constraints---is a dynamical
-system that must also be regulated.  This creates a recursive structure: the
-agent controls a plant, a regulator controls the agent, an optimizer tunes the
-regulator, and a governance layer constrains the optimizer.
+Autonomous AI agents increasingly operate as controllers of complex
+systems, from energy microgrids to software infrastructure.  Yet the
+agent itself---its internal state, cognitive resources, and economic
+constraints---is a dynamical system that must also be regulated.  This
+creates a recursive structure: one controller regulates a plant, a
+meta-controller regulates the first controller, and a governance layer
+constrains the meta-controller.
 
-We formalize this structure as a \emph{Recursive Controlled System} (RCS): a
-7-tuple $\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$ whose controller
-$\ctrl$ is itself an RCS at the next hierarchical level.  The same
-state-space formalism---state, observation, control, dynamics, safety shield,
-controller---applies at every level, producing a self-similar hierarchy.
+\paragraph{Framework, not instantiation.}
+We formalize this structure \emph{agnostically with respect to the
+controller implementation}.  The Recursive Controlled System (RCS) is a
+7-tuple $\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$---a
+\emph{type signature} over which stability theorems
+operate---not a commitment to any particular plant or policy class.
+Concrete controllers (classical LQR
+regulators~\cite{khalil2002nonlinear}, Dreamer-style latent world
+models~\cite{hafner2025dreamerv3}, JEPA-family
+predictors~\cite{assran2025vjepa2}, and LLM-based
+policies~\cite{bhargava2023magic,soatto2023taming}) are
+\emph{instantiations} of the type signature, each entering by
+discharging the per-level assumptions in its own regime.
+Section~\ref{sec:instantiations} catalogues four representative
+instantiations with their stability witnesses.
 
-Our main contributions are:
+\paragraph{Open problem this paper addresses.}
+The closest published articulation of the same ambition is LeCun's
+position paper~\cite{lecun2022path}, which sketches a six-module
+autonomous agent architecture with an intrinsic cost module whose
+stability is \emph{assumed} rather than derived, and an informal
+hierarchical JEPA (H-JEPA) whose composite stability is not stated as a
+theorem.  Our finite-depth induction (Theorem~\ref{thm:recursive})
+closes this gap: given per-level assumptions that modern world
+models~\cite{hafner2025dreamerv3,assran2025vjepa2}, classical
+regulators~\cite{khalil2002nonlinear}, and LLM controller
+architectures~\cite{bhargava2023magic,soatto2023taming,wang2026agentspec}
+are each known to satisfy on their respective state spaces, we obtain
+composite exponential stability for any hierarchy of finite depth.
+
+\paragraph{Contributions.}
 \begin{enumerate}
-  \item The RCS definition with self-similar recursion (Section~\ref{sec:rcs}).
-  \item The homeostatic drive as a unified Lyapunov function, reward signal,
-        and free energy bound (Section~\ref{sec:drive}).
+  \item The RCS definition as a recursive type signature
+        (Section~\ref{sec:rcs}).
+  \item The homeostatic drive as a common notation covering three
+        regime-restricted interpretations (Section~\ref{sec:drive}).
   \item A recursive stability budget extending Eslami \& Yu's
-        Theorem~2~\cite{eslami2026control} to multi-level hierarchies
-        (Section~\ref{sec:stability}).
-  \item The EGRI meta-controller formalized as Level~2 of the hierarchy,
-        with Five Laws mapped to stability conditions
+        Theorem~2~\cite{eslami2026control} to finite-depth hierarchies,
+        proven by induction on depth (Section~\ref{sec:stability}).
+  \item An instantiation catalogue showing how LQR, Dreamer, V-JEPA~2,
+        and LLM-as-controller each discharge the assumptions
+        (Section~\ref{sec:instantiations}).
+  \item The EGRI meta-controller as an instance of~$\rcs_2$, with two
+        of its Five Laws admitting derived formal content and the
+        remaining three recast as design principles
         (Section~\ref{sec:egri}).
 \end{enumerate}
 
@@ -161,9 +195,18 @@ $\ctrl = \rcs' = (\X', \Y', \U', \dyn', \obs', \shield', \ctrl')$.
 This produces a hierarchy $\Li{0}, \Li{1}, \Li{2}, \ldots$ where level
 $\Li{i}$ has controller $\Li{i+1}$, state $\X_{i+1}$ includes the
 parameters of $\Li{i}$'s controller, observation $\Y_{i+1}$ derives from
-$\Li{i}$'s performance, and control $\U_{i+1}$ modifies $\Li{i}$'s behavior.
-The hierarchy is a fixed point: $\text{RCS} \cong F(\text{RCS})$.
+$\Li{i}$'s performance, and control $\U_{i+1}$ modifies $\Li{i}$'s
+behavior.
 \end{definition}
+
+\begin{remark}[Structural self-similarity]
+\label{rem:structural-self-similarity}
+The same 7-tuple signature is reused at every level; in practice, the
+hierarchy has finite depth $N \leq 4$ (plant, adapter, meta-controller,
+governance).  The recursion is notational convenience, and
+Theorem~\ref{thm:recursive} proves composite stability by induction on
+this finite depth, without invoking a categorical fixed point.
+\end{remark}
 
 % =============================================================================
 \section{Homeostatic Drive as Lyapunov Function}
@@ -177,19 +220,30 @@ $\drive{i}(x) = \norm{x - \setpoint{i}}^2$,
 where $\setpoint{i}$ is the setpoint at level $i$.
 \end{definition}
 
-\begin{proposition}[Triple equivalence]
+\begin{proposition}[Three regime-restricted interpretations of $\drive{i}$]
 \label{prop:triple}
-Under appropriate mappings, $\drive{i}$ serves simultaneously as:
-(1)~a \textbf{Lyapunov function} certifying asymptotic stability;
-(2)~a \textbf{reward signal} via drive reduction $r_k = \drive{i}(x_k) -
-\drive{i}(x_{k+1})$~\cite{keramati2014homeostatic};
-(3)~a \textbf{free energy bound} under linear generative
-models~\cite{baltieri2019pid, friston2009reinforcement}.
+The drive $\drive{i}$ admits three interpretations, each holding in its
+own regime:
+(1)~a \textbf{Lyapunov function} certifying asymptotic stability in the
+quadratic-$V$ regime where Assumption~\ref{ass:per-level}
+holds~\cite{khalil2002nonlinear};
+(2)~a \textbf{reward signal} via drive reduction
+$r_k = \drive{i}(x_k) - \drive{i}(x_{k+1})$, for bounded physiological
+drives with pre-specified setpoints~\cite{keramati2014homeostatic};
+(3)~a \textbf{free-energy bound} under linear-Gaussian generative
+models with prior preferences at~$\setpoint{i}$, recovering active
+inference~\cite{baltieri2019pid,friston2009reinforcement}.
+The three regimes overlap only under linear-quadratic dynamics with
+pre-specified setpoints; a single notation unifies them, a single
+theorem does not.
 \end{proposition}
 
 Unlike unbounded reward maximization, $\drive{i}$ saturates at
-$\drive{i}(\setpoint{i}) = 0$, providing inherent safety
-guarantees~\cite{mineault2024neuroai}.
+$\drive{i}(\setpoint{i}) = 0$, which \emph{prevents unbounded resource
+acquisition} once equilibrium is
+reached~\cite{mineault2024neuroai}; this is narrower than ``safety''
+in the specification-gaming or Goodharting sense, which remains
+outside the scope of this paper.
 
 % =============================================================================
 \section{Recursive Stability Budget}
@@ -235,29 +289,75 @@ The \emph{stability budget} at level $\Li{i}$ is:
 \end{equation}
 \end{definition}
 
-\begin{theorem}[Recursive stability]
+\paragraph{Standing hypotheses.}
+For a finite RCS hierarchy $\rcs_0, \ldots, \rcs_N$ with
+$\ctrl_i = \rcs_{i+1}$ for $i < N$, take the following as standing:
+\textbf{(H1)}~per-level Lyapunov, Assumption~\ref{ass:per-level};
+\textbf{(H2)}~frozen decay $\decay_i > 0$, Assumption~\ref{ass:decay};
+\textbf{(H3)}~adaptation coupling with $L_{\param,i}, \rho_i$ (vacuous
+at $i = N$);
+\textbf{(H4)}~design coupling with $L_{d,i}, \eta_i$ (vacuous at $i = N$);
+\textbf{(H5)}~delay, jump, and dwell parameters
+$\beta_i, \taubar_i, \nu_i, \taua[i]$,
+Assumption~\ref{ass:coupling};
+\textbf{(H6)}~time-scale separation: $\exists\, c > 1$ such that
+$\taua[i+1] \geq c \cdot \taua[i]$ for every $i < N$;
+\textbf{(H7)}~positive budget: $\stab_i > 0$ for every $i$.
+
+\begin{theorem}[Recursive stability, inductive form]
 \label{thm:recursive}
-Consider an RCS hierarchy $\rcs_0, \ldots, \rcs_N$ satisfying
-Assumptions~\ref{ass:per-level}--\ref{ass:coupling} with time-scale
-separation between levels.  If $\stab_i > 0$ for all $i$,
-then the composite state $\chi = (x_0, \ldots, x_N)$ converges
-exponentially:
-\begin{equation}
-  \norm{\chi(t)} \leq K e^{-\omega t} \norm{\chi(0)},
-  \quad \omega = \min_i \stab_i.
-\end{equation}
+Under (H1)--(H7), any finite RCS hierarchy of depth $N \geq 0$ admits a
+composite Lyapunov function
+$\lyap{\leq N}: \prod_{i=0}^{N} \X_i \to \setR_{\geq 0}$ and scalars
+$K_N > 0$, $\omega_N > 0$ with
+\begin{align}
+  \lyap{\leq N}(\chi(t))
+    &\leq K_N\, e^{-\omega_N t}\, \lyap{\leq N}(\chi(0)), \\
+  \omega_N &= \min_{0 \leq i \leq N} \stab_i > 0.
+\end{align}
 \end{theorem}
 
-\begin{proof}[Proof sketch]
-By singular perturbation, each level sees higher levels as quasi-static.
-The per-level Lyapunov derivative is
-$\Delta\lyap{i} \leq -(\stab_i + \ln\nu_i/\taua[i])\lyap{i}$.
-Combining with jump growth and applying the average dwell-time
-condition~\cite{hespanha1999stability} yields
-$\lyap{i}(T) \leq \nu_i^{N_0} e^{-\stab_i T}\lyap{i}(0)$.
-The composite $V = \sum_i \alpha_i\lyap{i}$ decays at rate
-$\omega = \min_i \stab_i$.
+\begin{proof}
+Let $P(N)$ denote the claim for depth $\leq N$.  We induct on~$N$.
+
+\emph{Base case ($N=0$).}  With (H3) and (H4) vacuous at the top, (H1)
+and (H2) at $i=0$ combined with (H5) and the Hespanha--Morse
+dwell-time formula~\cite{hespanha1999stability} yield
+$\lyap{0}(t) \leq \nu_0^{N_0} e^{-\stab_0 t} \lyap{0}(0)$.
+Set $\lyap{\leq 0} := \lyap{0}$, $\omega_0 := \stab_0 > 0$ by (H7).
+
+\emph{Inductive step.}  Given $P(n)$, consider depth $n+1$.  Apply
+$P(n)$ to the sub-hierarchy $\rcs_0, \ldots, \rcs_n$, with $\rcs_{n+1}$
+supplying the quasi-static adaptation/design perturbations to level~$n$
+absorbed into $\stab_n$ via (H3)--(H4); this gives $\lyap{\leq n}$ at
+rate $\omega_n = \min_{i \leq n} \stab_i$.  At level~$n+1$, (H1), (H2),
+and (H5) with vacuous (H3)--(H4) yield
+$\lyap{n+1}(t) \leq \nu_{n+1}^{N_0} e^{-\stab_{n+1} t}
+\lyap{n+1}(0)$.  By (H6), $\taua[n+1] \geq c\, \taua[n]$ with $c > 1$
+places level~$n+1$ strictly slower than the sub-hierarchy, which
+discharges the time-scale hypothesis of Tikhonov's singular-perturbation
+theorem (Khalil~\cite{khalil2002nonlinear}~Thm.~11.4 /
+Liberzon~\cite{liberzon2003switching}~Thm.~3.1).  Choosing
+$\alpha_{n+1} > 0$ per the standard Tikhonov construction and setting
+\begin{equation}
+  \lyap{\leq n+1}(\chi)
+    := \lyap{\leq n}(x_0,\ldots,x_n) + \alpha_{n+1}\lyap{n+1}(x_{n+1}),
+\end{equation}
+the Tikhonov bound yields
+$\Delta \lyap{\leq n+1} \leq -\min(\omega_n, \stab_{n+1})
+\lyap{\leq n+1}$, giving
+$\omega_{n+1} = \min(\omega_n, \stab_{n+1})
+= \min_{i \leq n+1} \stab_i$ which is positive by (H7).
 \end{proof}
+
+\begin{remark}[Orphan check]
+\label{rem:orphan-check}
+Every standing hypothesis is invoked at least once: (H1), (H2), (H5)
+in the base case and the top-level bound; (H3), (H4) in the coupling
+step where they enter $\stab_n$ through the inductive hypothesis;
+(H6) in the Tikhonov invocation; (H7) in the positivity of
+$\omega_N$.
+\end{remark}
 
 % =============================================================================
 \section{EGRI as Level~2 Meta-Controller}
@@ -268,22 +368,27 @@ The Evaluator-Governed Recursive Improvement (EGRI) framework instantiates
 $\rcs_2$ with artifact state as $\X_2$, evaluator scores as $\Y_2$, mutation
 operators as $\U_2$, and budget closure + rollback as $\shield_2$.
 
-Five laws govern safe meta-control:
-\begin{law}[Evaluator supremacy]
-Loop safety $\leq$ evaluator quality.
-\end{law}
-\begin{law}[Mutation-evaluation proportionality]
+\paragraph{Two laws admit formal content.}  Two of the Five Laws of
+EGRI follow directly from the stability budget:
+\begin{law}[Mutation--evaluation proportionality]
+\label{law:capacity}
 $|\M| \leq \text{capacity}(\score)$ (Ashby~\cite{ashby1956introduction}).
 \end{law}
-\begin{law}[Evaluator immutability]
-Never mutate evaluator and artifact in the same trial.
-\end{law}
 \begin{law}[Budget closure]
+\label{law:budget}
 $\budget(t_{k+1}) < \budget(t_k)$; $\budget = 0 \Rightarrow$ halt.
 \end{law}
-\begin{law}[Rollback guarantee]
-Promoted states form a forward-invariant set.
-\end{law}
+\paragraph{Three design principles.}  The remaining three are
+\emph{design principles}: policy statements that shape the
+meta-controller but do not follow from the stability budget and are
+not invoked in any proof.
+\textbf{(DP1)~Evaluator supremacy:} loop safety is bounded by evaluator
+quality.
+\textbf{(DP2)~Evaluator immutability:} never mutate evaluator and
+artifact in the same trial; the analogy with the LQG separation
+principle is motivating but not derived for arbitrary artifacts.
+\textbf{(DP3)~Rollback guarantee:} promoted states are required, by
+design, to form a forward-invariant set under the rollback operation.
 
 \begin{proposition}[EGRI--stability coupling]
 For $\stab_1 > 0$, the EGRI mutation magnitude must satisfy:
@@ -299,9 +404,14 @@ For $\stab_1 > 0$, the EGRI mutation magnitude must satisfy:
 % =============================================================================
 
 \begin{definition}[Fold observer]
+\label{def:fold}
 At level $\Li{1}$, the \emph{fold observer} computes
-$\homostate_{k+1} = \text{fold}(\homostate_k, y_k)$---a Mealy machine
-equivalent to a Luenberger observer with $A = I$.
+$\homostate_{k+1} = \text{fold}(\homostate_k, y_k)$---a Mealy
+accumulator over the event stream.  The analogy with a Luenberger
+observer (with $A = I$ and full gain on measurements) holds only when
+plant dynamics are slower than the folding rate; outside that regime,
+the Luenberger framing is notational rather than technical, and no
+plant-prediction cancellation is performed.
 \end{definition}
 
 \begin{proposition}[Sufficiency]
@@ -327,6 +437,70 @@ resilience~\cite{chacon2025cooperative}:
   J_{jl} = \frac{t_i + F_{jl}\Delta t_f + G_{jl}\Delta t_r}
   {t_i + \Delta t_f + \Delta t_r}.
 \end{equation}
+
+% =============================================================================
+\section{Instantiation Catalogue}
+\label{sec:instantiations}
+% =============================================================================
+
+The RCS 7-tuple is a \emph{type signature}.  Each concrete controller
+populates the signature by discharging the per-level assumptions
+(H1)--(H5) on its own state space.  Table~\ref{tab:instantiations}
+lists four representative instantiations with the published result
+that supplies the per-level~$\decay_i > 0$ required by (H2).  The
+table is not exhaustive: additional instantiations (PID-style
+activation steering, CBF-QP over continuous plants, EGRI as $\rcs_2$)
+can be added by identifying their state space, dynamics, shield, and
+per-level decay witness.
+
+\begin{table}[h]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}p{1.0cm}p{1.1cm}p{1.4cm}p{1.3cm}p{2.4cm}@{}}
+\toprule
+\textbf{Instance} & \textbf{$\X$} & \textbf{$\dyn$} & \textbf{$\shield$} & \textbf{$\decay_i$ witness}\\
+\midrule
+LQR / classical
+  & $\setR^n$
+  & $Ax+Bu$
+  & CBF~\cite{ames2019cbf}
+  & Riccati / LMI; quadratic~$V$~\cite{khalil2002nonlinear}\\
+\addlinespace
+Dreamer a--c
+  & Latent $z$
+  & RSSM (Lip.)
+  & Barrier
+  & Spectral bound + symlog/KL~\cite{hafner2025dreamerv3}\\
+\addlinespace
+V-JEPA~2
+  & Latent $\hat z$
+  & JEPA + CEM
+  & Intrinsic cost
+  & Horizon-$T$ pred.\ error~\cite{assran2025vjepa2}\\
+\addlinespace
+LLM ctrl.
+  & Context (shift-grow)
+  & Stochastic kernel~\cite{bhargava2023magic}
+  & AgentSpec~\cite{wang2026agentspec}
+  & $\sigma_{\max}$ + lift~\cite{soatto2023taming}\\
+\bottomrule
+\end{tabular}
+\caption{Four instantiations of the RCS type signature, each
+discharging (H1)--(H5) on its own state space via the cited decay
+witness.  Theorem~\ref{thm:recursive} then composes levels into a
+finite-depth hierarchy with $\omega_N > 0$.}
+\label{tab:instantiations}
+\end{table}
+
+Two observations.  First, the LLM row discharges (H1)--(H2) in the
+meaning-space quotient of~\cite{soatto2023taming}, not in the raw
+token space; the attention spectral bound
+of~\cite{bhargava2023magic} provides the contraction rate on the
+lifted state.  Second, the four rows use four different mathematical
+frameworks (classical Lyapunov, learned latent dynamics, energy-based
+world models, discrete stochastic kernels) yet all fit the same
+7-tuple signature---which is the point of the type-signature framing.
 
 % =============================================================================
 \section{Conclusion}
