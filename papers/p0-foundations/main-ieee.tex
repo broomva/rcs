@@ -240,9 +240,18 @@ drives with pre-specified setpoints~\cite{keramati2014homeostatic};
 (3)~a \textbf{free-energy bound} under linear-Gaussian generative
 models with prior preferences at~$\setpoint{i}$, recovering active
 inference~\cite{baltieri2019pid,friston2009reinforcement}.
-The three regimes overlap only under linear-quadratic dynamics with
-pre-specified setpoints; a single notation unifies them, a single
-theorem does not.
+The three readings coincide exactly when \textbf{(A)}~the dynamics
+are linear-in-state $\dot{x} = Ax + Bu$ with quadratic cost
+$x^\top Q x + u^\top R u$ ($Q \succeq 0$, $R \succ 0$), and
+\textbf{(B)}~$\setpoint{i}$ is pre-specified and held constant.
+Under (A)+(B), \emph{Lyap\,$\Leftrightarrow$\,reward} via the Riccati
+value $V(x) = x^\top P x$ (drive-reduction equals value
+decrement~\cite{khalil2002nonlinear}); \emph{Lyap\,$\Leftrightarrow$\,
+free-energy} because the Gaussian-prior free-energy bound is tight
+and equals $V$ up to a log-partition constant~\cite{baltieri2019pid};
+\emph{reward\,$\Leftrightarrow$\,free-energy} by composition.  Outside
+(A)+(B) the readings diverge: a single notation unifies them, a
+single theorem does not.
 \end{proposition}
 
 Unlike unbounded reward maximization, $\drive{i}$ saturates at

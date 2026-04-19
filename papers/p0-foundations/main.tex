@@ -310,9 +310,30 @@ own regime:
         free energy, recovering active
         inference~\cite{friston2009reinforcement,baltieri2019pid}.
 \end{enumerate}
-The three regimes overlap only under linear-quadratic dynamics with
-pre-specified setpoints; a single notation unifies them, a single
-theorem does not.
+The three regimes coincide exactly when both of the following hold:
+\begin{itemize}
+  \item[\textbf{(A)}] \emph{Linear-quadratic structure.}  The dynamics
+        are linear-in-state, $\dot{x} = Ax + Bu$, and the cost is
+        quadratic, $\ell(x,u) = x^\top Q x + u^\top R u$ with
+        $Q \succeq 0$ and $R \succ 0$.
+  \item[\textbf{(B)}] \emph{Fixed setpoint.}  The setpoint
+        $\setpoint{i}$ is pre-specified and held constant, not adapted
+        online.
+\end{itemize}
+Under (A)+(B), the three readings relate as follows.
+\emph{Lyapunov $\Leftrightarrow$ reward}: the quadratic cost admits
+a value function $V(x) = x^\top P x$ where $P$ solves the algebraic
+Riccati equation~\cite{khalil2002nonlinear}; the drive-reduction
+reward $r_k = V(x_k) - V(x_{k+1})$ is the value decrement, so $V$ is
+simultaneously the Lyapunov certificate and the (negated) cost-to-go.
+\emph{Lyapunov $\Leftrightarrow$ free-energy}: under (A)+(B) the
+Gaussian prior on trajectories makes the variational free-energy
+bound tight; it equals $V$ up to a log-partition constant, so strict
+decrease of $\drive{i}$ coincides with decrease of free
+energy~\cite{baltieri2019pid}.  \emph{Reward $\Leftrightarrow$
+free-energy} follows by composition.  Outside (A)+(B) the three
+readings diverge: a single notation unifies them, a single theorem
+does not.
 \end{proposition}
 
 \begin{remark}[Bounded objectives prevent unbounded resource acquisition]
