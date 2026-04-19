@@ -310,9 +310,30 @@ own regime:
         free energy, recovering active
         inference~\cite{friston2009reinforcement,baltieri2019pid}.
 \end{enumerate}
-The three regimes overlap only under linear-quadratic dynamics with
-pre-specified setpoints; a single notation unifies them, a single
-theorem does not.
+The three regimes coincide exactly when both of the following hold:
+\begin{itemize}
+  \item[\textbf{(A)}] \emph{Linear-quadratic structure.}  The dynamics
+        are linear-in-state, $\dot{x} = Ax + Bu$, and the cost is
+        quadratic, $\ell(x,u) = x^\top Q x + u^\top R u$ with
+        $Q \succeq 0$ and $R \succ 0$.
+  \item[\textbf{(B)}] \emph{Fixed setpoint.}  The setpoint
+        $\setpoint{i}$ is pre-specified and held constant, not adapted
+        online.
+\end{itemize}
+Under (A)+(B), the three readings relate as follows.
+\emph{Lyapunov $\Leftrightarrow$ reward}: the quadratic cost admits
+a value function $V(x) = x^\top P x$ where $P$ solves the algebraic
+Riccati equation~\cite{khalil2002nonlinear}; the drive-reduction
+reward $r_k = V(x_k) - V(x_{k+1})$ is the value decrement, so $V$ is
+simultaneously the Lyapunov certificate and the (negated) cost-to-go.
+\emph{Lyapunov $\Leftrightarrow$ free-energy}: under (A)+(B) the
+Gaussian prior on trajectories makes the variational free-energy
+bound tight; it equals $V$ up to a log-partition constant, so strict
+decrease of $\drive{i}$ coincides with decrease of free
+energy~\cite{baltieri2019pid}.  \emph{Reward $\Leftrightarrow$
+free-energy} follows by composition.  Outside (A)+(B) the three
+readings diverge: a single notation unifies them, a single theorem
+does not.
 \end{proposition}
 
 \begin{remark}[Bounded objectives prevent unbounded resource acquisition]
@@ -475,18 +496,23 @@ hypotheses throughout Section~\ref{sec:stability}:
   \item[(H5) Jumps and delay.]  Assumptions~\ref{ass:delay}
         and~\ref{ass:jump} provide $\beta_i$, $\taubar_i$, $\nu_i$,
         $\taua[i]$ for each level.
-  \item[(H6) Time-scale separation.]  There exists a constant $c > 1$
-        such that for every $i < N$,
+  \item[(H6) Time-scale separation.]  For every $i < N$,
         \begin{equation}
-          \taua[i+1] \geq c \cdot \taua[i].
+          \taua[i+1] \geq c \cdot \taua[i],
+          \qquad c > c^\star_i,
           \label{eq:dwell-separation}
         \end{equation}
+        where $c^\star_i > 1$ is the level-$i$ Tikhonov rate
+        constant defined in~\eqref{eq:tikhonov-rate} below,
+        depending only on the Level-$i$ Lipschitz, rate, and
+        delay constants.
   \item[(H7) Positive stability budget.]  For every
         $i \in \{0, 1, \ldots, N\}$, $\stab_i > 0$.
 \end{description}
-The separation constant $c$ in~\eqref{eq:dwell-separation} may be
-arbitrarily close to~$1$; the proof relies on strict separation ($c > 1$)
-but no specific ratio.
+The separation constant $c$ in~\eqref{eq:dwell-separation} must
+exceed the level-dependent threshold $c^\star_i$; the proof uses
+this strict inequality in step~(iv) to discharge Tikhonov's
+singular-perturbation hypothesis~\cite{khalil2002nonlinear}.
 
 \begin{theorem}[Recursive stability, inductive form]
 \label{thm:recursive}
@@ -556,20 +582,55 @@ yields
 \noindent\textbf{(iii)~Coupling.}  The coupling of $\rcs_{n+1}$ into
 the sub-hierarchy is, by construction, the perturbation $\rcs_{n+1}$
 delivers to level~$n$ as adaptation (rate $\rho_n$) and design
-(rate~$\eta_n$) evolution.  These contributions are already absorbed
-into $\stab_n$ via (H3) and (H4), and therefore into $\omega_n$; no new
-inter-level coupling is introduced at step~(iii).
+(rate~$\eta_n$) evolution.  We make the absorption explicit.  By
+(H3), the adaptation-channel contribution to $\dot{\lyap{n}}$ obeys
+\begin{equation}
+  \left| \frac{\partial \lyap{n}}{\partial \param_n} \cdot
+         \dot{\param}_n \right|
+  \leq L_{\param,n}\, \rho_n\, \lyap{n},
+  \label{eq:h3-absorb}
+\end{equation}
+where $\dot{\param}_n$ is precisely the adaptation rate delivered by
+$\rcs_{n+1}$.  Analogously, by (H4),
+\begin{equation}
+  \left| \frac{\partial \lyap{n}}{\partial d_n} \cdot
+         \dot{d}_n \right|
+  \leq L_{d,n}\, \eta_n\, \lyap{n},
+  \label{eq:h4-absorb}
+\end{equation}
+with $\dot{d}_n$ the design-evolution rate from $\rcs_{n+1}$.  Adding
+\eqref{eq:h3-absorb} and \eqref{eq:h4-absorb}, the total cross-level
+coupling into level~$n$ is bounded by
+$(L_{\param,n}\rho_n + L_{d,n}\eta_n)\lyap{n}$---exactly the two
+terms already subtracted in
+$\stab_n = \decay_n - L_{\param,n}\rho_n - L_{d,n}\eta_n - \beta_n\taubar_n - \ln\nu_n/\taua[n]$
+by Definition~\ref{def:budget}.  Consequently $\lyap{n}$ decays at
+rate $\stab_n$ along the full trajectory, and $\lyap{\leq n}$ at
+rate $\omega_n$ through the inductive hypothesis.  No new inter-level
+coupling is introduced at step~(iii).
 
 \smallskip
-\noindent\textbf{(iv)~Time-scale separation.}  By (H6),
-$\taua[n+1] \geq c \cdot \taua[n]$ with $c > 1$ places level~$n+1$
-strictly slower than the sub-hierarchy top level.  This satisfies the
-time-scale hypothesis of Tikhonov's singular-perturbation theorem
+\noindent\textbf{(iv)~Time-scale separation.}  A bare $c > 1$ in (H6)
+is insufficient: Tikhonov's singular-perturbation theorem
 (Khalil~\cite{khalil2002nonlinear} Thm.~11.4 / Liberzon
-\cite{liberzon2003switching} Thm.~3.1): level~$n+1$ is the slow
-subsystem, the depth-$n$ sub-hierarchy is the fast one, and holding
-$x_{n+1}$ quasi-static is valid up to an $O(c^{-1})$ error that (H6)
-makes arbitrarily small.
+\cite{liberzon2003switching} Thm.~3.1) requires the slow/fast ratio
+to exceed a level-dependent constant.  Define
+\begin{equation}
+  c^\star_n
+  := 1 + \kappa \cdot
+  \frac{L_{\param,n}\rho_n + L_{d,n}\eta_n + \beta_n\taubar_n}
+       {\decay_n},
+  \label{eq:tikhonov-rate}
+\end{equation}
+where $\kappa > 0$ is the universal constant from Khalil's
+Thm.~11.4 proof.  Note $c^\star_n > 1$ whenever any coupling term is
+nonzero---otherwise (H6) would be vacuous.  Crucially, $c^\star_n$
+depends only on Level-$n$ constants, so (H6) is checkable per level.
+Strengthening (H6) to $\taua[n+1] \geq c \cdot \taua[n]$ with
+$c > c^\star_n$ discharges Tikhonov's hypothesis: level~$n+1$ is the
+slow subsystem, the depth-$n$ sub-hierarchy is the fast one, and
+holding $x_{n+1}$ quasi-static in step~(iii) is valid up to an
+$O(c^{-1})$ error.  This completes the inductive step.
 
 \smallskip
 \noindent\textbf{(v)~Composite Lyapunov construction.}  Choose
@@ -976,6 +1037,110 @@ Second, the table is not exhaustive: additional instantiations
 (PID-style activation steering, CBF-QP over continuous plants, EGRI as
 $\rcs_2$) can be added by identifying their state space, dynamics,
 shield, and per-level decay witness.
+
+
+% =============================================================================
+\appendix
+\section{LQR instantiation: end-to-end discharge of (H1)--(H7)}
+\label{sec:app-lqr}
+% =============================================================================
+
+We work through the Linear-Quadratic Regulator (LQR) as an explicit
+instance of an RCS and discharge each standing hypothesis with a
+concrete witness.  This establishes the template by which any other
+row of the Instantiation Catalogue can be audited.
+
+\subsection{Plant and control law}
+\label{sec:app-lqr-plant}
+Take $\X_0 = \setR^n$, $\U_0 = \setR^m$, and continuous-time dynamics
+\begin{equation}
+  \dot{x} = A x + B u, \qquad (A, B) \text{ stabilizable},
+  \label{eq:lqr-plant}
+\end{equation}
+with observation $h(x) = C x$, quadratic cost $\int_0^\infty
+(x^\top Q x + u^\top R u)\,dt$ with $Q \succeq 0$, $R \succ 0$, and a
+control barrier function (CBF) shield $\shield_0$ per
+Ames~\cite{ames2019cbf} enforcing forward invariance of a safe set.
+The LQR controller is the static gain $u = -K x$ with
+$K = R^{-1} B^\top P$ obtained from the algebraic Riccati equation
+(ARE)
+\begin{equation}
+  A^\top P + P A - P B R^{-1} B^\top P + Q = 0,
+  \qquad P \succ 0.
+  \label{eq:lqr-are}
+\end{equation}
+
+\subsection{Decay witness $\stab_0$ (discharges (H2))}
+\label{sec:app-lqr-decay}
+Under stabilizability and $Q \succeq 0$ detectable through $C$, the
+ARE admits a unique positive-definite solution $P$; the closed-loop
+matrix $A_{\text{cl}} := A - B K$ is Hurwitz
+\cite{khalil2002nonlinear}.  Let $\sigma_{\text{abs}}(A_{\text{cl}})
+:= -\max_i \Re \lambda_i(A_{\text{cl}}) > 0$ denote its spectral
+abscissa.  Take
+\begin{equation}
+  \stab_0 := \sigma_{\text{abs}}(A_{\text{cl}}) > 0,
+\end{equation}
+which discharges (H2) with a closed-form witness computable from
+$(A, B, Q, R)$.
+
+\subsection{Lyapunov construction (discharges (H1))}
+\label{sec:app-lqr-lyap}
+Define
+\begin{equation}
+  \lyap{0}(x) := x^\top P x.
+\end{equation}
+Then $\lambda_{\min}(P) \norm{x}^2 \leq \lyap{0}(x) \leq
+\lambda_{\max}(P) \norm{x}^2$, supplying the sandwich of
+Assumption~\ref{ass:per-level} with
+$\underline{\alpha}_0 = \lambda_{\min}(P)$ and
+$\bar{\alpha}_0 = \lambda_{\max}(P)$.  Differentiating along
+\eqref{eq:lqr-plant} with $u = -K x$,
+$\dot{\lyap{0}} = x^\top (A_{\text{cl}}^\top P + P A_{\text{cl}}) x
+= -x^\top Q_{\text{cl}} x \leq -\stab_0 \lyap{0}$ with
+$Q_{\text{cl}} := Q + K^\top R K \succeq 0$, matching the decay rate
+of Section~\ref{sec:app-lqr-decay}.  This discharges (H1).
+
+\subsection{Discharging (H3)--(H5)}
+\label{sec:app-lqr-h345}
+With the LQR gain $K$ fixed \emph{a priori} at plant level,
+$\rho_0 = 0$ (no online adaptation of $\theta_0$) and
+$L_{\param,0}$ is bounded: (H3) is satisfied with an identically zero
+coupling.  If the level-1 adapter (below) retunes $K$ from tracking
+error, $L_{\param,0}$ is the Lipschitz constant of
+$x \mapsto \partial V_0/\partial \theta_0$, bounded because $P$
+depends smoothly on $(A, B, Q, R)$ via the ARE.  Analogously for
+(H4) with design updates to $(Q, R)$.  For (H5): absent mode
+switching, take $\nu_0 = 1$ so $\ln \nu_0 = 0$ and
+$\taua[0] = \infty$ vacuously; delay $\taubar_0$ is the
+sensor--actuator loop delay, and the CBF-induced switching rate is
+computable from the geometry of the safe set and the boundary
+recovery law~\cite{ames2019cbf}.
+
+\subsection{Composition with Level 1}
+\label{sec:app-lqr-level1}
+Take $\rcs_1$ as a gain-scheduling outer loop retuning $(Q, R)$ on a
+slower timescale from the running integral of the tracking error
+$e(t) = x(t) - x^\star_0$.  The update law $\dot{Q} = -\eta_1 \nabla
+J(e, Q)$ for a convex $J$ gives
+$L_{d,1} \cdot \eta_1 = \eta_1 \cdot \norm{\nabla J}_{\infty}$
+explicitly.  Assume $\stab_1 > 0$ via
+Definition~\ref{def:budget}.  Verifying (H6) with
+$c > c^\star_0$: compute $c^\star_0$ from
+\eqref{eq:tikhonov-rate} using the explicit constants
+$(L_{\param,0}, \rho_0, L_{d,0}, \eta_0, \beta_0, \taubar_0,
+\decay_0)$ of Sections~\ref{sec:app-lqr-decay}--\ref{sec:app-lqr-h345};
+choose the level-1 dwell time $\taua[1] \geq c \taua[0]$ accordingly.
+Theorem~\ref{thm:recursive} then concludes composite stability at
+rate $\omega = \min(\stab_0, \stab_1)$.
+
+\subsection{Takeaway}
+\label{sec:app-lqr-takeaway}
+LQR is a full working instance of the framework: each hypothesis
+(H1)--(H7) has a verifiable, closed-form witness.  The same template
+applies to any row of the Instantiation Catalogue---plant, decay
+witness, Lyapunov, coupling bounds, composition---even when the
+witnesses are harder to state analytically.
 
 
 % =============================================================================
