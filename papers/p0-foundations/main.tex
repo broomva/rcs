@@ -496,18 +496,23 @@ hypotheses throughout Section~\ref{sec:stability}:
   \item[(H5) Jumps and delay.]  Assumptions~\ref{ass:delay}
         and~\ref{ass:jump} provide $\beta_i$, $\taubar_i$, $\nu_i$,
         $\taua[i]$ for each level.
-  \item[(H6) Time-scale separation.]  There exists a constant $c > 1$
-        such that for every $i < N$,
+  \item[(H6) Time-scale separation.]  For every $i < N$,
         \begin{equation}
-          \taua[i+1] \geq c \cdot \taua[i].
+          \taua[i+1] \geq c \cdot \taua[i],
+          \qquad c > c^\star_i,
           \label{eq:dwell-separation}
         \end{equation}
+        where $c^\star_i > 1$ is the level-$i$ Tikhonov rate
+        constant defined in~\eqref{eq:tikhonov-rate} below,
+        depending only on the Level-$i$ Lipschitz, rate, and
+        delay constants.
   \item[(H7) Positive stability budget.]  For every
         $i \in \{0, 1, \ldots, N\}$, $\stab_i > 0$.
 \end{description}
-The separation constant $c$ in~\eqref{eq:dwell-separation} may be
-arbitrarily close to~$1$; the proof relies on strict separation ($c > 1$)
-but no specific ratio.
+The separation constant $c$ in~\eqref{eq:dwell-separation} must
+exceed the level-dependent threshold $c^\star_i$; the proof uses
+this strict inequality in step~(iv) to discharge Tikhonov's
+singular-perturbation hypothesis~\cite{khalil2002nonlinear}.
 
 \begin{theorem}[Recursive stability, inductive form]
 \label{thm:recursive}
@@ -605,15 +610,27 @@ rate $\omega_n$ through the inductive hypothesis.  No new inter-level
 coupling is introduced at step~(iii).
 
 \smallskip
-\noindent\textbf{(iv)~Time-scale separation.}  By (H6),
-$\taua[n+1] \geq c \cdot \taua[n]$ with $c > 1$ places level~$n+1$
-strictly slower than the sub-hierarchy top level.  This satisfies the
-time-scale hypothesis of Tikhonov's singular-perturbation theorem
+\noindent\textbf{(iv)~Time-scale separation.}  A bare $c > 1$ in (H6)
+is insufficient: Tikhonov's singular-perturbation theorem
 (Khalil~\cite{khalil2002nonlinear} Thm.~11.4 / Liberzon
-\cite{liberzon2003switching} Thm.~3.1): level~$n+1$ is the slow
-subsystem, the depth-$n$ sub-hierarchy is the fast one, and holding
-$x_{n+1}$ quasi-static is valid up to an $O(c^{-1})$ error that (H6)
-makes arbitrarily small.
+\cite{liberzon2003switching} Thm.~3.1) requires the slow/fast ratio
+to exceed a level-dependent constant.  Define
+\begin{equation}
+  c^\star_n
+  := 1 + \kappa \cdot
+  \frac{L_{\param,n}\rho_n + L_{d,n}\eta_n + \beta_n\taubar_n}
+       {\decay_n},
+  \label{eq:tikhonov-rate}
+\end{equation}
+where $\kappa > 0$ is the universal constant from Khalil's
+Thm.~11.4 proof.  Note $c^\star_n > 1$ whenever any coupling term is
+nonzero---otherwise (H6) would be vacuous.  Crucially, $c^\star_n$
+depends only on Level-$n$ constants, so (H6) is checkable per level.
+Strengthening (H6) to $\taua[n+1] \geq c \cdot \taua[n]$ with
+$c > c^\star_n$ discharges Tikhonov's hypothesis: level~$n+1$ is the
+slow subsystem, the depth-$n$ sub-hierarchy is the fast one, and
+holding $x_{n+1}$ quasi-static in step~(iii) is valid up to an
+$O(c^{-1})$ error.  This completes the inductive step.
 
 \smallskip
 \noindent\textbf{(v)~Composite Lyapunov construction.}  Choose
