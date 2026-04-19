@@ -344,9 +344,19 @@ Set $\lyap{\leq 0} := \lyap{0}$, $\omega_0 := \stab_0 > 0$ by (H7).
 
 \emph{Inductive step.}  Given $P(n)$, consider depth $n+1$.  Apply
 $P(n)$ to the sub-hierarchy $\rcs_0, \ldots, \rcs_n$, with $\rcs_{n+1}$
-supplying the quasi-static adaptation/design perturbations to level~$n$
-absorbed into $\stab_n$ via (H3)--(H4); this gives $\lyap{\leq n}$ at
-rate $\omega_n = \min_{i \leq n} \stab_i$.  At level~$n+1$, (H1), (H2),
+supplying the quasi-static adaptation/design perturbations to
+level~$n$.  By (H3),
+$|\partial\lyap{n}/\partial\param_n \cdot \dot{\param}_n|
+\leq L_{\param,n}\rho_n \lyap{n}$, with $\dot{\param}_n$ the rate
+delivered by $\rcs_{n+1}$; by (H4),
+$|\partial\lyap{n}/\partial d_n \cdot \dot{d}_n|
+\leq L_{d,n}\eta_n \lyap{n}$ analogously.  Summed, the cross-level
+coupling into level~$n$ is bounded by
+$(L_{\param,n}\rho_n + L_{d,n}\eta_n)\lyap{n}$---exactly the two
+terms already subtracted in $\stab_n$ (Def.~\ref{def:budget}).  Hence
+$\lyap{n}$ decays at rate $\stab_n$ along the full trajectory, and
+the inductive hypothesis yields $\lyap{\leq n}$ at rate
+$\omega_n = \min_{i \leq n} \stab_i$.  At level~$n+1$, (H1), (H2),
 and (H5) with vacuous (H3)--(H4) yield
 $\lyap{n+1}(t) \leq \nu_{n+1}^{N_0} e^{-\stab_{n+1} t}
 \lyap{n+1}(0)$.  By (H6), $\taua[n+1] \geq c\, \taua[n]$ with $c > 1$

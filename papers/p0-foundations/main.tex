@@ -577,9 +577,32 @@ yields
 \noindent\textbf{(iii)~Coupling.}  The coupling of $\rcs_{n+1}$ into
 the sub-hierarchy is, by construction, the perturbation $\rcs_{n+1}$
 delivers to level~$n$ as adaptation (rate $\rho_n$) and design
-(rate~$\eta_n$) evolution.  These contributions are already absorbed
-into $\stab_n$ via (H3) and (H4), and therefore into $\omega_n$; no new
-inter-level coupling is introduced at step~(iii).
+(rate~$\eta_n$) evolution.  We make the absorption explicit.  By
+(H3), the adaptation-channel contribution to $\dot{\lyap{n}}$ obeys
+\begin{equation}
+  \left| \frac{\partial \lyap{n}}{\partial \param_n} \cdot
+         \dot{\param}_n \right|
+  \leq L_{\param,n}\, \rho_n\, \lyap{n},
+  \label{eq:h3-absorb}
+\end{equation}
+where $\dot{\param}_n$ is precisely the adaptation rate delivered by
+$\rcs_{n+1}$.  Analogously, by (H4),
+\begin{equation}
+  \left| \frac{\partial \lyap{n}}{\partial d_n} \cdot
+         \dot{d}_n \right|
+  \leq L_{d,n}\, \eta_n\, \lyap{n},
+  \label{eq:h4-absorb}
+\end{equation}
+with $\dot{d}_n$ the design-evolution rate from $\rcs_{n+1}$.  Adding
+\eqref{eq:h3-absorb} and \eqref{eq:h4-absorb}, the total cross-level
+coupling into level~$n$ is bounded by
+$(L_{\param,n}\rho_n + L_{d,n}\eta_n)\lyap{n}$---exactly the two
+terms already subtracted in
+$\stab_n = \decay_n - L_{\param,n}\rho_n - L_{d,n}\eta_n - \beta_n\taubar_n - \ln\nu_n/\taua[n]$
+by Definition~\ref{def:budget}.  Consequently $\lyap{n}$ decays at
+rate $\stab_n$ along the full trajectory, and $\lyap{\leq n}$ at
+rate $\omega_n$ through the inductive hypothesis.  No new inter-level
+coupling is introduced at step~(iii).
 
 \smallskip
 \noindent\textbf{(iv)~Time-scale separation.}  By (H6),
