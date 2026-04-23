@@ -64,8 +64,8 @@ Yu~\cite{eslami2026control} to finite-depth hierarchies, we prove by
 induction on depth~$N$ that if the per-level stability budget is positive
 and a time-scale-separation bound holds, the composite state decays
 exponentially at rate $\omega_N = \min_i \stab_i$.  An instantiation
-catalogue illustrates how LQR, Dreamer, V-JEPA~2, and LLM controllers plug
-into the type signature.
+catalogue illustrates how LQR, Dreamer, V-JEPA~2, LLM controllers, and
+flow-matching VLAs ($\pi_0$-family) plug into the type signature.
 \end{abstract}
 
 \tableofcontents
@@ -100,7 +100,7 @@ framework by discharging the per-level assumptions of
 Section~\ref{sec:stability} in its own regime.  This
 architecture-agnostic stance is what the main theorem requires: what
 matters is not what $\ctrl$ is, but whether the per-level stability
-budget is positive.  Section~\ref{sec:instantiations} catalogues four
+budget is positive.  Section~\ref{sec:instantiations} catalogues five
 representative instantiations with their stability witnesses.
 
 \paragraph{Open problem this paper addresses.}
@@ -132,7 +132,8 @@ finite depth.
         hierarchies, proven by induction on depth
         (Section~\ref{sec:stability}).
   \item An instantiation catalogue showing how LQR, Dreamer, V-JEPA~2,
-        and LLM-as-controller each discharge the assumptions
+        LLM-as-controller, and flow-matching VLAs ($\pi_0$-family) each
+        discharge the assumptions
         (Section~\ref{sec:instantiations}).
   \item The EGRI meta-controller as an instance of $\rcs_2$, with two
         of its Five Laws admitting derived formal content and the
@@ -975,7 +976,7 @@ layers~--- in the sense of compiler verification~--- is not claimed.
 The RCS 7-tuple is a \emph{type signature}.  Each concrete controller
 populates the signature by discharging the per-level assumptions
 (H1)--(H5) of Section~\ref{sec:stability} on its own state space.  We
-illustrate the breadth of the signature with four instantiations, each
+illustrate the breadth of the signature with five instantiations, each
 drawn from a distinct control-theoretic or learning-theoretic
 community.  For every row we name $(\X, \dyn, \shield)$ concretely and
 cite the result that produces the per-level~$\decay_i > 0$ required by
@@ -1016,9 +1017,15 @@ LLM-as-controller
   & Bhargava stochastic kernel
   & AgentSpec PDA~\cite{wang2026agentspec}
   & Attention-block $\sigma_{\max}$~\cite{bhargava2023magic} plus meaning-space quotient of~\cite{soatto2023taming} yields reachability + lifted contraction sufficient for (H2).\\
+\addlinespace
+Flow-matching VLA ($\pi_0$-family)
+  & Proprio vector + vision/text tokens in a shared embedding
+  & VLM backbone + action-expert flow matching~\cite{black2024pi0}
+  & Action-chunk bound + smoother
+  & Knowledge insulation at training time~\cite{driess2025ki}: stop-gradient between action expert and VLM plus discrete FAST-tokenised actions as a substitute signal bound representation drift of the backbone under continuous-action flow-matching updates, yielding $\decay_i > 0$ at both levels.\\
 \bottomrule
 \end{tabular}
-\caption{Four instantiations of the RCS type signature.  Each row
+\caption{Five instantiations of the RCS type signature.  Each row
 populates the 7-tuple on its own state space; the decay-witness column
 produces (H2).  The remaining per-level hypotheses (H1, H3--H5) follow
 from each row's state-space conventions (sandwich bounds,
@@ -1029,7 +1036,7 @@ finite-depth hierarchy with $\omega_N > 0$.}
 \label{tab:instantiations}
 \end{table}
 
-Two observations on Table~\ref{tab:instantiations}.  First, the
+Three observations on Table~\ref{tab:instantiations}.  First, the
 witnesses cited for the LLM row establish reachability and lifted
 contraction, not a quadratic Lyapunov bound in the raw token space; the
 per-level assumption is therefore discharged in the meaning-space
@@ -1038,6 +1045,25 @@ Second, the table is not exhaustive: additional instantiations
 (PID-style activation steering, CBF-QP over continuous plants, EGRI as
 $\rcs_2$) can be added by identifying their state space, dynamics,
 shield, and per-level decay witness.
+Third, the $\pi_0$-family row is also the strongest external
+empirical validation of the level-separation principle in the current
+foundation-model literature.  Driess et al.~\cite{driess2025ki} report
+that when the action expert (fast level) is trained with gradients
+propagating into the pre-trained VLM backbone (slow level), the
+backbone's web-scale representations degrade and downstream
+generalisation suffers --- a training-time phenomenon they attribute
+to the joint optimisation of the two levels with mismatched learning
+dynamics.  Their stop-gradient + discrete-substitute-signal protocol
+(``knowledge insulation'') restores per-level decay at training time
+and is structurally analogous to the time-scale separation underpinning
+Theorem~\ref{thm:recursive}'s $\omega_N > 0$ composition.  Theorem~\ref{thm:recursive}
+is an inference-time composite-stability result while knowledge insulation operates
+during training, so the correspondence is between the level-separation \emph{principle}
+rather than a shared dynamical system.  That a 3B-parameter deployed model required
+an explicit insulation mechanism to generalise nonetheless corroborates the
+prediction of (H6)--(H7): without level separation, lower-level adaptation
+destabilises higher-level representations regardless of state-space choice or
+optimisation horizon.
 
 
 % =============================================================================

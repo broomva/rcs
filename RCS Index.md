@@ -10,7 +10,7 @@ aliases:
   - Recursive Controlled Systems
   - RCS
 created: "2026-04-16"
-updated: "2026-04-16"
+updated: "2026-04-23"
 ---
 
 # RCS — Recursive Controlled Systems
@@ -31,11 +31,14 @@ Formal control-theoretic foundation for autonomous AI agents, where the agent it
 
 | # | Title | Status | Linear | Target Venue |
 |---|-------|--------|--------|-------------|
-| P0 | [[p0-foundations/README\|RCS Foundations]] | Drafting | BRO-697 | Workshop (Dec 2026) |
-| P1 | [[p1-stability/README\|Homeostatic Stability]] | Planned | BRO-698 | CDC/L4DC (May 2027) |
+| P0 | [[p0-foundations/README\|RCS Foundations]] | Drafting (12 PRs landed, π₀-family instantiation added) | BRO-697 | Workshop (Dec 2026) |
+| P1 | [[p1-stability/README\|Empirical Budget Validation]] | Scaffold (PROTOCOL + root-Makefile p1 build targets landed PR #14) | BRO-698 | CDC/L4DC (May 2027) |
 | P2 | [[p2-egri/README\|EGRI as Meta-Controller]] | Planned | BRO-699 | ICML/AAMAS (May 2027) |
 | P3 | [[p3-observers/README\|Self-Referential Observers]] | Planned | BRO-700 | AAAI (Sep 2027) |
 | P4 | [[p4-fleet/README\|Fleet Cooperative Resilience]] | Planned | BRO-701 | IEEE TAI (Mar 2028) |
+| P5 | [[p5-categorical-foundations/SCOPE\|Categorical Foundations]] | Dormant (annual review; retire 2030 if no trigger) | TBD | TBD |
+| P6 | [[p6-horizontal-composition/README\|Horizontal Composition]] | Outline (171-line README; closes horizontal-scaling gap) | TBD | Workshop (CDC or NeurIPS, 2027) |
+| P7 | [[p7-thermodynamic-limits/README\|Thermodynamic Limits & Depth-Kardashev]] | Outline (197-line README; substrate-warp data in) | TBD | Physics of Life Reviews / Entropy / AI-TDSP workshop |
 
 ## Core Concepts
 
