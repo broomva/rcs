@@ -151,15 +151,31 @@ Before F1, the paper's governance table hard-coded cost products (`L_theta*rho =
 
 ```bash
 make test              # params-check + both proof test suites (9 algebraic + 4 simulation)
-make build             # regenerate parameters.tex + build all paper PDFs (currently P0 only)
+make build             # regenerate parameters.tex + build all paper PDFs (P0 + P1)
 make build-p0          # build both formats of P0 (article + IEEE)
 make build-p0-article  # article format only
 make build-p0-ieee     # IEEE format only
+make build-p1          # build both formats of P1 (article + IEEE)
+make epub              # build reflowable EPUB for every paper (iOS Books target)
+make epub-p0           # P0 EPUB only → papers/p0-foundations/main.epub
+make epub-p1           # P1 EPUB only → papers/p1-stability/main.epub
 make params            # just regenerate latex/parameters.tex
 make params-check      # verify latex/parameters.tex matches data/parameters.toml
 make all               # build + test
 make clean             # clean LaTeX intermediates under papers/
 ```
+
+### EPUB pipeline (`make epub`)
+
+The PDFs are fixed-layout and painful to read on a phone. `scripts/tex2epub.sh`
+drives pandoc 3.x to produce reflowable EPUB3 with MathML (rendered natively
+by Apple Books), `--citeproc`-resolved bibliography, a per-paper metadata
+block (title / author / series — see `epub/metadata-*.yaml`), and an
+iOS-Books-friendly stylesheet at `epub/styles.css`. A sed pre-filter rewrites
+`\taua` call sites to their expanded form because pandoc's math parser
+cannot tokenise the `\ifx`-based macro body in `preamble.tex`. EPUB build
+is **not** wired into CI (pandoc is not a CI dependency); regenerate
+locally and commit the EPUB alongside the PDFs as release artefacts.
 
 When a new paper is drafted, add `build-p1-*`, `build-p2-*`, etc. targets that `cd` into the paper's directory and invoke tectonic on its `main.tex` / `main-ieee.tex`. The `build:` umbrella target should list all paper build targets.
 
