@@ -1,0 +1,76 @@
+{
+  "scripts": [
+    {
+      "name": "all",
+      "command": "make all",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "build",
+      "command": "make build",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "build-p0",
+      "command": "make build-p0",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "build-p0-article",
+      "command": "make build-p0-article",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "build-p0-ieee",
+      "command": "make build-p0-ieee",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "build-p1",
+      "command": "make build-p1",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "build-p1-article",
+      "command": "make build-p1-article",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "build-p1-ieee",
+      "command": "make build-p1-ieee",
+      "mode": "command",
+      "category": "build"
+    },
+    {
+      "name": "test",
+      "command": "make test",
+      "mode": "command",
+      "category": "test"
+    },
+    {
+      "name": "params",
+      "command": "make params",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "params-check",
+      "command": "make params-check",
+      "mode": "command",
+      "category": "other"
+    },
+    {
+      "name": "clean",
+      "command": "make clean",
+      "mode": "command",
+      "category": "other"
+    }
+  ]
+}
