@@ -64,8 +64,8 @@ Yu~\cite{eslami2026control} to finite-depth hierarchies, we prove by
 induction on depth~$N$ that if the per-level stability budget is positive
 and a time-scale-separation bound holds, the composite state decays
 exponentially at rate $\omega_N = \min_i \stab_i$.  An instantiation
-catalogue illustrates how LQR, Dreamer, V-JEPA~2, and LLM controllers plug
-into the type signature.
+catalogue illustrates how LQR, Dreamer, V-JEPA~2, LLM controllers, and
+flow-matching VLAs ($\pi_0$-family) plug into the type signature.
 \end{abstract}
 
 \tableofcontents
@@ -100,7 +100,7 @@ framework by discharging the per-level assumptions of
 Section~\ref{sec:stability} in its own regime.  This
 architecture-agnostic stance is what the main theorem requires: what
 matters is not what $\ctrl$ is, but whether the per-level stability
-budget is positive.  Section~\ref{sec:instantiations} catalogues four
+budget is positive.  Section~\ref{sec:instantiations} catalogues five
 representative instantiations with their stability witnesses.
 
 \paragraph{Open problem this paper addresses.}
@@ -132,7 +132,8 @@ finite depth.
         hierarchies, proven by induction on depth
         (Section~\ref{sec:stability}).
   \item An instantiation catalogue showing how LQR, Dreamer, V-JEPA~2,
-        and LLM-as-controller each discharge the assumptions
+        LLM-as-controller, and flow-matching VLAs ($\pi_0$-family) each
+        discharge the assumptions
         (Section~\ref{sec:instantiations}).
   \item The EGRI meta-controller as an instance of $\rcs_2$, with two
         of its Five Laws admitting derived formal content and the
@@ -975,7 +976,7 @@ layers~--- in the sense of compiler verification~--- is not claimed.
 The RCS 7-tuple is a \emph{type signature}.  Each concrete controller
 populates the signature by discharging the per-level assumptions
 (H1)--(H5) of Section~\ref{sec:stability} on its own state space.  We
-illustrate the breadth of the signature with four instantiations, each
+illustrate the breadth of the signature with five instantiations, each
 drawn from a distinct control-theoretic or learning-theoretic
 community.  For every row we name $(\X, \dyn, \shield)$ concretely and
 cite the result that produces the per-level~$\decay_i > 0$ required by
@@ -1054,12 +1055,15 @@ generalisation suffers --- a training-time phenomenon they attribute
 to the joint optimisation of the two levels with mismatched learning
 dynamics.  Their stop-gradient + discrete-substitute-signal protocol
 (``knowledge insulation'') restores per-level decay at training time
-and is directly analogous to the time-scale separation underpinning
-Theorem~\ref{thm:recursive}'s $\omega_N > 0$ composition.  That a
-3B-parameter deployed model required an explicit insulation mechanism
-to generalise corroborates the prediction of (H6)--(H7): without
-level separation, lower-level adaptation destabilises higher-level
-representations regardless of state-space choice.
+and is structurally analogous to the time-scale separation underpinning
+Theorem~\ref{thm:recursive}'s $\omega_N > 0$ composition.  Theorem~\ref{thm:recursive}
+is an inference-time composite-stability result while knowledge insulation operates
+during training, so the correspondence is between the level-separation \emph{principle}
+rather than a shared dynamical system.  That a 3B-parameter deployed model required
+an explicit insulation mechanism to generalise nonetheless corroborates the
+prediction of (H6)--(H7): without level separation, lower-level adaptation
+destabilises higher-level representations regardless of state-space choice or
+optimisation horizon.
 
 
 % =============================================================================

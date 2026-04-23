@@ -32,7 +32,7 @@ Formal control-theoretic foundation for autonomous AI agents, where the agent it
 | # | Title | Status | Linear | Target Venue |
 |---|-------|--------|--------|-------------|
 | P0 | [[p0-foundations/README\|RCS Foundations]] | Drafting (12 PRs landed, π₀-family instantiation added) | BRO-697 | Workshop (Dec 2026) |
-| P1 | [[p1-stability/README\|Empirical Budget Validation]] | Scaffold (PROTOCOL + Makefile landed PR #14) | BRO-698 | CDC/L4DC (May 2027) |
+| P1 | [[p1-stability/README\|Empirical Budget Validation]] | Scaffold (PROTOCOL + root-Makefile p1 build targets landed PR #14) | BRO-698 | CDC/L4DC (May 2027) |
 | P2 | [[p2-egri/README\|EGRI as Meta-Controller]] | Planned | BRO-699 | ICML/AAMAS (May 2027) |
 | P3 | [[p3-observers/README\|Self-Referential Observers]] | Planned | BRO-700 | AAAI (Sep 2027) |
 | P4 | [[p4-fleet/README\|Fleet Cooperative Resilience]] | Planned | BRO-701 | IEEE TAI (Mar 2028) |
