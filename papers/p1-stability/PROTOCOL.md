@@ -107,8 +107,8 @@ invalid** — stop, reconcile the name, and restart.
 
 | Metric name (OTel)                          | Kind       | Labels                        | Meaning                                                                 |
 | ------------------------------------------- | ---------- | ----------------------------- | ----------------------------------------------------------------------- |
-| `rcs.lambda_hat`                            | Gauge      | `level ∈ {L0,L1,L2,L3}`       | Per-level stability margin $\hat{\lambda}_i$ from `MarginEstimator`.    |
-| `rcs.lambda_hat.budget`                     | Gauge      | `level`                       | $\hat{\gamma}_i - \hat{L_\theta\rho}_i - \hat{L_d\eta}_i - \hat{\beta\bar\tau}_i - \hat{\ln\nu / \tau_a}_i$; numerically identical to `rcs.lambda_hat` at steady state, exposed separately to make the decomposition visible in the trace. |
+| `rcs.lambda_hat`                            | Gauge      | `level ∈ {L0,L1,L2,L3}`       | Per-level stability margin $\hat{\lambda}_i$ as reported by `MarginEstimator` (may be EMA-smoothed; smoothing window is a `MarginEstimator` config recorded in `config.toml`). |
+| `rcs.lambda_hat.budget`                     | Gauge      | `level`                       | Instantaneous algebraic decomposition $\hat{\gamma}_i - \hat{L_\theta\rho}_i - \hat{L_d\eta}_i - \hat{\beta\bar\tau}_i - \hat{\ln\nu / \tau_a}_i$, recomputed per tick from the five component gauges below. Equals `rcs.lambda_hat` exactly when the estimator's smoothing window has elapsed; during warm-up or a rapid perturbation the two may diverge by up to the smoothing response. **Invariant the P1d harness MUST assert on each run:** after the §2 warm-up, `|rcs.lambda_hat − rcs.lambda_hat.budget| ≤ ε` for all samples, with `ε = 5e-3` by default (≥ one display digit of precision in the paper's tables; override in `config.toml` if the run intentionally uses a longer smoothing window). Violations of this invariant fail the capture and are logged to `events.ndjson` as `kind = "violation"` with `detail.reason = "lambda_hat_budget_divergence"`. |
 | `rcs.lambda_hat.decay`                      | Gauge      | `level`                       | Nominal decay $\hat{\gamma}_i$.                                         |
 | `rcs.lambda_hat.adapt_cost`                 | Gauge      | `level`                       | $\hat{L}_{\theta,i}\hat{\rho}_i$ adaptation cost.                       |
 | `rcs.lambda_hat.design_cost`                | Gauge      | `level`                       | $\hat{L}_{d,i}\hat{\eta}_i$ design-evolution cost.                      |
@@ -162,7 +162,7 @@ Rows C, D, E must also record the perturbation schedule in
 
 All runs are written to `data/p1-runs/` at the repo root.
 
-```
+```text
 data/p1-runs/
 ├── manifest.ndjson                  # one JSON object per run (metadata)
 └── runs/
