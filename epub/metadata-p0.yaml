@@ -1,0 +1,30 @@
+---
+title: "Recursive Controlled Systems"
+subtitle: "A Self-Similar Control-Theoretic Foundation for Autonomous AI Agents"
+creator:
+  - role: author
+    text: "Carlos Vásquez Polo"
+publisher: "Broomva Research — Recursive Controlled Systems Series"
+series:
+  name: "Recursive Controlled Systems"
+  position: 0
+date: "2026"
+rights: "Copyright © 2026 Carlos Vásquez Polo. All rights reserved."
+language: en
+description: |
+  Paper 0 of the RCS series. Formalises autonomous AI agents as recursive
+  control-theoretic plants, where the controller Π is itself an RCS at the
+  next level, producing a self-similar hierarchy with a recursive stability
+  budget. Instantiation catalogue covers LQR, Dreamer world models,
+  V-JEPA-2 predictive architectures, LLM-as-controller, and flow-matching
+  vision-language-action models (π₀-family).
+subject:
+  - control theory
+  - autonomous AI agents
+  - stability theory
+  - recursive systems
+  - foundation models
+identifier:
+  - scheme: broomva
+    text: rcs.p0.foundations.2026
+---

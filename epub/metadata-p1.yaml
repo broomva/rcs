@@ -1,0 +1,27 @@
+---
+title: "RCS Empirical Budget Validation"
+subtitle: "Paper 1 — Experimental Protocol (Scaffold)"
+creator:
+  - role: author
+    text: "Carlos Vásquez Polo"
+publisher: "Broomva Research — Recursive Controlled Systems Series"
+series:
+  name: "Recursive Controlled Systems"
+  position: 1
+date: "2026"
+rights: "Copyright © 2026 Carlos Vásquez Polo. All rights reserved."
+language: en
+description: |
+  Paper 1 of the RCS series. Empirical validation protocol for the
+  stability budget λᵢ = γᵢ − L_θᵢ·ρᵢ − L_dᵢ·ηᵢ − βᵢ·τ̄ᵢ − (ln νᵢ)/τₐ,ᵢ
+  established in Paper 0. Current state: scaffold — PROTOCOL plus build
+  targets only, full methodology and results forthcoming.
+subject:
+  - control theory
+  - empirical validation
+  - stability budget
+  - autonomous AI agents
+identifier:
+  - scheme: broomva
+    text: rcs.p1.stability.2026
+---

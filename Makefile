@@ -2,7 +2,7 @@
 # RCS — Build & Test
 # =============================================================================
 
-.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee test params params-check clean
+.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test params params-check clean
 
 # --- Parameters ---
 # data/parameters.toml is the single source of truth for all stability
@@ -39,6 +39,41 @@ build-p1-article: params
 build-p1-ieee: params
 	cd papers/p1-stability && tectonic main-ieee.tex
 
+# --- EPUB (iOS Books / reflowable readers) ---
+# pandoc 3.x required; see scripts/tex2epub.sh for pipeline details.
+
+epub: epub-p0 epub-p1
+
+epub-p0: papers/p0-foundations/main.epub
+
+papers/p0-foundations/main.epub: \
+		papers/p0-foundations/main.tex \
+		latex/references.bib \
+		latex/preamble.tex \
+		latex/parameters.tex \
+		epub/styles.css \
+		epub/metadata-p0.yaml \
+		scripts/tex2epub.sh
+	bash scripts/tex2epub.sh \
+		papers/p0-foundations/main.tex \
+		papers/p0-foundations/main.epub \
+		epub/metadata-p0.yaml
+
+epub-p1: papers/p1-stability/main.epub
+
+papers/p1-stability/main.epub: \
+		papers/p1-stability/main.tex \
+		latex/references.bib \
+		latex/preamble.tex \
+		latex/parameters.tex \
+		epub/styles.css \
+		epub/metadata-p1.yaml \
+		scripts/tex2epub.sh
+	bash scripts/tex2epub.sh \
+		papers/p1-stability/main.tex \
+		papers/p1-stability/main.epub \
+		epub/metadata-p1.yaml
+
 # --- Test ---
 
 test: params-check
@@ -55,3 +90,4 @@ clean:
 	find papers -name '*.out' -delete 2>/dev/null || true
 	find papers -name '*.toc' -delete 2>/dev/null || true
 	find papers -name '*.synctex.gz' -delete 2>/dev/null || true
+	find papers -name '.epub-tmp-*' -delete 2>/dev/null || true

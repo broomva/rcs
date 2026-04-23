@@ -1,0 +1,263 @@
+/* =============================================================================
+ * RCS EPUB stylesheet — optimised for iOS Books (Apple Books) readability.
+ *
+ * Principles:
+ *   1. Don't fight the reader. iOS Books lets the user pick font size,
+ *      typeface, and theme (sepia/dark). CSS sets structure + hierarchy,
+ *      never absolute sizes that override user choice.
+ *   2. Large, calm defaults. Line-height 1.6, serif body, generous
+ *      margins. Comfortable on a 6.1" iPhone screen at the default
+ *      Books font size.
+ *   3. Math and tables shouldn't clip. Both use horizontal auto-scroll
+ *      when they exceed viewport width.
+ *   4. Theorems and assumptions get a visible left-rule so the formal
+ *      scaffolding stays legible when reading on a small screen.
+ * ============================================================================= */
+
+/* --- Base text --- */
+
+body {
+  font-family: Palatino, "Palatino Linotype", Georgia, "Iowan Old Style", serif;
+  line-height: 1.6;
+  text-align: left;           /* justify is too aggressive on narrow screens */
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -epub-hyphens: auto;
+  margin: 1em 1.2em;
+  color: #1a1a1a;
+}
+
+p {
+  margin: 0.6em 0;
+  orphans: 2;
+  widows: 2;
+}
+
+/* --- Headings: sans-serif for contrast, avoid breaks --- */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Avenir Next", sans-serif;
+  font-weight: 600;
+  margin-top: 1.8em;
+  margin-bottom: 0.6em;
+  page-break-after: avoid;
+  break-after: avoid;
+  line-height: 1.25;
+}
+
+h1 { font-size: 1.7em; margin-top: 1em; }
+h2 { font-size: 1.4em; }
+h3 { font-size: 1.2em; }
+h4 { font-size: 1.05em; font-style: italic; }
+h5, h6 { font-size: 1em; }
+
+/* --- Math: never clip display math --- */
+
+math {
+  font-size: 1em;
+}
+
+math[display="block"],
+.math.display {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 1em 0;
+  max-width: 100%;
+}
+
+/* MathML inline shouldn't break line height */
+math[display="inline"],
+.math.inline {
+  display: inline;
+  vertical-align: baseline;
+}
+
+/* --- Theorem-like environments: clear formal blocks --- */
+
+.theorem, .proposition, .corollary, .lemma,
+.definition, .assumption, .remark, .example {
+  margin: 1.2em 0;
+  padding: 0.4em 0.9em;
+  border-left: 3px solid #5a5a5a;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.theorem::before, .proposition::before, .corollary::before,
+.lemma::before, .definition::before, .assumption::before,
+.remark::before, .example::before {
+  font-weight: 600;
+  font-style: italic;
+}
+
+/* Proofs: italicised QED marker */
+.proof {
+  margin: 1em 0;
+}
+.proof::after {
+  content: " ∎";
+}
+
+/* --- Tables: horizontal scroll for wide ones --- */
+
+table {
+  display: block;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  font-size: 0.92em;
+  line-height: 1.35;
+  max-width: 100%;
+}
+
+table caption {
+  caption-side: bottom;
+  font-size: 0.9em;
+  font-style: italic;
+  margin-top: 0.3em;
+  color: #555;
+}
+
+th, td {
+  padding: 0.4em 0.7em;
+  border: 1px solid #ccc;
+  vertical-align: top;
+}
+
+th {
+  background: rgba(0, 0, 0, 0.05);
+  font-weight: 600;
+  text-align: left;
+}
+
+/* --- Citations, footnotes, references --- */
+
+.citation {
+  white-space: nowrap;
+}
+
+a {
+  color: #0a58ca;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+sup.footnote-ref,
+a.footnote-ref {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+
+.footnote,
+.footnotes {
+  font-size: 0.88em;
+  color: #444;
+  border-top: 1px solid #ddd;
+  padding-top: 0.5em;
+  margin-top: 2em;
+}
+
+/* Bibliography list */
+#refs, .references {
+  font-size: 0.92em;
+  line-height: 1.5;
+}
+
+#refs .csl-entry,
+.references p {
+  margin: 0.6em 0;
+  padding-left: 1.8em;
+  text-indent: -1.8em;    /* hanging indent */
+}
+
+/* --- Code --- */
+
+code, kbd, samp {
+  font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+  font-size: 0.9em;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+pre {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  line-height: 1.45;
+  overflow-x: auto;
+  padding: 0.7em 1em;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
+  margin: 1em 0;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* --- Lists --- */
+
+ul, ol {
+  padding-left: 1.8em;
+  margin: 0.7em 0;
+}
+
+li {
+  margin: 0.3em 0;
+}
+
+li p {
+  margin: 0.3em 0;
+}
+
+/* --- Figures --- */
+
+figure {
+  margin: 1.2em 0;
+  text-align: center;
+}
+
+figure img {
+  max-width: 100%;
+  height: auto;
+}
+
+figcaption {
+  font-size: 0.9em;
+  color: #555;
+  font-style: italic;
+  margin-top: 0.4em;
+}
+
+/* --- Dark-mode-friendly: respect iOS Books night theme --- */
+
+@media (prefers-color-scheme: dark) {
+  body {
+    color: #e8e8e8;
+  }
+  a {
+    color: #6ba7ff;
+  }
+  .theorem, .proposition, .corollary, .lemma,
+  .definition, .assumption, .remark, .example {
+    border-left-color: #888;
+    background: rgba(255, 255, 255, 0.04);
+  }
+  table th {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  th, td {
+    border-color: #555;
+  }
+  code, kbd, samp, pre {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  table caption, figcaption, .footnote, .footnotes {
+    color: #bbb;
+  }
+}
