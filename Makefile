@@ -2,7 +2,7 @@
 # RCS — Build & Test
 # =============================================================================
 
-.PHONY: all build build-p0 build-p0-article build-p0-ieee test params params-check clean
+.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee test params params-check clean
 
 # --- Parameters ---
 # data/parameters.toml is the single source of truth for all stability
@@ -21,7 +21,7 @@ params-check:
 
 all: build test
 
-build: build-p0
+build: build-p0 build-p1
 
 build-p0: build-p0-article build-p0-ieee
 
@@ -30,6 +30,14 @@ build-p0-article: params
 
 build-p0-ieee: params
 	cd papers/p0-foundations && tectonic main-ieee.tex
+
+build-p1: build-p1-article build-p1-ieee
+
+build-p1-article: params
+	cd papers/p1-stability && tectonic main.tex
+
+build-p1-ieee: params
+	cd papers/p1-stability && tectonic main-ieee.tex
 
 # --- Test ---
 

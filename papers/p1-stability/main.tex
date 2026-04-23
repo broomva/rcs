@@ -1,0 +1,142 @@
+% =============================================================================
+% RCS Paper 1 --- Empirical Stability Budget in a Production Agent OS
+% Skeleton scaffold (body to be drafted in P1f).
+% =============================================================================
+\documentclass[11pt,a4paper]{article}
+
+% --- Encoding and fonts ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% --- Language ---
+\usepackage[english]{babel}
+
+% --- Page geometry ---
+\usepackage[margin=2.5cm]{geometry}
+
+% --- Colors (must load before hyperref for color mixing) ---
+\usepackage{xcolor}
+
+% --- Hyperlinks ---
+\usepackage[colorlinks=true,linkcolor=blue!70!black,citecolor=blue!70!black,urlcolor=blue!70!black]{hyperref}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{array}
+
+% --- Paragraph spacing ---
+\usepackage{parskip}
+
+% --- Micro-typography ---
+\usepackage{microtype}
+
+% --- Shared RCS preamble ---
+% \SHAREDLATEX points at the shared LaTeX assets dir. Each paper in
+% papers/pN-.../ resolves it relative to its own location; preamble.tex
+% uses the macro to reference its own includes (parameters.tex, etc.).
+\def\SHAREDLATEX{../../latex}
+\input{\SHAREDLATEX/preamble}
+
+% --- Bibliography ---
+\usepackage[numbers,sort&compress]{natbib}
+
+% =============================================================================
+\title{Measuring the Recursive Stability Budget\\
+In a Production Agent Operating System}
+\author{Carlos D.\ Escobar-Valbuena}
+\date{April 2026 --- Scaffold Draft}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\emph{Scaffold placeholder.} This paper reports a runtime validation of
+the Recursive Controlled System stability budget introduced in Paper~0
+of this series. Using the Life Agent OS as the experimental
+plant, we estimate the per-level margin $\hat{\stab}_i$ and composite
+rate $\hat{\omega}_N = \min_i \hat{\stab}_i$ from OpenTelemetry
+instrumentation of the autonomic controller. We characterize regime
+transitions, budget violations, and the empirical distribution of the
+four cost components (adaptation, design, delay, switching) that
+Paper~0's theory predicts. The final abstract will be written in
+P1f once experimental data has been collected according to
+\texttt{PROTOCOL.md}.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Introduction}
+\label{sec:introduction}
+% =============================================================================
+% TODO(P1f): motivate empirical validation of the stability budget;
+% state the contribution (first production-scale measurement of
+% $\hat{\stab}_i$ across L0--L3); position relative to Paper~0's
+% inductive theorem.
+
+% =============================================================================
+\section{Related Work}
+\label{sec:related}
+% =============================================================================
+% TODO(P1f): Eslami \& Yu 2026 original budget; homeostatic control
+% monitoring; observability of switched systems; Lyapunov function
+% estimation from data; production ML-safety monitoring.
+
+% =============================================================================
+\section{RCS Recap}
+\label{sec:recap}
+% =============================================================================
+% Short, cites Paper~0 of the series: restate the 7-tuple, the
+% per-level budget decomposition
+% $\stab_i = \decay_i - \adapt_i - \design_i - \delay_i - \switch_i$,
+% and the composite rate $\omega_N = \min_i \stab_i$ from
+% Theorem~\ref{thm:recursive} (proved in Paper~0).
+% No new proofs here; forward all details to Paper~0.
+
+% =============================================================================
+\section{Experimental Methodology}
+\label{sec:methodology}
+% =============================================================================
+% TODO(P1f): point at PROTOCOL.md for full detail. Sub-sections:
+%   \ref{sec:methodology}.1 System under test (Life Agent OS deployment)
+%   \ref{sec:methodology}.2 Instrumentation (StabilityBudget, MarginEstimator, vigil gauges)
+%   \ref{sec:methodology}.3 Data capture (sampling rate, window length, run matrix)
+%   \ref{sec:methodology}.4 Dataset layout (\texttt{data/p1-runs/})
+
+% =============================================================================
+\section{Results}
+\label{sec:results}
+% =============================================================================
+% TODO(P1f): per-level margin traces; composite rate across load
+% regimes; budget-violation incidents; cost-component breakdown;
+% comparison against the canonical parameters in
+% \texttt{data/parameters.toml}.
+
+% =============================================================================
+\section{Discussion}
+\label{sec:discussion}
+% =============================================================================
+% TODO(P1f): where the theory fits observations; where it doesn't;
+% dominant cost term in practice; implications for controller design
+% and for the Paper~0 hypotheses (H1)--(H7).
+
+% =============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =============================================================================
+% TODO(P1f): summary; limitations; threads to Papers 2--4 (EGRI
+% observers, fleet composition).
+
+% =============================================================================
+% BIBLIOGRAPHY
+% =============================================================================
+% Scaffold: anchor at least one entry so the bibliography is non-empty
+% until P1f populates the body with real \cite commands. Eslami & Yu's
+% original stability budget is the load-bearing reference for Paper 1.
+\nocite{eslami2026control}
+\bibliographystyle{plainnat}
+\bibliography{\SHAREDLATEX/references}
+
+\end{document}
