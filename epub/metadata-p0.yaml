@@ -3,13 +3,13 @@ title: "Recursive Controlled Systems"
 subtitle: "A Self-Similar Control-Theoretic Foundation for Autonomous AI Agents"
 creator:
   - role: author
-    text: "Carlos Vásquez Polo"
+    text: "Carlos D. Escobar-Valbuena"
 publisher: "Broomva Research — Recursive Controlled Systems Series"
 series:
   name: "Recursive Controlled Systems"
   position: 0
 date: "2026"
-rights: "Copyright © 2026 Carlos Vásquez Polo. All rights reserved."
+rights: "Copyright © 2026 Carlos D. Escobar-Valbuena. All rights reserved."
 language: en
 description: |
   Paper 0 of the RCS series. Formalises autonomous AI agents as recursive

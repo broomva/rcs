@@ -101,7 +101,16 @@ trap cleanup EXIT
 sed -E \
   -e 's/\\taua\[([^][]*)\]/\\tau_{a,\1}/g' \
   -e 's/\\taua([^[:alnum:]])/\\tau_{a}\1/g' \
+  -e 's/\\author\{[^}]*\}//g' \
   "$INPUT_TEX" > "$TMP_TEX"
+
+# Rationale for stripping \author{}:
+#   Pandoc otherwise emits the author TWICE on the title page — once
+#   from the LaTeX \author{} block and once from the YAML creator:
+#   metadata. Stripping it from the pandoc input leaves the YAML as
+#   the single source of truth for EPUB author metadata while the
+#   tectonic PDF pipeline still sees \author{} untouched (this script
+#   edits a per-build temp copy, never the source tex).
 
 # Run pandoc from the paper directory so \input{../../latex/...} works.
 cd "$PAPER_DIR"
