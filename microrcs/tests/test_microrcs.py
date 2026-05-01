@@ -1275,6 +1275,193 @@ def test_shadow_eval_accepts_helpful_rule(tmp_path):
     assert shields[0].payload["decision"] == "accept"
 
 
+# =====================================================================
+# D1 — Live progress emission
+# =====================================================================
+def test_emit_progress_quiet_silences_stderr(capfd):
+    m._emit_progress(quiet=True, message="hello")
+    out, err = capfd.readouterr()
+    assert "hello" not in err
+    assert "hello" not in out
+
+
+def test_emit_progress_writes_to_stderr(capfd):
+    m._emit_progress(quiet=False, message="hello world")
+    out, err = capfd.readouterr()
+    assert "hello world" in err
+    assert "hello world" not in out  # stderr only — never pollute stdout
+
+
+# =====================================================================
+# D3 — HARDER_SUITE
+# =====================================================================
+def test_harder_suite_size_and_well_formed():
+    assert len(m.HARDER_SUITE) == 10
+    seen_ids = set()
+    for t in m.HARDER_SUITE:
+        assert t.id, "task missing id"
+        assert t.id not in seen_ids, f"duplicate task id {t.id}"
+        seen_ids.add(t.id)
+        assert callable(t.verify)
+        assert t.prompt
+        # Each harder task has a non-empty prompt of meaningful length
+        assert len(t.prompt) >= 30
+
+
+def test_harder_suite_no_overlap_with_reference():
+    """HARDER_SUITE should not duplicate REFERENCE_SUITE tasks (no leakage)."""
+    ref_ids = {t.id for t in m.REFERENCE_SUITE}
+    harder_ids = {t.id for t in m.HARDER_SUITE}
+    assert ref_ids.isdisjoint(harder_ids)
+
+
+def test_verify_numeric_extracts_last_number():
+    v = m._verify_numeric(42.0, tolerance=0.1)
+    assert v("The answer is 42") == 1.0
+    assert v("First I get 7, then 42") == 1.0
+    assert v("not a number") == 0.0
+    assert v("") == 0.0
+
+
+def test_verify_numeric_tolerance():
+    v = m._verify_numeric(11.2, tolerance=0.2)
+    assert v("11.0") == 1.0
+    assert v("11.4") == 1.0
+    assert v("12.0") == 0.0
+
+
+def test_verify_integer_in_range():
+    v = m._verify_integer_in_range(34650)
+    assert v("the answer is 34650") == 1.0
+    assert v("the answer is 34,650") == 1.0
+    assert v("the answer is 34651") == 0.0
+    assert v("MISSISSIPPI has 11 letters and 34650 arrangements") == 1.0
+
+
+def test_5disk_hanoi_verifier_validates_legal_sequence():
+    # Optimal 5-disk Hanoi: 31 moves
+    v = m._verify_5disk_hanoi
+    invalid = "A->C\nA->B"  # incomplete
+    assert v(invalid) == 0.0
+    # A clearly illegal sequence
+    assert v("A->A\nA->C") == 0.0
+
+
+def test_n_queens_4_verifier_accepts_valid_solutions():
+    v = m._verify_n_queens_4
+    # Two known valid solutions for 4-queens
+    assert v("2,4,1,3") == 1.0
+    assert v("3,1,4,2") == 1.0
+    # Same column → invalid
+    assert v("1,1,1,1") == 0.0
+    # Same diagonal — 1,2,3,4 has all on a diagonal
+    assert v("1,2,3,4") == 0.0
+    # Out of range
+    assert v("5,6,7,8") == 0.0
+    assert v("") == 0.0
+
+
+def test_qa_three_dual_role_needs_three_names():
+    v = m._verify_qa_three_dual_role
+    assert v("John Marshall, Charles Evans Hughes, William Howard Taft") == 1.0
+    assert v("Just Marshall and Hughes") == 0.0  # only 2
+    assert v("") == 0.0
+
+
+# =====================================================================
+# D4 — Suite resolution
+# =====================================================================
+def test_resolve_suite_reference():
+    assert len(m._resolve_suite("reference")) == 5
+
+
+def test_resolve_suite_harder():
+    assert len(m._resolve_suite("harder")) == 10
+
+
+def test_resolve_suite_both():
+    assert len(m._resolve_suite("both")) == 15
+
+
+def test_resolve_suite_unknown_falls_back_to_reference():
+    assert len(m._resolve_suite("unknown_suite_name")) == 5
+
+
+def test_build_run_config_with_harder_suite():
+    cfg = m._build_run_config(quick=False, paper=False, suite="harder")
+    assert len(cfg.suite) == 10
+
+
+def test_build_run_config_quick_truncates_to_2():
+    cfg = m._build_run_config(quick=True, paper=False, suite="harder")
+    assert len(cfg.suite) == 2  # quick uses [:2]
+
+
+# =====================================================================
+# D2 — microrcs watch CLI helpers
+# =====================================================================
+def test_format_event_for_watch_episode_end():
+    pass_counts: dict = {}
+    event = {
+        "kind": "lyapunov", "level": 0,
+        "timestamp": 1700000000,
+        "payload": {"V": 0.1, "score": 1.0, "cost": 0.012, "step": 3},
+    }
+    formatted = m._format_event_for_watch(event, "+meta", pass_counts)
+    assert formatted is not None
+    assert "✓" in formatted
+    assert "+meta" in formatted
+    assert pass_counts["+meta"]["passes"] == 1
+    assert pass_counts["+meta"]["n"] == 1
+
+
+def test_format_event_for_watch_failure():
+    pass_counts: dict = {}
+    event = {
+        "kind": "lyapunov", "level": 0,
+        "timestamp": 1700000000,
+        "payload": {"V": 1.0, "score": 0.0, "cost": 0.05, "step": 5},
+    }
+    formatted = m._format_event_for_watch(event, "full", pass_counts)
+    assert formatted is not None
+    assert "✗" in formatted
+    assert pass_counts["full"]["passes"] == 0
+
+
+def test_format_event_for_watch_param_change_rule():
+    event = {
+        "kind": "param_change", "level": 2,
+        "timestamp": 1700000000,
+        "payload": {"target_level": 0, "field": "system_rules",
+                    "added": "Some rule text"},
+    }
+    formatted = m._format_event_for_watch(event, "+meta", {})
+    assert formatted is not None
+    assert "RULE+" in formatted
+
+
+def test_format_event_for_watch_skips_uninteresting_events():
+    event = {
+        "kind": "observe", "level": 0,
+        "timestamp": 1700000000, "payload": {},
+    }
+    assert m._format_event_for_watch(event, "+meta", {}) is None
+
+
+def test_condition_from_workspace_path_extracts_correctly(tmp_path):
+    p = tmp_path / "microrcs-RUNID-plus_autonomic" / ".rcs" / "events.jsonl"
+    p.parent.mkdir(parents=True)
+    p.touch()
+    assert m._condition_from_workspace_path(p) == "+autonomic"
+
+
+def test_condition_from_workspace_path_full(tmp_path):
+    p = tmp_path / "microrcs-RUNID-full" / ".rcs" / "events.jsonl"
+    p.parent.mkdir(parents=True)
+    p.touch()
+    assert m._condition_from_workspace_path(p) == "full"
+
+
 def test_l2_noop_when_no_failures_and_decay(tmp_path):
     """If V₁ is already decaying and there are no failures, L2 should noop."""
     class _R:

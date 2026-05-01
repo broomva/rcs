@@ -1966,6 +1966,274 @@ REFERENCE_SUITE: list[Task] = [
 ]
 
 
+# --- Numeric verifier for harder math tasks ---------------------------------
+def _verify_numeric(expected: float, tolerance: float = 0.01):
+    """Extract the last numeric token from the answer; compare with tolerance.
+    Uses an epsilon (1e-9) to absorb float-precision boundary effects."""
+    def fn(answer: str) -> float:
+        if not answer:
+            return 0.0
+        nums = re.findall(r"-?\d+(?:\.\d+)?", answer.replace(",", ""))
+        if not nums:
+            return 0.0
+        try:
+            diff = abs(float(nums[-1]) - expected)
+            return 1.0 if diff <= tolerance + 1e-9 else 0.0
+        except ValueError:
+            return 0.0
+    return fn
+
+
+def _verify_integer_in_range(expected: int):
+    """Strict integer match — expected value must appear as an int token."""
+    def fn(answer: str) -> float:
+        if not answer:
+            return 0.0
+        ints = [int(n) for n in re.findall(r"-?\d+", answer.replace(",", ""))]
+        return 1.0 if expected in ints else 0.0
+    return fn
+
+
+def _verify_5disk_hanoi(answer: str) -> float:
+    """Validate 5-disk Hanoi solution: A→C with 5 disks via B."""
+    if not answer:
+        return 0.0
+    pegs: dict[str, list[int]] = {"A": [5, 4, 3, 2, 1], "B": [], "C": []}
+    moves = re.findall(r"([ABC])\s*->\s*([ABC])", answer)
+    if not moves:
+        return 0.0
+    for src, dst in moves:
+        if src == dst or not pegs[src]:
+            return 0.0
+        d = pegs[src][-1]
+        if pegs[dst] and pegs[dst][-1] < d:
+            return 0.0
+        pegs[src].pop()
+        pegs[dst].append(d)
+    return 1.0 if pegs["C"] == [5, 4, 3, 2, 1] and not pegs["A"] and not pegs["B"] else 0.0
+
+
+def _verify_n_queens_4(answer: str) -> float:
+    """Validate a 4-queens solution. Accept any valid placement.
+
+    Expected format: 4 numbers in 1..4, each in a different row/col with no
+    two on same diagonal. Examples of valid answers:
+      '2,4,1,3' or 'col 2, col 4, col 1, col 3'.
+    """
+    if not answer:
+        return 0.0
+    nums = [int(n) for n in re.findall(r"\d+", answer) if n.isdigit()]
+    # First 4 numbers form the placement (col index per row)
+    if len(nums) < 4:
+        return 0.0
+    placement = nums[:4]
+    if any(c < 1 or c > 4 for c in placement):
+        return 0.0
+    if len(set(placement)) != 4:
+        return 0.0  # columns must differ
+    # No two queens on same diagonal: |r1-r2| != |c1-c2|
+    for i in range(4):
+        for j in range(i + 1, 4):
+            if abs(i - j) == abs(placement[i] - placement[j]):
+                return 0.0
+    return 1.0
+
+
+# Cross-suite verifiers (forward-declared so HARDER_SUITE below can reference them).
+def _verify_bsearch_assertions(answer: str) -> float:
+    if not answer:
+        return 0.0
+    try:
+        ns: dict = {}
+        exec(answer, ns, ns)  # noqa: S102 — guarded
+        bs = ns.get("bsearch")
+        if bs is None:
+            return 0.0
+        cases = [
+            ([1, 3, 5, 7, 9], 5, 2),
+            ([1, 3, 5, 7, 9], 1, 0),
+            ([1, 3, 5, 7, 9], 9, 4),
+            ([1, 3, 5, 7, 9], 4, -1),
+            ([], 5, -1),
+        ]
+        for arr, target, expected in cases:
+            if bs(arr, target) != expected:
+                return 0.0
+        return 1.0
+    except Exception:
+        return 0.0
+
+
+def _verify_fib_assertions(answer: str) -> float:
+    if not answer:
+        return 0.0
+    try:
+        ns: dict = {}
+        exec(answer, ns, ns)  # noqa: S102 — guarded
+        fib = ns.get("fib")
+        if fib is None:
+            return 0.0
+        for n, expected in [(0, 0), (1, 1), (10, 55), (20, 6765)]:
+            if fib(n) != expected:
+                return 0.0
+        return 1.0
+    except Exception:
+        return 0.0
+
+
+def _verify_qa_three_dual_role(answer: str) -> float:
+    """Need any 3 names from the set of people who held both roles."""
+    a = (answer or "").lower()
+    if not a:
+        return 0.0
+    candidates = (
+        "marshall", "hughes", "jackson", "taft", "chase", "day",
+        "goldberg", "byrnes", "mcreynolds",
+    )
+    matched = sum(1 for c in candidates if c in a)
+    return 1.0 if matched >= 3 else 0.0
+
+
+# --- HARDER_SUITE: 10 problems calibrated to Haiku ~50% pass rate -----------
+# Each problem chosen so the base model (Haiku) succeeds roughly half the time
+# with no scaffolding, leaving headroom for L1/L2/L3 to demonstrate value.
+# This is the suite where H1 (full > flat) becomes a real, testable claim.
+HARDER_SUITE: list[Task] = [
+    # Math: multi-step word problems with non-trivial arithmetic
+    Task(
+        id="harder-math-mixture",
+        domain="math",
+        prompt=(
+            "A solution is 12% acid by volume. How many liters of pure water "
+            "must be added to 8 liters of this solution to make it 5% acid? "
+            "Answer with the number of liters (one number)."
+        ),
+        # 0.12 * 8 = 0.96 L acid; need 0.96 / 0.05 = 19.2 L total; add 11.2 L water.
+        verify=_verify_numeric(11.2, tolerance=0.2),
+    ),
+    Task(
+        id="harder-math-rate",
+        domain="math",
+        prompt=(
+            "Three workers paint a wall together. Worker A alone takes 6 hours, "
+            "Worker B alone takes 8 hours, Worker C alone takes 12 hours. "
+            "How many hours do they take working together? Answer with one number."
+        ),
+        # Combined rate = 1/6 + 1/8 + 1/12 = 4/24 + 3/24 + 2/24 = 9/24 = 3/8 walls/hr
+        # Time = 8/3 ≈ 2.67 hr.
+        verify=_verify_numeric(8/3, tolerance=0.05),
+    ),
+    Task(
+        id="harder-math-combinatorics",
+        domain="math",
+        prompt=(
+            "How many distinct ways can you arrange the letters of MISSISSIPPI? "
+            "Answer with the number."
+        ),
+        # 11! / (4! * 4! * 2!) = 39916800 / (24*24*2) = 34650
+        verify=_verify_integer_in_range(34650),
+    ),
+    # Code: subtle bugs requiring careful reading
+    Task(
+        id="harder-code-binsearch",
+        domain="code",
+        prompt=(
+            "Define a Python function `bsearch(arr, target)` that returns the index "
+            "of `target` in the sorted list `arr`, or -1 if not found. It must satisfy:\n"
+            "  bsearch([1,3,5,7,9], 5) == 2\n"
+            "  bsearch([1,3,5,7,9], 1) == 0\n"
+            "  bsearch([1,3,5,7,9], 9) == 4\n"
+            "  bsearch([1,3,5,7,9], 4) == -1\n"
+            "  bsearch([], 5) == -1\n"
+            "Submit the complete function source."
+        ),
+        verify=_verify_bsearch_assertions,
+    ),
+    Task(
+        id="harder-code-fibonacci",
+        domain="code",
+        prompt=(
+            "Define a Python function `fib(n)` that returns the n-th Fibonacci number "
+            "with fib(0)=0, fib(1)=1. It must satisfy:\n"
+            "  fib(0) == 0\n"
+            "  fib(1) == 1\n"
+            "  fib(10) == 55\n"
+            "  fib(20) == 6765\n"
+            "Submit the complete function source."
+        ),
+        verify=_verify_fib_assertions,
+    ),
+    # Logic: 4-person constraint puzzles
+    Task(
+        id="harder-logic-houses",
+        domain="logic",
+        prompt=(
+            "Four houses in a row (1=leftmost, 4=rightmost) painted red, blue, "
+            "green, yellow (one each). Clues:\n"
+            "  - The red house is immediately left of the blue house.\n"
+            "  - The green house is at position 1 or 4.\n"
+            "  - The yellow house is at position 2.\n"
+            "What color is each house? List them in order from position 1 to 4."
+        ),
+        # Yellow=2. Red+Blue adjacent (red left). Possible: Red=3,Blue=4 (then 1=green).
+        # Final: green, yellow, red, blue.
+        verify=_make_assignment_verifier({
+            "1": "green", "2": "yellow", "3": "red", "4": "blue",
+        }),
+    ),
+    Task(
+        id="harder-logic-meeting",
+        domain="logic",
+        prompt=(
+            "Four people (Alex, Beth, Carl, Dana) meet on different days "
+            "(Mon, Tue, Wed, Thu — one person per day). Constraints:\n"
+            "  - Alex meets the day after Beth.\n"
+            "  - Carl does not meet on Monday or Thursday.\n"
+            "  - Dana meets on Monday.\n"
+            "Who meets each day? State each person's day."
+        ),
+        # Dana=Mon. Carl ∉ {Mon,Thu} → Carl ∈ {Tue,Wed}. Alex = Beth+1 day.
+        # If Beth=Tue then Alex=Wed → Carl=Thu (no, Carl ≠ Thu)... try Beth=Wed→Alex=Thu→Carl=Tue. ✓
+        verify=_make_assignment_verifier({
+            "Alex": "thursday", "Beth": "wednesday",
+            "Carl": "tuesday", "Dana": "monday",
+        }),
+    ),
+    # Closed-book QA: multi-fact synthesis
+    Task(
+        id="harder-qa-multifact",
+        domain="qa",
+        prompt=(
+            "Name three distinct people who served as both a U.S. Supreme Court "
+            "justice and a U.S. Cabinet Secretary (in any cabinet position) at "
+            "different points in their careers. List all three names."
+        ),
+        verify=_verify_qa_three_dual_role,
+    ),
+    # Planning: bigger Hanoi, n-queens
+    Task(
+        id="harder-planning-hanoi5",
+        domain="planning",
+        prompt=(
+            "Solve Tower of Hanoi for 5 disks from peg A to peg C using peg B. "
+            "Output one move per line as 'A->B' or 'B->C' etc. "
+            "Submit only the moves (no other text)."
+        ),
+        verify=_verify_5disk_hanoi,
+    ),
+    Task(
+        id="harder-planning-queens4",
+        domain="planning",
+        prompt=(
+            "Solve the 4-queens problem: place 4 queens on a 4x4 chessboard so "
+            "no two attack each other. State the column (1..4) of the queen in "
+            "each row, in order rows 1..4. Example format: '2,4,1,3'."
+        ),
+        verify=_verify_n_queens_4,
+    ),
+]
+
+
 # === 16. Run loop with 4-condition ablation ==================================
 @dataclass
 class RunConfig:
@@ -1996,10 +2264,20 @@ class RunResult:
     report_path: Path | None = None
 
 
+def _emit_progress(quiet: bool, message: str) -> None:
+    """Per-episode progress to stderr. Goes to stderr (not stdout) so the
+    headline JSON/HTML capture from stdout-redirected scripts stays clean.
+    Gated by `quiet=True` so CI / batch scripts can suppress."""
+    if not quiet:
+        ts = time.strftime("%H:%M:%S")
+        print(f"[{ts}] {message}", file=sys.stderr, flush=True)
+
+
 def run(
     cfg: RunConfig,
     out_dir: Path | str,
     conditions: tuple[str, ...] = ("flat", "+autonomic", "+meta", "full"),
+    quiet: bool = False,
 ) -> RunResult:
     if cfg.seed is not None:
         random.seed(cfg.seed)
@@ -2007,6 +2285,9 @@ def run(
     run_id = new_event_id()
     out_dir = Path(out_dir) / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
+    _emit_progress(quiet, f"run_id={run_id} conditions={list(conditions)} "
+                            f"epochs={cfg.n_epochs} repeats={cfg.n_repeats} "
+                            f"tasks={len(cfg.suite)}")
     metrics: dict = {}
     workspace_paths: dict = {}
 
@@ -2045,8 +2326,8 @@ def run(
         l3 = L3Governance(l3_reasoner, log) if l3_reasoner is not None else None
 
         cond_results: dict = {"episodes": [], "lambda": {}}
-        # Recent failures (rolling) for L2 to read.
         recent_failures: list[FailureSummary] = []
+        _emit_progress(quiet, f"  ╭─ {cond} (workspace={ws.path.name})")
 
         for epoch in range(cfg.n_epochs):
             if l2 is not None:
@@ -2059,6 +2340,17 @@ def run(
                         "score": trace.score, "aborted": trace.aborted_reason,
                         "cost": trace.cost_usd, "n_steps": trace.n_steps,
                     })
+                    # Live per-episode signal: the most useful update granularity.
+                    glyph = "✓" if trace.score >= 1.0 else (
+                        "✗" if trace.aborted_reason else "·"
+                    )
+                    _emit_progress(quiet,
+                        f"  │  {cond:<12} e{epoch}/r{repeat} "
+                        f"{task.id:<20} {glyph} "
+                        f"score={trace.score:.2f} steps={trace.n_steps:<2} "
+                        f"${trace.cost_usd:.4f}"
+                        + (f" abort={trace.aborted_reason}" if trace.aborted_reason else "")
+                    )
                     if trace.score < 1.0:
                         recent_failures.append(FailureSummary(
                             task_id=task.id, domain=task.domain,
@@ -2066,9 +2358,7 @@ def run(
                             n_steps=trace.n_steps,
                             submitted_answer=trace.final_answer,
                         ))
-                        # Keep just the last 20 to bound memory.
                         recent_failures = recent_failures[-20:]
-                    # L1 fires per task
                     if l1 is not None:
                         history = list(log._events)
                         obs = l1.observe(history)
@@ -2077,21 +2367,24 @@ def run(
                         apply_decision_downward(1, safe, plant, l1, l2, log)
                         _emit_lyapunov(log, level=1, controller=l1, state=obs,
                                         correlation_id=f"task_{task.id}_e{epoch}_r{repeat}")
-            # L2 fires per epoch
+                        if isinstance(safe.action, ModeSwitch):
+                            _emit_progress(quiet,
+                                f"  │  {cond:<12} L1 mode → {safe.action.target_mode.value}")
             if l2 is not None:
                 state = MetaState.from_log(log, epoch=epoch,
                                               recent_failures=recent_failures)
                 dec = l2.decide(state)
                 safe = l2.shield(dec, state)
-                # Post-shield hooks (e.g., shadow eval) — Noesis pattern.
-                # These run AFTER the controller's built-in shield and may veto
-                # mutations that pass static safety checks but fail empirical
-                # validation (the bad-rule-injection that hurt PR #22's full).
                 safe = l2.run_hooks(safe, state)
                 apply_decision_downward(2, safe, plant, l1, l2, log)
                 _emit_lyapunov(log, level=2, controller=l2, state=state,
                                 correlation_id=f"epoch_{epoch}")
-            # L3 fires when conditions met
+                action_name = type(safe.action).__name__
+                _emit_progress(quiet,
+                    f"  │  {cond:<12} L2 epoch {epoch} → {action_name}"
+                    + (f" ({getattr(safe.action, 'reason', '')[:40]})"
+                       if hasattr(safe.action, 'reason') else "")
+                )
             if l3 is not None and l3._should_fire(log):
                 state = GovernanceState.from_log(log)
                 dec = l3.decide(state)
@@ -2101,6 +2394,8 @@ def run(
                 apply_decision_downward(3, safe, plant, l1, l2, log)
                 _emit_lyapunov(log, level=3, controller=l3, state=state,
                                 correlation_id=f"gov_e{epoch}")
+                _emit_progress(quiet,
+                    f"  │  {cond:<12} L3 fired → {type(safe.action).__name__}")
             # Even when L3 doesn't fire, sample its V over time so we get a
             # stream of L3 lyapunov samples for fitting (rare events otherwise
             # produce nan from LambdaMonitor).
@@ -2130,6 +2425,11 @@ def run(
             })
         metrics[cond] = cond_results
         workspace_paths[cond] = str(ws.path)
+        _emit_progress(quiet,
+            f"  ╰─ {cond} done: pass^3={cond_results.get('pass_pow_k', 0):.3f}  "
+            f"cost=${sum(e['cost'] for e in cond_results['episodes']):.4f}  "
+            f"n={len(cond_results['episodes'])}"
+        )
 
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2, default=str))
     paper_lams = load_canonical_lambdas() if PARAMS_PATH.exists() else {}
@@ -2452,14 +2752,149 @@ def cli_replay(args: argparse.Namespace) -> int:
     return 0
 
 
+def cli_watch(args: argparse.Namespace) -> int:
+    """Tail one or more events.jsonl files and stream formatted progress.
+
+    Usage:
+        microrcs watch /tmp/microrcs-RUN-flat
+        microrcs watch /tmp/microrcs-RUN-*    # via shell glob expansion
+        microrcs watch reports/RUN_ID         # auto-discovers all events.jsonl
+
+    Polls every `--interval` seconds (default 1.0); reports new events with the
+    same formatting as live --live runs. Exits when no activity for `--idle`
+    seconds (default 30) or on Ctrl-C. Designed to be safe against partial
+    JSONL writes (skips malformed lines).
+    """
+    paths_to_watch: list[Path] = []
+    for arg_path in args.paths:
+        p = Path(arg_path)
+        if p.is_file():
+            paths_to_watch.append(p)
+        elif p.is_dir():
+            paths_to_watch.extend(p.rglob("events.jsonl"))
+        else:
+            print(f"watch: skipping non-existent {arg_path}", file=sys.stderr)
+    if not paths_to_watch:
+        print("watch: no events.jsonl found in provided paths.", file=sys.stderr)
+        return 1
+
+    print(f"watch: tailing {len(paths_to_watch)} log(s); idle timeout={args.idle}s; "
+          f"poll={args.interval}s. Ctrl-C to stop.", file=sys.stderr)
+
+    offsets: dict[Path, int] = {p: 0 for p in paths_to_watch}
+    last_activity = time.time()
+    pass_counts: dict[str, dict[str, int]] = {}  # cond → {"passes": x, "n": y}
+
+    try:
+        while True:
+            had_event = False
+            for p in paths_to_watch:
+                if not p.exists():
+                    continue
+                try:
+                    with p.open("r") as f:
+                        f.seek(offsets[p])
+                        chunk = f.read()
+                        offsets[p] = f.tell()
+                except OSError:
+                    continue
+                if not chunk:
+                    continue
+                cond_name = _condition_from_workspace_path(p)
+                for line in chunk.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        e = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    formatted = _format_event_for_watch(e, cond_name, pass_counts)
+                    if formatted:
+                        print(formatted, flush=True)
+                        had_event = True
+            if had_event:
+                last_activity = time.time()
+            elif (time.time() - last_activity) > args.idle:
+                print(f"watch: no activity for {args.idle}s — exiting.",
+                      file=sys.stderr)
+                break
+            time.sleep(args.interval)
+    except KeyboardInterrupt:
+        print("\nwatch: interrupted.", file=sys.stderr)
+    return 0
+
+
+def _condition_from_workspace_path(events_jsonl: Path) -> str:
+    """Extract the condition name from a workspace path like
+    /tmp/microrcs-<runid>-<cond>/.rcs/events.jsonl
+
+    Conditions never contain a hyphen, so splitting on the LAST hyphen of the
+    workspace dir name reliably isolates the condition regardless of how many
+    hyphens the run-id has.
+    """
+    p = events_jsonl
+    for _ in range(3):
+        p = p.parent
+        name = p.name
+        if name.startswith("microrcs-"):
+            last_dash = name.rfind("-")
+            if last_dash > len("microrcs"):
+                return name[last_dash + 1:].replace("plus_", "+")
+            return name
+    return events_jsonl.parent.name
+
+
+def _format_event_for_watch(event: dict, cond: str,
+                              pass_counts: dict) -> str | None:
+    """Render a JSONL event as a one-line live-feed summary. None to skip."""
+    kind = event.get("kind", "?")
+    level = event.get("level", "?")
+    payload = event.get("payload", {}) or {}
+    ts = time.strftime("%H:%M:%S", time.localtime(event.get("timestamp", 0)))
+    # Episode end (LYAPUNOV at level 0 with score in payload)
+    if kind == "lyapunov" and level == 0 and "score" in payload:
+        score = payload.get("score", 0)
+        cost = payload.get("cost", 0)
+        steps = payload.get("step", 0)
+        cond_pass = pass_counts.setdefault(cond, {"passes": 0, "n": 0})
+        cond_pass["n"] += 1
+        if score >= 1.0:
+            cond_pass["passes"] += 1
+        glyph = "✓" if score >= 1.0 else "✗"
+        rate = f"{cond_pass['passes']}/{cond_pass['n']}"
+        return (f"[{ts}] {cond:<14} {glyph} score={score:.2f} steps={steps:<2} "
+                f"${cost:.4f}  cumulative pass={rate}")
+    if kind == "param_change":
+        field = payload.get("field", "?")
+        target = payload.get("target_level", "?")
+        if field == "system_rules":
+            added = payload.get("added", "")[:80]
+            return f"[{ts}] {cond:<14} L→L{target} RULE+ {added}"
+        if field == "mode":
+            return (f"[{ts}] {cond:<14} L→L{target} MODE "
+                    f"{payload.get('old')}→{payload.get('new')}")
+        return f"[{ts}] {cond:<14} L→L{target} {field}={payload.get('new', '?')}"
+    if kind == "shield" and event.get("correlation_id") == "shadow_eval":
+        d = payload.get("decision", "?")
+        sp = payload.get("shadow_passes", 0)
+        bp = payload.get("baseline_passes", 0)
+        return (f"[{ts}] {cond:<14} L2 shadow_eval {d.upper()} "
+                f"({sp}/baseline {bp})")
+    if kind == "breaker":
+        return f"[{ts}] {cond:<14} ⚠️  CIRCUIT_BREAKER {payload}"
+    return None
+
+
 def cli_run(args: argparse.Namespace) -> int:
-    cfg = _build_run_config(args.quick, args.paper)
+    cfg = _build_run_config(args.quick, args.paper, getattr(args, "suite", "reference"))
     cfg = replace(cfg, break_budgets=getattr(args, "break_budgets", False))
     out = getattr(args, "out", Path("reports"))
     conditions = ("flat", "+autonomic", "+meta", "full")
     if args.quick:
         conditions = ("flat", "full")
-    result = run(cfg, out, conditions=conditions)
+    quiet = getattr(args, "quiet", False)
+    result = run(cfg, out, conditions=conditions, quiet=quiet)
     report_path = out / result.run_id / "report.html"
     render_report(result.metrics, report_path)
     print(f"Report: {report_path}")
@@ -2467,20 +2902,31 @@ def cli_run(args: argparse.Namespace) -> int:
     return 0
 
 
-def _build_run_config(quick: bool, paper: bool) -> RunConfig:
+def _resolve_suite(name: str) -> list:
+    """Map a `--suite` flag value to a concrete task list."""
+    if name == "harder":
+        return list(HARDER_SUITE)
+    if name == "both":
+        return list(REFERENCE_SUITE) + list(HARDER_SUITE)
+    return list(REFERENCE_SUITE)  # default
+
+
+def _build_run_config(quick: bool, paper: bool,
+                       suite: str = "reference") -> RunConfig:
+    base_suite = _resolve_suite(suite)
     if quick:
         return RunConfig(
-            suite=REFERENCE_SUITE[:2], n_epochs=1, n_repeats=1,
+            suite=base_suite[:2], n_epochs=1, n_repeats=1,
             n_runs=2, max_steps_per_episode=10,
             max_cost_usd_per_episode=0.20,
         )
     if paper:
         return RunConfig(
-            suite=REFERENCE_SUITE, n_epochs=5, n_repeats=20,
+            suite=base_suite, n_epochs=5, n_repeats=20,
             n_runs=4, max_steps_per_episode=25,
             max_cost_usd_per_episode=0.75,
         )
-    return RunConfig()
+    return RunConfig(suite=base_suite)
 
 
 # === 21. main() + argparse ===================================================
@@ -2499,6 +2945,16 @@ def main() -> int:
         help="Force λ_2 < 0 by removing L2 mutation budget (H4 test)",
     )
     p_run.add_argument("--out", default=Path("reports"), type=Path)
+    p_run.add_argument(
+        "--quiet", action="store_true",
+        help="Suppress live per-episode progress to stderr (default: live)",
+    )
+    p_run.add_argument(
+        "--suite", choices=("reference", "harder", "both"), default="reference",
+        help="Task suite: 'reference' (5 mostly-easy tasks, default), "
+             "'harder' (10 problems calibrated to ~50%% pass rate), "
+             "or 'both' (15 tasks)",
+    )
 
     p_trace = sub.add_parser("trace", help="Walk parent chain from event_id")
     p_trace.add_argument("event_id")
@@ -2511,6 +2967,19 @@ def main() -> int:
     p_replay = sub.add_parser("replay", help="Re-execute episode from JSONL (stub)")
     p_replay.add_argument("episode_jsonl")
 
+    p_watch = sub.add_parser(
+        "watch",
+        help="Tail events.jsonl from one or more workspaces and stream live progress",
+    )
+    p_watch.add_argument(
+        "paths", nargs="+",
+        help="Workspace dirs or events.jsonl files (shell glob OK)",
+    )
+    p_watch.add_argument("--interval", type=float, default=1.0,
+                          help="Poll interval seconds (default 1.0)")
+    p_watch.add_argument("--idle", type=float, default=30.0,
+                          help="Exit after this many seconds of no new events (default 30)")
+
     args = p.parse_args()
     if args.cmd is None or args.cmd == "run":
         if args.cmd is None:
@@ -2518,6 +2987,8 @@ def main() -> int:
             args.paper = False
             args.break_budgets = False
             args.out = Path("reports")
+            args.quiet = False
+            args.suite = "reference"
         return cli_run(args)
     if args.cmd == "trace":
         return cli_trace(args)
@@ -2525,6 +2996,8 @@ def main() -> int:
         return cli_lambda(args)
     if args.cmd == "replay":
         return cli_replay(args)
+    if args.cmd == "watch":
+        return cli_watch(args)
     return 0
 
 
