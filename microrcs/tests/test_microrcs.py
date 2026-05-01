@@ -991,6 +991,290 @@ def test_l2_accepts_well_formed_rule(tmp_path):
     assert "constraint" in dec.action.rule.lower()
 
 
+# =====================================================================
+# Hooks pipeline (Noesis pattern) — composable post-shield veto chain
+# =====================================================================
+def test_hook_context_carries_action_and_state(tmp_path):
+    log = m.EventLog(tmp_path / "e.jsonl")
+    ctx = m.HookContext(level=2, state="s", action="a", log=log)
+    assert ctx.level == 2 and ctx.state == "s" and ctx.action == "a"
+
+
+def test_run_hooks_chain_passes_through_with_no_hooks(tmp_path):
+    log = m.EventLog(tmp_path / "e.jsonl")
+    dec = m.Decision(action=m.AppendSystemRule(rule="x" * 50, rationale="r"))
+    out = m.run_hooks_chain([], dec, state=None, level=2, log=log)
+    assert out is dec
+
+
+def test_run_hooks_chain_first_veto_wins(tmp_path):
+    log = m.EventLog(tmp_path / "e.jsonl")
+    calls = []
+
+    def passing_hook(ctx):
+        calls.append("pass")
+        return m.HookResult(decision=m.Decision(action=ctx.action))
+
+    def vetoing_hook(ctx):
+        calls.append("veto")
+        return m.HookResult(decision=m.Decision(action=ctx.action),
+                              veto=True, veto_reason="nope")
+
+    def never_called(ctx):
+        calls.append("never")
+        return m.HookResult(decision=m.Decision(action=ctx.action))
+
+    dec = m.Decision(action=m.AppendSystemRule(rule="x" * 50, rationale="r"))
+    out = m.run_hooks_chain([passing_hook, vetoing_hook, never_called],
+                              dec, state=None, level=2, log=log)
+    assert isinstance(out.action, m.NoOp)
+    assert "nope" in out.action.reason
+    assert calls == ["pass", "veto"]
+    # Veto event was recorded
+    shields = list(log.filter(level=2, kind=m.EventKind.SHIELD))
+    assert any(s.payload.get("reason") == "nope" for s in shields)
+
+
+def test_run_hooks_chain_modifies_action(tmp_path):
+    log = m.EventLog(tmp_path / "e.jsonl")
+
+    def rewrite_hook(ctx):
+        # Replace the action with a different one
+        return m.HookResult(decision=m.Decision(
+            action=m.NoOp(reason="rewritten"), rationale="r"))
+
+    out = m.run_hooks_chain(
+        [rewrite_hook],
+        m.Decision(action=m.AppendSystemRule(rule="x" * 50, rationale="r")),
+        state=None, level=2, log=log,
+    )
+    assert isinstance(out.action, m.NoOp)
+    assert out.action.reason == "rewritten"
+
+
+def test_run_hooks_chain_swallows_hook_exceptions(tmp_path):
+    """Hook errors must not crash the run loop."""
+    log = m.EventLog(tmp_path / "e.jsonl")
+
+    def crashy_hook(ctx):
+        raise RuntimeError("boom")
+
+    def follow_up(ctx):
+        return m.HookResult(decision=m.Decision(action=ctx.action,
+                                                   rationale="ran"))
+
+    dec = m.Decision(action=m.AppendSystemRule(rule="x" * 50, rationale="r"))
+    out = m.run_hooks_chain([crashy_hook, follow_up], dec, state=None,
+                              level=2, log=log)
+    # Exception logged, then follow_up ran, action preserved
+    assert isinstance(out.action, m.AppendSystemRule)
+    errors = list(log.filter(level=2, kind=m.EventKind.SHIELD))
+    assert any("hook_error" in (e.correlation_id or "") for e in errors)
+
+
+# =====================================================================
+# L2.run_hooks integration
+# =====================================================================
+def test_l2_run_hooks_no_op_when_no_hooks(tmp_path):
+    log = m.EventLog(tmp_path / "e.jsonl")
+    l2 = m.L2Meta(_MockReasoner([]), log, mutation_budget=5, hooks=[])
+    dec = m.Decision(action=m.AppendSystemRule(rule="x" * 50, rationale="r"))
+    assert l2.run_hooks(dec, state=None) is dec
+
+
+def test_l2_run_hooks_applies_chain(tmp_path):
+    log = m.EventLog(tmp_path / "e.jsonl")
+    seen = []
+
+    def hook(ctx):
+        seen.append("ran")
+        return m.HookResult(decision=m.Decision(action=ctx.action))
+
+    l2 = m.L2Meta(_MockReasoner([]), log, mutation_budget=5, hooks=[hook])
+    dec = m.Decision(action=m.AppendSystemRule(rule="x" * 50, rationale="r"))
+    l2.run_hooks(dec, state=None)
+    assert seen == ["ran"]
+
+
+# =====================================================================
+# Shadow evaluation hook
+# =====================================================================
+def test_shadow_eval_default_threshold_above_noise():
+    """Default threshold_delta MUST be >= 2.
+
+    A 1-trial improvement at n_trials_per_task=2 × n_eval_tasks=3 = 6 trials
+    is within temperature=1.0 sampling noise. Default delta=2 is ~33% relative
+    improvement — meaningfully above noise. PR #23 live run demonstrated that
+    delta=1 lets unhelpful rules accumulate and degrades `full` performance.
+    """
+    cfg = m.ShadowEvalConfig()
+    assert cfg.threshold_delta >= 2.0, (
+        f"default threshold_delta={cfg.threshold_delta} too lenient; "
+        "see PR #23 live data — delta=1 produced false positives"
+    )
+
+
+def test_shadow_eval_skips_noop_actions(tmp_path):
+    """Hook must pass through NoOp/Retry/Abort without spawning a shadow plant."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(tmp_path / "e.jsonl")
+    plant = m.L0Plant(_MockReasoner([]), ws, log, m.Caps(model="mock"))
+    cfg = m.ShadowEvalConfig(enabled=True)
+    hook = m.make_shadow_eval_hook(cfg, plant, m.REFERENCE_SUITE,
+                                      workspace_root=tmp_path)
+    ctx = m.HookContext(level=2, state=None,
+                          action=m.NoOp(reason="x"), log=log)
+    res = hook(ctx)
+    assert not res.veto
+    assert isinstance(res.decision.action, m.NoOp)
+
+
+def test_shadow_eval_skips_when_disabled(tmp_path):
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(tmp_path / "e.jsonl")
+    plant = m.L0Plant(_MockReasoner([]), ws, log, m.Caps(model="mock"))
+    cfg = m.ShadowEvalConfig(enabled=False)
+    hook = m.make_shadow_eval_hook(cfg, plant, m.REFERENCE_SUITE,
+                                      workspace_root=tmp_path)
+    rule = m.AppendSystemRule(rule="x" * 50, rationale="r")
+    res = hook(m.HookContext(level=2, state=None, action=rule, log=log))
+    # When disabled the hook is a pass-through — not a veto
+    assert not res.veto
+    assert res.decision.action is rule
+
+
+def test_shadow_eval_passes_when_no_recent_failures(tmp_path):
+    """No evidence to evaluate against → trust upstream budget shields."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(tmp_path / "e.jsonl")
+    plant = m.L0Plant(_MockReasoner([]), ws, log, m.Caps(model="mock"))
+    state = m.MetaState(l1_decisions=[], l1_lyapunov_trend=0.5,
+                          helper_diffs=[], memory_snapshot={},
+                          recent_failures=[])
+    cfg = m.ShadowEvalConfig(enabled=True)
+    hook = m.make_shadow_eval_hook(cfg, plant, m.REFERENCE_SUITE,
+                                      workspace_root=tmp_path)
+    rule = m.AppendSystemRule(rule="x" * 50, rationale="r")
+    res = hook(m.HookContext(level=2, state=state, action=rule, log=log))
+    assert not res.veto
+
+
+def test_shadow_eval_select_tasks_uses_failures(tmp_path):
+    """Selection prioritizes recent failures + 1 healthy task."""
+    failed_task_ids = ["math-multi-step", "logic-zebra"]
+    state = m.MetaState(
+        l1_decisions=[], l1_lyapunov_trend=0.0,
+        helper_diffs=[], memory_snapshot={},
+        recent_failures=[
+            m.FailureSummary(task_id=tid, domain="x", score=0.0,
+                              aborted_reason=None, n_steps=2,
+                              submitted_answer="y") for tid in failed_task_ids
+        ],
+    )
+    chosen = m._select_shadow_tasks(state, m.REFERENCE_SUITE, n_eval=3)
+    chosen_ids = [t.id for t in chosen]
+    # Both failed tasks present
+    assert "math-multi-step" in chosen_ids
+    assert "logic-zebra" in chosen_ids
+    # And one extra healthy task (the third pick)
+    assert len(chosen) == 3
+    assert chosen_ids[2] not in failed_task_ids
+
+
+def test_shadow_eval_baseline_pass_count():
+    """Baseline = expected current passes (n_trials per healthy task,
+    minus observed failures for failed tasks)."""
+    suite = [m.Task(id=f"t{i}", domain="x", prompt="p",
+                       verify=lambda a: 1.0) for i in range(3)]
+    state = m.MetaState(
+        l1_decisions=[], l1_lyapunov_trend=0.0,
+        helper_diffs=[], memory_snapshot={},
+        # t0 failed twice, t1 failed once, t2 has no failures
+        recent_failures=[
+            m.FailureSummary(task_id="t0", domain="x", score=0.0,
+                              aborted_reason=None, n_steps=1, submitted_answer=""),
+            m.FailureSummary(task_id="t0", domain="x", score=0.0,
+                              aborted_reason=None, n_steps=1, submitted_answer=""),
+            m.FailureSummary(task_id="t1", domain="x", score=0.0,
+                              aborted_reason=None, n_steps=1, submitted_answer=""),
+        ],
+    )
+    n_trials = 2
+    bp = m._baseline_pass_count(state, suite, n_trials=n_trials)
+    # t0: 2 trials, 2 fails → 0 passes; t1: 2 trials, 1 fail → 1 pass;
+    # t2: 0 fails → 2 passes; total = 3
+    assert bp == 3
+
+
+def test_shadow_eval_vetoes_unhelpful_rule(tmp_path):
+    """If shadow run fails as much as baseline, veto."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(tmp_path / "e.jsonl")
+    # Reasoner that always returns wrong answer regardless of rule
+    bad_reasoner = _MockReasoner([_resp_submit("WRONG")] * 50)
+    plant = m.L0Plant(bad_reasoner, ws, log, m.Caps(model="mock"))
+    suite = [m.Task(id=f"t{i}", domain="x", prompt="p",
+                       verify=lambda a: 1.0 if a == "RIGHT" else 0.0)
+              for i in range(3)]
+    state = m.MetaState(
+        l1_decisions=[], l1_lyapunov_trend=0.5,
+        helper_diffs=[], memory_snapshot={},
+        recent_failures=[m.FailureSummary(
+            task_id="t0", domain="x", score=0.0,
+            aborted_reason=None, n_steps=1, submitted_answer="WRONG")],
+    )
+    cfg = m.ShadowEvalConfig(
+        enabled=True, n_eval_tasks=2, n_trials_per_task=1,
+        threshold_delta=1.0, max_steps_per_shadow=2,
+    )
+    hook = m.make_shadow_eval_hook(cfg, plant, suite, workspace_root=tmp_path)
+    rule = m.AppendSystemRule(rule="useless rule of fifty chars XXXXXXXXXX",
+                                 rationale="r")
+    res = hook(m.HookContext(level=2, state=state, action=rule, log=log))
+    assert res.veto
+    assert "shadow_eval" in res.veto_reason
+    # SHIELD event recorded with the eval details
+    shields = [e for e in log.filter(level=2, kind=m.EventKind.SHIELD)
+                 if e.correlation_id == "shadow_eval"]
+    assert len(shields) >= 1
+    assert shields[0].payload["decision"] == "veto"
+
+
+def test_shadow_eval_accepts_helpful_rule(tmp_path):
+    """If shadow run beats baseline, accept."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(tmp_path / "e.jsonl")
+    # Reasoner that always submits "RIGHT"
+    good_reasoner = _MockReasoner([_resp_submit("RIGHT")] * 50)
+    plant = m.L0Plant(good_reasoner, ws, log, m.Caps(model="mock"))
+    suite = [m.Task(id=f"t{i}", domain="x", prompt="p",
+                       verify=lambda a: 1.0 if a == "RIGHT" else 0.0)
+              for i in range(3)]
+    # Recent failures: t0 failed once, baseline = 0 (with n_trials=1)
+    # Shadow with the rule: 1 pass per task. With 2 tasks (t0 + t1 healthy),
+    # shadow = 2, baseline (t0=0 + t1=1) = 1. Shadow exceeds by 1 = threshold_delta.
+    state = m.MetaState(
+        l1_decisions=[], l1_lyapunov_trend=0.5,
+        helper_diffs=[], memory_snapshot={},
+        recent_failures=[m.FailureSummary(
+            task_id="t0", domain="x", score=0.0,
+            aborted_reason=None, n_steps=1, submitted_answer="WRONG")],
+    )
+    cfg = m.ShadowEvalConfig(
+        enabled=True, n_eval_tasks=2, n_trials_per_task=1,
+        threshold_delta=1.0, max_steps_per_shadow=2,
+    )
+    hook = m.make_shadow_eval_hook(cfg, plant, suite, workspace_root=tmp_path)
+    rule = m.AppendSystemRule(rule="helpful rule fifty chars XXXXXXXXXXXXXXXXXX",
+                                 rationale="r")
+    res = hook(m.HookContext(level=2, state=state, action=rule, log=log))
+    assert not res.veto
+    assert isinstance(res.decision.action, m.AppendSystemRule)
+    shields = [e for e in log.filter(level=2, kind=m.EventKind.SHIELD)
+                 if e.correlation_id == "shadow_eval"]
+    assert shields[0].payload["decision"] == "accept"
+
+
 def test_l2_noop_when_no_failures_and_decay(tmp_path):
     """If V₁ is already decaying and there are no failures, L2 should noop."""
     class _R:
