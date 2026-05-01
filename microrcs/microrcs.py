@@ -673,6 +673,19 @@ class EpisodeTrace:
     workspace_diff: dict
 
 
+def _l0_lyapunov(cost: float, step: int, score: float, caps: "Caps") -> float:
+    """Continuous V₀ ∈ [0, 1] combining capacity usage + correctness gap.
+
+    V₀ = 0.3·(cost/budget) + 0.3·(step/max_steps) + 0.4·(1 − score)
+
+    Continuous so the linear regression on log(V) for λ̂_0 is well-defined.
+    All three terms are clamped to [0, 1] before summing.
+    """
+    cost_frac = min(cost / max(caps.max_cost_usd, 1e-9), 1.0)
+    step_frac = min(step / max(caps.max_steps, 1), 1.0)
+    return 0.3 * cost_frac + 0.3 * step_frac + 0.4 * (1.0 - score)
+
+
 L0_SYSTEM_PROMPT = """\
 You are an agent in a workspace. Your tools are `bash` and `submit`.
 
@@ -838,9 +851,11 @@ class L0Plant:
                         new_event_id(), dec_event.event_id, time.time(), 0,
                         EventKind.STEP, cid, {"submitted": True, "score": score},
                     ))
+                    v0 = _l0_lyapunov(cost, step + 1, score, self.caps)
                     self.log.append(RCSEvent(
                         new_event_id(), None, time.time(), 0,
-                        EventKind.LYAPUNOV, cid, {"V": 1.0 - score},
+                        EventKind.LYAPUNOV, cid,
+                        {"V": v0, "score": score, "cost": cost, "step": step + 1},
                     ))
                     return EpisodeTrace(
                         task.id, messages, shielded.answer, score, None,
@@ -928,9 +943,11 @@ class L0Plant:
                cost: float, step: int, snap_before: dict) -> EpisodeTrace:
         snap_after = self.workspace.snapshot()
         diff = diff_snapshots(snap_before, snap_after)
+        v0 = _l0_lyapunov(cost, step, 0.0, self.caps)
         self.log.append(RCSEvent(
             new_event_id(), None, time.time(), 0,
-            EventKind.LYAPUNOV, cid, {"V": 1.0, "aborted": reason},
+            EventKind.LYAPUNOV, cid,
+            {"V": v0, "score": 0.0, "cost": cost, "step": step, "aborted": reason},
         ))
         return EpisodeTrace(task.id, messages, None, 0.0, reason, cost, step, diff)
 
@@ -1369,6 +1386,26 @@ def apply_decision_downward(
     # NoOp / Retry / Abort — no state mutation
 
 
+def _emit_lyapunov(log: EventLog, level: int, controller: Any, state: Any,
+                    correlation_id: str = "control") -> float:
+    """Compute V_k(state) via controller.lyapunov() and emit a LYAPUNOV event.
+
+    Centralized so every level emits the same shape, and so the run loop
+    has a single point to hook for instrumentation. Returns the V value
+    that was emitted for caller convenience.
+    """
+    try:
+        v = float(controller.lyapunov(state))
+    except Exception:  # noqa: BLE001 — defensive: lyapunov fns shouldn't raise
+        v = float("nan")
+    if not math.isnan(v):
+        log.append(RCSEvent(
+            new_event_id(), None, time.time(), level,
+            EventKind.LYAPUNOV, correlation_id, {"V": v},
+        ))
+    return v
+
+
 # === 15. REFERENCE_SUITE + verifiers =========================================
 def _verify_approx_time(target: str, tolerance_minutes: int):
     target_minutes = _hhmm_to_minutes(target)
@@ -1471,9 +1508,12 @@ REFERENCE_SUITE: list[Task] = [
         prompt=(
             "A train leaves Town A at 9:47 going 73 mph. A second train leaves "
             "Town B at 11:23 going 81 mph toward Town A. Towns are 412 miles apart. "
-            "At what time do they meet? Answer as HH:MM (24h)."
+            "At what time do they meet? Answer as HH:MM (24h).\n\n"
+            "(Hint: at 11:23 the first train has covered 73·(11:23−9:47) = 116.8 mi; "
+            "remaining gap 295.2 mi closes at 73+81 = 154 mph in 1h54.95min.)"
         ),
-        verify=_verify_approx_time("13:54", tolerance_minutes=4),
+        # Correct answer: 13:18 (verified analytically; old 13:54 was an arithmetic error).
+        verify=_verify_approx_time("13:18", tolerance_minutes=4),
     ),
     Task(
         id="code-bugfix",
@@ -1604,12 +1644,16 @@ def run(
                         dec = l1.decide(obs)
                         safe = l1.shield(dec, obs)
                         apply_decision_downward(1, safe, plant, l1, l2, log)
+                        _emit_lyapunov(log, level=1, controller=l1, state=obs,
+                                        correlation_id=f"task_{task.id}_e{epoch}_r{repeat}")
             # L2 fires per epoch
             if l2 is not None:
                 state = MetaState.from_log(log, epoch=epoch)
                 dec = l2.decide(state)
                 safe = l2.shield(dec, state)
                 apply_decision_downward(2, safe, plant, l1, l2, log)
+                _emit_lyapunov(log, level=2, controller=l2, state=state,
+                                correlation_id=f"epoch_{epoch}")
             # L3 fires when conditions met
             if l3 is not None and l3._should_fire(log):
                 state = GovernanceState.from_log(log)
@@ -1618,6 +1662,15 @@ def run(
                 if not isinstance(safe.action, NoOp):
                     l3.last_change_t = time.time()
                 apply_decision_downward(3, safe, plant, l1, l2, log)
+                _emit_lyapunov(log, level=3, controller=l3, state=state,
+                                correlation_id=f"gov_e{epoch}")
+            # Even when L3 doesn't fire, sample its V over time so we get a
+            # stream of L3 lyapunov samples for fitting (rare events otherwise
+            # produce nan from LambdaMonitor).
+            elif l3 is not None:
+                state = GovernanceState.from_log(log)
+                _emit_lyapunov(log, level=3, controller=l3, state=state,
+                                correlation_id=f"gov_e{epoch}_passive")
 
         # Compute lambdas for all 4 levels
         for level in (0, 1, 2, 3):

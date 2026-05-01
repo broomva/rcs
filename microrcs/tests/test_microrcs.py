@@ -376,6 +376,46 @@ def _resp_bash(command: str) -> "m.ReasoningResponse":
     )
 
 
+def test_l0_lyapunov_helper_continuous_in_zero_one():
+    """V_0 ∈ [0, 1] across all extremes."""
+    caps = m.Caps(max_steps=20, max_cost_usd=0.50)
+    # Perfect: zero cost, 1 step, score=1
+    assert m._l0_lyapunov(0.0, 1, 1.0, caps) == pytest.approx(0.3 * (1/20), abs=1e-6)
+    # Worst: max cost, max steps, score=0
+    assert m._l0_lyapunov(0.50, 20, 0.0, caps) == pytest.approx(1.0, abs=1e-6)
+    # Score-only failure (no cost, 1 step, score=0)
+    assert m._l0_lyapunov(0.0, 1, 0.0, caps) == pytest.approx(0.3 * (1/20) + 0.4, abs=1e-6)
+
+
+def test_l0_lyapunov_clamps_overrun():
+    """Cost or steps exceeding budget clamp to 1.0; V remains in [0,1]."""
+    caps = m.Caps(max_steps=10, max_cost_usd=0.10)
+    v = m._l0_lyapunov(cost=0.30, step=20, score=0.0, caps=caps)
+    assert v == pytest.approx(1.0, abs=1e-6)
+
+
+def test_l0_emits_continuous_lyapunov_on_submit(tmp_path):
+    """Episode-end LYAPUNOV event payload includes V (continuous), score, cost, step."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(ws.path / ".rcs" / "events.jsonl")
+    plant = m.L0Plant(
+        reasoner=_MockReasoner([_resp_submit("42")]),
+        workspace=ws, log=log,
+        caps=m.Caps(max_steps=5, max_cost_usd=1.0, model="mock"),
+    )
+    task = m.Task(id="t1", domain="math", prompt="x",
+                    verify=lambda a: 1.0 if a == "42" else 0.0)
+    plant.run_episode(task)
+    lyap = list(log.filter(level=0, kind=m.EventKind.LYAPUNOV))
+    assert len(lyap) == 1
+    p = lyap[0].payload
+    assert "V" in p and "score" in p and "cost" in p and "step" in p
+    # V is in [0,1] — not just {0,1}
+    assert 0.0 <= p["V"] <= 1.0
+    # Successful submit at step=1 → V should be small
+    assert p["V"] < 0.5
+
+
 def test_l0_plant_runs_episode_to_submit(tmp_path):
     ws = m.Workspace.create(tmp_path / "ws", run_id="t")
     log = m.EventLog(ws.path / ".rcs" / "events.jsonl")
@@ -715,21 +755,30 @@ def test_apply_update_cap(tmp_path):
 # Section 15 — verifiers
 # =====================================================================
 def test_math_verifier_exact_match():
-    v = m._verify_approx_time("13:54", tolerance_minutes=2)
-    assert v("13:54") == 1.0
-    assert v("13:55") == 1.0
-    assert v("13:53") == 1.0
+    v = m._verify_approx_time("13:18", tolerance_minutes=2)
+    assert v("13:18") == 1.0
+    assert v("13:19") == 1.0
+    assert v("13:17") == 1.0
 
 
 def test_math_verifier_outside_tolerance():
-    v = m._verify_approx_time("13:54", tolerance_minutes=2)
+    v = m._verify_approx_time("13:18", tolerance_minutes=2)
     assert v("13:50") == 0.0
     assert v("not a time") == 0.0
 
 
 def test_math_verifier_extracts_from_text():
-    v = m._verify_approx_time("13:54", tolerance_minutes=2)
-    assert v("They meet at 13:54.") == 1.0
+    v = m._verify_approx_time("13:18", tolerance_minutes=2)
+    assert v("They meet at 13:18.") == 1.0
+
+
+def test_reference_suite_math_task_verifier_correct_answer():
+    """Regression: the math task in REFERENCE_SUITE accepts the analytically
+    correct answer 13:18 (computed: (412 + 73*9.7833 + 81*11.3833) / 154 = 13.30h)."""
+    math_task = next(t for t in m.REFERENCE_SUITE if t.id == "math-multi-step")
+    assert math_task.verify("13:18") == 1.0
+    assert math_task.verify("They meet at 13:18.") == 1.0
+    assert math_task.verify("13:54") == 0.0  # the previous (wrong) answer
 
 
 def test_python_assertions_verifier_correct():
@@ -889,6 +938,65 @@ def test_circuit_breaker_no_fire_on_positive_lambda(tmp_path):
 
 
 # =====================================================================
+# Section: _emit_lyapunov + run-loop instrumentation at L1/L2/L3
+# =====================================================================
+def test_emit_lyapunov_appends_event(tmp_path):
+    log = m.EventLog(tmp_path / "e.jsonl")
+
+    class _C:
+        def lyapunov(self, state): return 0.42
+    v = m._emit_lyapunov(log, level=1, controller=_C(), state=None,
+                          correlation_id="cid")
+    assert v == 0.42
+    events = list(log.filter(level=1, kind=m.EventKind.LYAPUNOV))
+    assert len(events) == 1
+    assert events[0].payload["V"] == 0.42
+
+
+def test_emit_lyapunov_silences_lyapunov_exceptions(tmp_path):
+    log = m.EventLog(tmp_path / "e.jsonl")
+
+    class _Boom:
+        def lyapunov(self, state): raise RuntimeError("boom")
+    v = m._emit_lyapunov(log, level=2, controller=_Boom(), state=None)
+    assert np.isnan(v)
+    # No event appended on nan
+    assert list(log.filter(level=2, kind=m.EventKind.LYAPUNOV)) == []
+
+
+def test_run_loop_emits_l1_l2_l3_lyapunov_events(tmp_path, monkeypatch):
+    """End-to-end check: a `full` run emits LYAPUNOV events at every level."""
+    class _UniMock:
+        def __init__(self, **kwargs): pass
+
+        def reason(self, req):
+            if any(t.name == "submit" for t in req.tools):
+                return _resp_submit("13:18")  # math task correct answer
+            return m.ReasoningResponse(
+                text="noop", thinking="", tool_calls=(),
+                stop_reason="end_turn",
+                usage=m.TokenUsage(input=10, output=5),
+                latency_ms=5.0, model="mock",
+            )
+    monkeypatch.setattr(m, "make_reasoner",
+                          lambda *a, **kw: _UniMock(**kw))
+    cfg = m.RunConfig(
+        suite=m.REFERENCE_SUITE[:1],
+        n_epochs=2, n_repeats=1, n_runs=1,
+        max_steps_per_episode=3, max_cost_usd_per_episode=0.1,
+        workspace_root=tmp_path,
+        model_l0_l1="mock", model_l2_l3="mock",
+    )
+    res = m.run(cfg, tmp_path / "out", conditions=("full",))
+    # Walk the workspace to find the events.jsonl
+    ws_path = Path(res.workspace_paths["full"])
+    log = m.EventLog(ws_path / ".rcs" / "events.jsonl")
+    for level in (0, 1, 2, 3):
+        events = list(log.filter(level=level, kind=m.EventKind.LYAPUNOV))
+        assert len(events) >= 1, f"no LYAPUNOV at L{level}"
+
+
+# =====================================================================
 # Section 16 — run loop (end-to-end smoke with mock reasoner)
 # =====================================================================
 def test_smoke_run_end_to_end(tmp_path, monkeypatch):
@@ -898,9 +1006,9 @@ def test_smoke_run_end_to_end(tmp_path, monkeypatch):
             self.kwargs = kwargs
 
         def reason(self, req):
-            # If the request is for a tool-use response, submit a generic answer.
+            # If the request is for a tool-use response, submit the correct answer.
             if any(t.name == "submit" for t in req.tools):
-                return _resp_submit("13:54")
+                return _resp_submit("13:18")
             # Otherwise assume L1/L2/L3 controller — return text "noop"
             return m.ReasoningResponse(
                 text="noop", thinking="", tool_calls=(),
@@ -925,7 +1033,7 @@ def test_smoke_run_end_to_end(tmp_path, monkeypatch):
     metrics_file = tmp_path / "out" / res.run_id / "metrics.json"
     assert metrics_file.exists()
     md = json.loads(metrics_file.read_text())
-    assert md["flat"]["pass_pow_k"] == 1.0  # math verifier accepts 13:54
+    assert md["flat"]["pass_pow_k"] == 1.0  # math verifier accepts 13:18
     # Render report
     m.render_report(res.metrics, tmp_path / "out" / res.run_id / "report.html")
     assert (tmp_path / "out" / res.run_id / "report.html").exists()
