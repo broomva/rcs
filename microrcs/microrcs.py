@@ -1351,15 +1351,19 @@ class L2Meta:
 class ShadowEvalConfig:
     """Configures the shadow-evaluation hook for L2 mutations.
 
-    Default thresholds tuned for low-cost runs: 2 trials × 3 tasks = 6 shadow
-    episodes per mutation candidate. At Haiku rates that's ~$0.20-0.40 per
-    candidate. Threshold of +1 successful trial vs baseline is the smallest
-    detectable improvement at n=6 trials.
+    Default thresholds: 2 trials × 3 tasks = 6 shadow episodes per mutation
+    candidate. At Haiku rates that's ~$0.20-0.40 per candidate.
+
+    threshold_delta=2.0: shadow must beat baseline by ≥2 trials out of 6.
+    A 1-trial improvement at n=6 is within sampling variance (temperature=1.0)
+    and produces false positives — the live PR #23 run showed all 3 candidate
+    rules accepted at delta=1, accumulated, and degraded `full` to 0.935. With
+    delta=2 the threshold is ~33% relative improvement, well above noise floor.
     """
     enabled: bool = True
     n_eval_tasks: int = 3       # at most this many tasks per shadow eval
     n_trials_per_task: int = 2  # repeats per task for noise robustness
-    threshold_delta: float = 1.0  # absolute pass-count delta vs baseline
+    threshold_delta: float = 2.0  # require ≥2 trial improvement vs baseline
     max_steps_per_shadow: int = 10
     max_cost_usd_per_shadow: float = 0.10
 

@@ -1099,6 +1099,21 @@ def test_l2_run_hooks_applies_chain(tmp_path):
 # =====================================================================
 # Shadow evaluation hook
 # =====================================================================
+def test_shadow_eval_default_threshold_above_noise():
+    """Default threshold_delta MUST be >= 2.
+
+    A 1-trial improvement at n_trials_per_task=2 × n_eval_tasks=3 = 6 trials
+    is within temperature=1.0 sampling noise. Default delta=2 is ~33% relative
+    improvement — meaningfully above noise. PR #23 live run demonstrated that
+    delta=1 lets unhelpful rules accumulate and degrades `full` performance.
+    """
+    cfg = m.ShadowEvalConfig()
+    assert cfg.threshold_delta >= 2.0, (
+        f"default threshold_delta={cfg.threshold_delta} too lenient; "
+        "see PR #23 live data — delta=1 produced false positives"
+    )
+
+
 def test_shadow_eval_skips_noop_actions(tmp_path):
     """Hook must pass through NoOp/Retry/Abort without spawning a shadow plant."""
     ws = m.Workspace.create(tmp_path / "ws", run_id="t")
