@@ -429,6 +429,74 @@ class Decision:
     metadata: dict = field(default_factory=dict)
 
 
+# === 6b. Hook pipeline (Noesis-inspired veto chain) ==========================
+@dataclass
+class HookContext:
+    """Snapshot passed to a hook. Hooks are pure functions over this."""
+    level: int
+    state: Any
+    action: Any
+    log: "EventLog"
+    metadata: dict = field(default_factory=dict)
+
+
+@dataclass
+class HookResult:
+    """Hook return value: pass-through, modified action, or veto with reason."""
+    decision: Decision
+    veto: bool = False
+    veto_reason: str = ""
+
+
+# A Hook is a pure function from context to result. Composable and testable.
+# Type alias rather than Protocol because hooks are typically tiny closures.
+Hook = Any  # Callable[[HookContext], HookResult] — kept loose to avoid import gymnastics
+
+
+def run_hooks_chain(
+    hooks: list[Hook],
+    initial: Decision,
+    state: Any,
+    level: int,
+    log: "EventLog",
+) -> Decision:
+    """Run hooks in order. Each may modify the action or veto. First veto wins.
+
+    Vetoed actions become NoOp(reason=veto_reason) and emit a SHIELD event for
+    visibility. This is the Noesis pattern: composable safety filters above the
+    controller's built-in shield(), enabling shadow-evaluation, coherence checks,
+    and other pre-commit validations without touching controller internals.
+    """
+    current = initial
+    for hook in hooks:
+        ctx = HookContext(level=level, state=state, action=current.action, log=log)
+        try:
+            result = hook(ctx)
+        except Exception as exc:  # noqa: BLE001 — hooks must not crash the loop
+            log.append(RCSEvent(
+                new_event_id(), None, time.time(), level,
+                EventKind.SHIELD, "hook_error",
+                {"hook": getattr(hook, "__name__", repr(hook)),
+                 "error": f"{type(exc).__name__}: {exc}"},
+            ))
+            continue
+        if result.veto:
+            log.append(RCSEvent(
+                new_event_id(), None, time.time(), level,
+                EventKind.SHIELD, "hook_veto",
+                {"hook": getattr(hook, "__name__", repr(hook)),
+                 "reason": result.veto_reason,
+                 "blocked_action_type": type(current.action).__name__},
+            ))
+            return Decision(
+                action=NoOp(reason=f"hook_veto:{result.veto_reason}"[:200]),
+                rationale=current.rationale,
+                metadata={**current.metadata, "vetoed_by": getattr(hook, "__name__", "?")},
+            )
+        current = result.decision
+    return current
+
+
 # === 7. RCSEvent + EventKind + EventLog ======================================
 class EventKind(enum.Enum):
     OBSERVE = "observe"
@@ -1136,26 +1204,39 @@ class MetaState:
 
 
 class L2Meta:
-    """Watches L1 history. Proposes mutations to L0's prompt template, helpers, memory."""
+    """Watches L1 history. Proposes mutations to L0's prompt template, helpers, memory.
+
+    `hooks` is an optional list of post-shield validators (Noesis-pattern). The
+    canonical use case is a shadow-eval hook that tests a candidate mutation
+    on a small task set before commit, vetoing if it doesn't measurably help.
+    """
 
     def __init__(self, reasoner: Reasoner, log: EventLog,
-                 mutation_budget: int = 5):
+                 mutation_budget: int = 5,
+                 hooks: list[Hook] | None = None):
         self.reasoner = reasoner
         self.log = log
         self.mutation_budget = mutation_budget
         self.mutations_this_epoch = 0
         self.accepted_mutations: list = []
+        self.hooks: list[Hook] = list(hooks or [])
 
-    def observe(self, history: list[RCSEvent]) -> MetaState:
+    def run_hooks(self, dec: Decision, state: Any) -> Decision:
+        """Apply registered post-shield hooks. See `run_hooks_chain` docstring."""
+        if not self.hooks:
+            return dec
+        return run_hooks_chain(self.hooks, dec, state, level=2, log=self.log)
+
+    def observe(self, history: list[RCSEvent]) -> "MetaState":
         return MetaState.from_log(self.log)
 
-    def decide(self, state: MetaState) -> Decision:
+    def decide(self, state: "MetaState") -> Decision:
         if state.l1_lyapunov_trend < -0.001 and not state.recent_failures:
             return Decision(action=NoOp(reason="V₁ already decaying, no failures"),
                               rationale="ok")
-        # Build a compact failure-context block. The previous version of this
-        # prompt gave L2 only metrics, no idea WHAT was failing — so its rules
-        # were generic platitudes. Now L2 sees the actual failure pattern.
+        # Build a compact failure-context block. Previous version gave L2 only
+        # metrics, no idea WHAT was failing — so its rules were generic
+        # platitudes. Now L2 sees the actual failure pattern.
         if state.recent_failures:
             fails_block = "RECENT L0 FAILURES (last few):\n"
             for f in state.recent_failures[-5:]:
@@ -1208,11 +1289,9 @@ class L2Meta:
     def _parse_decision(self, text: str) -> Decision:
         first_line = text.strip().split("\n", 1)[0]
         upper = first_line.upper()
-        # Accept both `RULE: When X, do Y.` and legacy `RULE foo` formats.
         if upper.startswith("RULE:") or upper.startswith("RULE "):
             sep_idx = first_line.find(":") if upper.startswith("RULE:") else 4
             rule_text = first_line[sep_idx + 1:].strip().strip("'\"")[:300]
-            # Reject empty / generic / overly-short rules — they hurt more than help.
             if len(rule_text) < 10 or rule_text.lower() in (
                 "be careful", "verify", "be precise", "think step by step",
             ):
@@ -1245,10 +1324,11 @@ class L2Meta:
             )
         return Decision(action=NoOp(reason="unparsed_or_noop"), rationale=text)
 
-    def shield(self, dec: Decision, state: MetaState) -> Decision:
+    def shield(self, dec: Decision, state: "MetaState") -> Decision:
         if self.mutations_this_epoch >= self.mutation_budget:
             return Decision(
-                action=NoOp(reason="mutation_budget_exhausted"), rationale=dec.rationale,
+                action=NoOp(reason="mutation_budget_exhausted"),
+                rationale=dec.rationale,
             )
         a = dec.action
         if isinstance(a, PromoteHelper):
@@ -1260,10 +1340,187 @@ class L2Meta:
                 )
         return dec
 
-    def lyapunov(self, state: MetaState) -> float:
+    def lyapunov(self, state: "MetaState") -> float:
         # V₂ = max(0, -dV₁/dt)² — bigger when V₁ is NOT decaying
         positive_slope = max(0.0, state.l1_lyapunov_trend)
         return positive_slope ** 2
+
+
+# --- Shadow-evaluation hook for L2 (EGRI selector pattern) -------------------
+@dataclass
+class ShadowEvalConfig:
+    """Configures the shadow-evaluation hook for L2 mutations.
+
+    Default thresholds tuned for low-cost runs: 2 trials × 3 tasks = 6 shadow
+    episodes per mutation candidate. At Haiku rates that's ~$0.20-0.40 per
+    candidate. Threshold of +1 successful trial vs baseline is the smallest
+    detectable improvement at n=6 trials.
+    """
+    enabled: bool = True
+    n_eval_tasks: int = 3       # at most this many tasks per shadow eval
+    n_trials_per_task: int = 2  # repeats per task for noise robustness
+    threshold_delta: float = 1.0  # absolute pass-count delta vs baseline
+    max_steps_per_shadow: int = 10
+    max_cost_usd_per_shadow: float = 0.10
+
+
+def _select_shadow_tasks(
+    state: "MetaState", suite: list["Task"], n_eval: int,
+) -> list["Task"]:
+    """Pick tasks to shadow-evaluate the mutation against.
+
+    Strategy: at most 2 recent failure tasks (the rule should fix what it
+    claimed to fix) + at most 1 healthy task (rule must not regress healthy
+    behavior). Truncates to `n_eval`.
+    """
+    suite_by_id = {t.id: t for t in suite}
+    failed_ids: list[str] = []
+    for f in state.recent_failures[-5:]:
+        if f.task_id in suite_by_id and f.task_id not in failed_ids:
+            failed_ids.append(f.task_id)
+    failed = [suite_by_id[i] for i in failed_ids[:2]]
+    healthy = [t for t in suite if t.id not in failed_ids][:max(0, n_eval - len(failed))]
+    return (failed + healthy)[:n_eval]
+
+
+def _baseline_pass_count(
+    state: "MetaState", eval_tasks: list["Task"], n_trials: int,
+) -> int:
+    """Baseline successes across the eval tasks from `recent_failures` evidence.
+
+    A failed episode contributes 0; the absence of recent failure for that
+    task implies it has been passing — contributes n_trials per missing task.
+    Lower bound on the true baseline (we count present-failures fully against,
+    absent-tasks fully for). The shadow needs to clearly beat this floor.
+    """
+    failed_by_task: dict[str, int] = {}
+    for f in state.recent_failures[-20:]:
+        failed_by_task[f.task_id] = failed_by_task.get(f.task_id, 0) + 1
+    total_passes = 0
+    for t in eval_tasks:
+        # If we've seen recent failures for this task, count them; cap at n_trials
+        fails = min(failed_by_task.get(t.id, 0), n_trials)
+        total_passes += (n_trials - fails)
+    return total_passes
+
+
+def make_shadow_eval_hook(
+    config: ShadowEvalConfig,
+    plant_template: "L0Plant",
+    suite: list["Task"],
+    workspace_root: Path,
+) -> Hook:
+    """Build a hook that shadow-evaluates AppendSystemRule / PromoteHelper actions.
+
+    The hook is a closure capturing the eval config + read-only references to
+    the plant template + suite. Each invocation:
+      1. Skips NoOps and non-mutation actions.
+      2. Builds an isolated shadow `Workspace` that mirrors helpers/ + memory/.
+      3. Spawns a shadow `L0Plant` with the candidate mutation applied.
+      4. Runs n_trials × n_eval_tasks shadow episodes (cheap caps).
+      5. Vetoes the mutation if shadow pass-count <= baseline + threshold_delta.
+
+    Cost: ≤ n_eval_tasks × n_trials_per_task × max_cost_usd_per_shadow per call.
+    With defaults: 3 × 2 × $0.10 = $0.60 per shadow invocation worst-case.
+    """
+    def shadow_eval_hook(ctx: HookContext) -> HookResult:
+        action = ctx.action
+        # Pass-through for non-mutating actions
+        if not config.enabled or isinstance(action, (NoOp, Retry, Abort)):
+            return HookResult(decision=Decision(action=action,
+                                                 rationale="shadow_eval:skip"))
+        if not isinstance(action, (AppendSystemRule, PromoteHelper)):
+            return HookResult(decision=Decision(action=action,
+                                                 rationale="shadow_eval:not-applicable"))
+        state = ctx.state
+        if not isinstance(state, MetaState) or not state.recent_failures:
+            # No evidence to evaluate against — let it pass (the mutation
+            # budget shield still bounds rate; absent failures we trust L2).
+            return HookResult(decision=Decision(action=action,
+                                                 rationale="shadow_eval:no-failures"))
+
+        eval_tasks = _select_shadow_tasks(state, suite, config.n_eval_tasks)
+        if not eval_tasks:
+            return HookResult(decision=Decision(action=action,
+                                                 rationale="shadow_eval:no-tasks"))
+        n_trials = config.n_trials_per_task
+
+        # Build an isolated shadow workspace (sibling of the real one)
+        shadow_root = workspace_root / f"shadow-{new_event_id()}"
+        shadow_ws = Workspace.create(shadow_root, run_id=plant_template.workspace.run_id)
+        # Mirror helpers/ + memory/ from the real workspace before applying mutation
+        for sub in ("helpers", "memory"):
+            src = plant_template.workspace.path / sub
+            if src.is_dir():
+                for f in src.rglob("*"):
+                    if f.is_file():
+                        rel = f.relative_to(src)
+                        dst = shadow_ws.path / sub / rel
+                        dst.parent.mkdir(parents=True, exist_ok=True)
+                        dst.write_bytes(f.read_bytes())
+
+        # Apply the candidate mutation in the shadow workspace ONLY
+        shadow_rules = list(plant_template.system_rules)
+        if isinstance(action, AppendSystemRule):
+            shadow_rules.append(action.rule)
+        elif isinstance(action, PromoteHelper):
+            target = shadow_ws.path / action.path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(action.new_content)
+
+        # Tight caps for shadow episodes
+        shadow_caps = Caps(
+            max_steps=config.max_steps_per_shadow,
+            max_cost_usd=config.max_cost_usd_per_shadow,
+            model=plant_template.caps.model,
+            allowed_tools=plant_template.caps.allowed_tools,
+        )
+        # Separate event log so shadow events don't pollute the main run.
+        shadow_log = EventLog(shadow_ws.path / ".rcs" / "events.jsonl")
+        shadow_plant = L0Plant(
+            reasoner=plant_template.reasoner,
+            workspace=shadow_ws, log=shadow_log,
+            caps=shadow_caps, system_rules=shadow_rules,
+            memory_invitation=plant_template.memory_invitation,
+        )
+
+        shadow_passes = 0
+        shadow_total_cost = 0.0
+        for task in eval_tasks:
+            for _ in range(n_trials):
+                trace = shadow_plant.run_episode(task)
+                shadow_total_cost += trace.cost_usd
+                if trace.score >= 1.0:
+                    shadow_passes += 1
+
+        baseline = _baseline_pass_count(state, eval_tasks, n_trials)
+        passed = shadow_passes >= (baseline + config.threshold_delta)
+
+        ctx.log.append(RCSEvent(
+            new_event_id(), None, time.time(), 2,
+            EventKind.SHIELD, "shadow_eval",
+            {
+                "n_eval_tasks": len(eval_tasks),
+                "n_trials_per_task": n_trials,
+                "shadow_passes": shadow_passes,
+                "baseline_passes": baseline,
+                "threshold_delta": config.threshold_delta,
+                "decision": "accept" if passed else "veto",
+                "shadow_cost_usd": round(shadow_total_cost, 4),
+                "action_type": type(action).__name__,
+            },
+        ))
+        if passed:
+            return HookResult(decision=Decision(action=action,
+                                                 rationale=f"shadow_eval:{shadow_passes}/{n_trials*len(eval_tasks)} > baseline {baseline}"))
+        return HookResult(
+            decision=Decision(action=action),
+            veto=True,
+            veto_reason=f"shadow_eval failed: {shadow_passes}/{n_trials*len(eval_tasks)} ≤ baseline {baseline} + {config.threshold_delta}",
+        )
+
+    shadow_eval_hook.__name__ = "shadow_eval_hook"
+    return shadow_eval_hook
 
 
 # === 13. L3Governance — policy gate ==========================================
@@ -1719,6 +1976,11 @@ class RunConfig:
     workspace_root: Path = field(default_factory=lambda: Path("/tmp"))
     seed: int | None = None
     break_budgets: bool = False  # H4: force λ_2 < 0 by removing mutation budget
+    # Shadow-evaluation config for L2 mutations (Noesis-pattern hook).
+    # Default: enabled — L2 candidates must beat baseline on a small task set
+    # before commit. The bad-mutation injection that hurt PR #22's `full`
+    # condition is exactly what this prevents.
+    shadow_eval: ShadowEvalConfig = field(default_factory=ShadowEvalConfig)
 
 
 @dataclass
@@ -1764,7 +2026,17 @@ def run(
             if l1_reasoner is not None else None
         # Break budgets test (H4): infinite mutation budget
         l2_budget = 10**6 if cfg.break_budgets else 5
-        l2 = L2Meta(l2_reasoner, log, mutation_budget=l2_budget) \
+        # L2 hooks: shadow eval (PR #23) — gated on shadow_eval.enabled.
+        # H4 mode disables shadow eval to allow free mutation flow (the whole
+        # point is to demonstrate that without budget shields, λ_2 < 0).
+        l2_hooks: list[Hook] = []
+        if cfg.shadow_eval.enabled and not cfg.break_budgets:
+            l2_hooks.append(make_shadow_eval_hook(
+                cfg.shadow_eval, plant, cfg.suite,
+                workspace_root=cfg.workspace_root,
+            ))
+        l2 = L2Meta(l2_reasoner, log,
+                      mutation_budget=l2_budget, hooks=l2_hooks) \
             if l2_reasoner is not None else None
         l3 = L3Governance(l3_reasoner, log) if l3_reasoner is not None else None
 
@@ -1807,6 +2079,11 @@ def run(
                                               recent_failures=recent_failures)
                 dec = l2.decide(state)
                 safe = l2.shield(dec, state)
+                # Post-shield hooks (e.g., shadow eval) — Noesis pattern.
+                # These run AFTER the controller's built-in shield and may veto
+                # mutations that pass static safety checks but fail empirical
+                # validation (the bad-rule-injection that hurt PR #22's full).
+                safe = l2.run_hooks(safe, state)
                 apply_decision_downward(2, safe, plant, l1, l2, log)
                 _emit_lyapunov(log, level=2, controller=l2, state=state,
                                 correlation_id=f"epoch_{epoch}")
