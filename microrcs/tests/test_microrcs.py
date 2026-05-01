@@ -44,6 +44,16 @@ def test_token_usage_unknown_model_zero_cost():
     assert u.cost_usd("unknown-model") == 0.0
 
 
+def test_token_usage_prefix_match_for_pinned_models():
+    """Anthropic returns date-pinned model strings like 'claude-haiku-4-5-20251001';
+    pricing must match by longest prefix so cost is computed correctly."""
+    u = m.TokenUsage(input=1_000_000, output=500_000)
+    cost_pinned = u.cost_usd("claude-haiku-4-5-20251001")
+    cost_clean = u.cost_usd("claude-haiku-4-5")
+    assert cost_pinned == cost_clean
+    assert cost_pinned == pytest.approx(1.0 + 5.0 * 0.5, rel=1e-6)
+
+
 # =====================================================================
 # Section 3 — AnthropicReasoner with fake client
 # =====================================================================

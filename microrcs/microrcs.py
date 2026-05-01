@@ -96,7 +96,16 @@ class TokenUsage:
     cache_create: int = 0
 
     def cost_usd(self, model: str) -> float:
-        i, o, cr, cc = _PRICING.get(model, (0.0, 0.0, 0.0, 0.0))
+        # Anthropic returns date-pinned model strings (e.g. "claude-haiku-4-5-20251001").
+        # Look up by exact match first, then by longest matching prefix.
+        prices = _PRICING.get(model)
+        if prices is None:
+            best_key = ""
+            for k in _PRICING:
+                if model.startswith(k) and len(k) > len(best_key):
+                    best_key = k
+            prices = _PRICING.get(best_key, (0.0, 0.0, 0.0, 0.0))
+        i, o, cr, cc = prices
         return (
             self.input * i
             + self.output * o
