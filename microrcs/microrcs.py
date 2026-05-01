@@ -338,6 +338,28 @@ class AgentMode(enum.Enum):
     VERIFY = "verify"
 
 
+# Concrete L0 behavior per mode. L1 mode-switching now produces measurable change,
+# not just a label. Fragments are appended to the L0 system prompt by _mode_fragment().
+MODE_FRAGMENTS: dict[AgentMode, str] = {}
+MODE_FRAGMENTS.update({
+    AgentMode.BASE: "",
+    AgentMode.COT: (
+        "Before calling submit(), write your step-by-step reasoning to "
+        "scratch/reasoning.md. Submit only after you have written it."
+    ),
+    AgentMode.SCRATCHPAD: (
+        "You MUST run at least one bash command to compute or verify the answer "
+        "(e.g., `python3 -c '...'` or write/run a small script in scratch/) "
+        "before calling submit()."
+    ),
+    AgentMode.VERIFY: (
+        "After deriving an answer, derive it a second way (e.g., reverse the "
+        "calculation, check constraints, run an alternative method). "
+        "Submit only if both derivations agree; otherwise iterate."
+    ),
+})
+
+
 @dataclass(frozen=True)
 class ModeSwitch:
     target_mode: AgentMode
@@ -692,23 +714,34 @@ You are an agent in a workspace. Your tools are `bash` and `submit`.
 ENVIRONMENT
   cwd: {cwd}
   helpers/   - Python utilities you may use, edit, or extend.
-  memory/    - Your knowledge graph. Read existing entries; add new ones with
-               frontmatter (see memory/README.md). Use wikilinks to relate them.
-  scratch/   - Ephemeral, wiped between tasks.
+  scratch/   - Ephemeral, wiped between tasks. Write working files here.
 
 TASK
-  See TASK.md (or use the user message below).
-
-DOCUMENT AS YOU WORK
-  When you discover something durable (a fact, a pattern, a useful helper),
-  write it as a markdown file in memory/ with frontmatter so future tasks
-  can find it. Bump `score` on entries you reuse.
-
-CURRENT MODE: {mode}
-{rules_addendum}
-
+  See the user message.
+{memory_section}{mode_fragment}{rules_addendum}
 Submit your final answer with submit() when done.
 """
+
+
+def _mode_fragment(mode: "AgentMode") -> str:
+    frag = MODE_FRAGMENTS.get(mode, "")
+    return f"\nMODE: {mode.value} — {frag}\n" if frag else ""
+
+
+def _memory_section(memory_invitation: bool, has_entries: bool) -> str:
+    """Memory invitation only appears when invited (L2-injected) or pre-populated.
+
+    Default: no memory instructions (avoids forcing the agent to do unnecessary
+    documentation on simple tasks — bitter-lesson alignment).
+    """
+    if not memory_invitation and not has_entries:
+        return ""
+    if has_entries and not memory_invitation:
+        return ("\nMEMORY\n  memory/ contains durable knowledge from past tasks. "
+                "Search it (e.g. `grep -rl <kw> memory/`) before reasoning from scratch.\n")
+    return ("\nMEMORY\n  memory/ is your knowledge graph. Read existing entries; "
+            "add new ones with frontmatter (see memory/README.md) when you discover "
+            "something durable that future tasks could reuse.\n")
 
 
 class L0Plant:
@@ -725,6 +758,7 @@ class L0Plant:
         caps: Caps,
         mode: AgentMode | None = None,
         system_rules: list[str] | None = None,
+        memory_invitation: bool = False,
     ):
         self.reasoner = reasoner
         self.workspace = workspace
@@ -732,6 +766,17 @@ class L0Plant:
         self.caps = caps
         self.mode = mode or AgentMode.BASE
         self.system_rules: list[str] = list(system_rules or [])
+        # Off by default — bitter-lesson aligned. L2 may flip it on as a rule when warranted.
+        self.memory_invitation = memory_invitation
+
+    def _has_memory_entries(self) -> bool:
+        try:
+            return any(
+                p.is_file() and p.suffix == ".md" and p.name not in ("README.md", "SCHEMA.md")
+                for p in (self.workspace.path / "memory").rglob("*.md")
+            )
+        except OSError:
+            return False
 
     def run_episode(self, task: Task) -> EpisodeTrace:
         cid = f"ep_{new_event_id()}"
@@ -739,9 +784,12 @@ class L0Plant:
         (self.workspace.path / "TASK.md").write_text(task.prompt)
         rules = ""
         if self.system_rules:
-            rules = "RULES YOU'VE LEARNED\n" + "\n".join(f"  - {r}" for r in self.system_rules)
+            rules = "\nRULES YOU'VE LEARNED\n" + "\n".join(f"  - {r}" for r in self.system_rules) + "\n"
         sys_prompt = L0_SYSTEM_PROMPT.format(
-            cwd=str(self.workspace.path), mode=self.mode.value, rules_addendum=rules
+            cwd=str(self.workspace.path),
+            memory_section=_memory_section(self.memory_invitation, self._has_memory_entries()),
+            mode_fragment=_mode_fragment(self.mode),
+            rules_addendum=rules,
         )
 
         messages: list[dict] = [{"role": "user", "content": task.prompt}]
@@ -1050,15 +1098,28 @@ class L1Autonomic:
 
 # === 12. L2Meta — strategy mutator ===========================================
 @dataclass
+class FailureSummary:
+    """Compact view of a single L0 episode failure for L2 to reason over."""
+    task_id: str
+    domain: str
+    score: float
+    aborted_reason: str | None
+    n_steps: int
+    submitted_answer: str | None
+
+
+@dataclass
 class MetaState:
     l1_decisions: list
     l1_lyapunov_trend: float
     helper_diffs: list
     memory_snapshot: dict
     epoch: int = 0
+    recent_failures: list = field(default_factory=list)
 
     @classmethod
-    def from_log(cls, log: EventLog, epoch: int = 0) -> "MetaState":
+    def from_log(cls, log: EventLog, epoch: int = 0,
+                 recent_failures: list | None = None) -> "MetaState":
         l1_decs = [e for e in log.filter(level=1, kind=EventKind.DECIDE)]
         l0_lyap = list(log.filter(level=0, kind=EventKind.LYAPUNOV))
         if len(l0_lyap) >= 4:
@@ -1070,7 +1131,8 @@ class MetaState:
         else:
             trend = 0.0
         return cls(l1_decisions=l1_decs, l1_lyapunov_trend=trend,
-                    helper_diffs=[], memory_snapshot={}, epoch=epoch)
+                    helper_diffs=[], memory_snapshot={}, epoch=epoch,
+                    recent_failures=list(recent_failures or []))
 
 
 class L2Meta:
@@ -1088,22 +1150,54 @@ class L2Meta:
         return MetaState.from_log(self.log)
 
     def decide(self, state: MetaState) -> Decision:
-        if state.l1_lyapunov_trend < -0.001:
-            return Decision(action=NoOp(reason="V₁ already decaying"), rationale="ok")
+        if state.l1_lyapunov_trend < -0.001 and not state.recent_failures:
+            return Decision(action=NoOp(reason="V₁ already decaying, no failures"),
+                              rationale="ok")
+        # Build a compact failure-context block. The previous version of this
+        # prompt gave L2 only metrics, no idea WHAT was failing — so its rules
+        # were generic platitudes. Now L2 sees the actual failure pattern.
+        if state.recent_failures:
+            fails_block = "RECENT L0 FAILURES (last few):\n"
+            for f in state.recent_failures[-5:]:
+                ans = (f.submitted_answer or "")[:80]
+                if f.aborted_reason:
+                    fails_block += (
+                        f"  - [{f.domain}/{f.task_id}] aborted: {f.aborted_reason} "
+                        f"after {f.n_steps} steps\n"
+                    )
+                else:
+                    fails_block += (
+                        f"  - [{f.domain}/{f.task_id}] wrong: submitted {ans!r} "
+                        f"in {f.n_steps} steps\n"
+                    )
+        else:
+            fails_block = "RECENT L0 FAILURES: none\n"
+
         prompt = (
-            f"L1 Lyapunov trend (slope): {state.l1_lyapunov_trend:+.4f}\n"
+            f"You are the L2 meta-controller of a recursive agent system. "
+            f"L0 is the agent solving tasks; L1 gates retries/mode. Your job: "
+            f"propose ONE small mutation that addresses a recurring failure pattern.\n\n"
+            f"{fails_block}\n"
+            f"L1 Lyapunov trend (slope of V₁): {state.l1_lyapunov_trend:+.4f}  "
+            f"(positive = L0 not improving)\n"
             f"L1 decisions this epoch: {len(state.l1_decisions)}\n"
-            f"Past mutations: {len(self.accepted_mutations)}\n\n"
-            "Pick ONE action:\n"
-            "  RULE <text>          — append a system rule for L0\n"
-            "  HELPER <path>=<text> — promote a helper file\n"
-            "  PROMOTE_MEMORY <path>=<canonical|draft>\n"
+            f"Past accepted mutations: {len(self.accepted_mutations)}/"
+            f"{self.mutation_budget}\n\n"
+            "Action grammar (pick exactly one, single line):\n"
+            "  RULE: When <trigger>, <action>.\n"
+            "    — append an actionable rule to L0's system prompt\n"
+            "    — must be specific and address a failure mode above\n"
+            "  HELPER <relative/path.py>=<python source>\n"
+            "    — promote a helper module (e.g. helpers/parse_logic.py=def parse(...): ...)\n"
+            "  PROMOTE_MEMORY <relative/path.md>=<canonical|draft>\n"
             "  NOOP\n\n"
-            "Reply on one line with the action keyword + arguments."
+            "Prefer NOOP if no failures or no clear pattern. Avoid generic "
+            "rules like 'be careful' — they hurt more than help.\n"
+            "Reply with exactly one action on a single line."
         )
         try:
             resp = self.reasoner.reason(ReasoningRequest(
-                messages=(Message("user", prompt),), max_tokens=200,
+                messages=(Message("user", prompt),), max_tokens=300,
                 model="claude-sonnet-4-6",
             ))
             txt = (resp.text or "").strip()
@@ -1114,9 +1208,18 @@ class L2Meta:
     def _parse_decision(self, text: str) -> Decision:
         first_line = text.strip().split("\n", 1)[0]
         upper = first_line.upper()
-        if upper.startswith("RULE "):
+        # Accept both `RULE: When X, do Y.` and legacy `RULE foo` formats.
+        if upper.startswith("RULE:") or upper.startswith("RULE "):
+            sep_idx = first_line.find(":") if upper.startswith("RULE:") else 4
+            rule_text = first_line[sep_idx + 1:].strip().strip("'\"")[:300]
+            # Reject empty / generic / overly-short rules — they hurt more than help.
+            if len(rule_text) < 10 or rule_text.lower() in (
+                "be careful", "verify", "be precise", "think step by step",
+            ):
+                return Decision(action=NoOp(reason="rule_too_generic"),
+                                  rationale=text)
             return Decision(
-                action=AppendSystemRule(rule=first_line[5:].strip()[:300],
+                action=AppendSystemRule(rule=rule_text,
                                           rationale=text[:300]),
                 rationale=text,
             )
@@ -1465,6 +1568,39 @@ def _make_normalize_match(target: str):
     return fn
 
 
+def _make_assignment_verifier(expected: dict[str, str]):
+    """Verify person→item mappings tolerantly across phrasings.
+
+    Accepts answers like:
+      'Alice: water, Bob: coffee, Carol: tea'
+      'alice has water; bob = coffee; carol = tea'
+      'Alice ordered water. Bob ordered coffee. Carol ordered tea.'
+
+    Extracts (name → item) pairs case-insensitively from the answer and
+    checks all expected mappings are present.
+    """
+    expected_norm = {k.lower(): v.lower() for k, v in expected.items()}
+    items_pattern = "|".join(re.escape(v) for v in set(expected_norm.values()))
+    names_pattern = "|".join(re.escape(k) for k in expected_norm)
+
+    def fn(answer: str) -> float:
+        if not answer:
+            return 0.0
+        text = answer.lower()
+        # Patterns: "<name> ... <item>" with various separators within ~40 chars
+        found: dict[str, str] = {}
+        for m in re.finditer(
+            rf"({names_pattern})\s*[:=]?\s*[\w\s]{{0,40}}?\b({items_pattern})",
+            text,
+        ):
+            name, item = m.group(1), m.group(2)
+            if name not in found:
+                found[name] = item
+        return 1.0 if found == expected_norm else 0.0
+
+    return fn
+
+
 _DECL_AND_CONST_SIGNERS = (
     "franklin", "sherman", "morris", "wilson", "clymer", "fitzsimons", "read",
 )
@@ -1506,13 +1642,15 @@ REFERENCE_SUITE: list[Task] = [
         id="math-multi-step",
         domain="math",
         prompt=(
-            "A train leaves Town A at 9:47 going 73 mph. A second train leaves "
-            "Town B at 11:23 going 81 mph toward Town A. Towns are 412 miles apart. "
-            "At what time do they meet? Answer as HH:MM (24h).\n\n"
-            "(Hint: at 11:23 the first train has covered 73·(11:23−9:47) = 116.8 mi; "
-            "remaining gap 295.2 mi closes at 73+81 = 154 mph in 1h54.95min.)"
+            "A train leaves Town A at 9:47 going 73 mph toward Town B. "
+            "A second train leaves Town B at 11:23 going 81 mph toward Town A. "
+            "The towns are 412 miles apart. "
+            "At what time do they meet? Answer as HH:MM (24h)."
         ),
-        # Correct answer: 13:18 (verified analytically; old 13:54 was an arithmetic error).
+        # Correct answer: 13:18.
+        # Derivation: at 11:23, T1 has covered 73·(11:23−9:47) ≈ 116.83 mi.
+        # Remaining gap 295.17 mi closes at 73+81 = 154 mph in 1h54.99 min.
+        # Meeting time = 11:23 + 1:54:59 = 13:17:59 ≈ 13:18.
         verify=_verify_approx_time("13:18", tolerance_minutes=4),
     ),
     Task(
@@ -1531,12 +1669,18 @@ REFERENCE_SUITE: list[Task] = [
         id="logic-zebra",
         domain="logic",
         prompt=(
-            "Three friends ordered different drinks: coffee, tea, water. "
-            "Alice didn't order coffee. Bob ordered the same drink as the person "
-            "whose name comes alphabetically last (Carol). Carol didn't order water. "
-            "Who ordered what? Answer EXACTLY as 'Alice: X, Bob: Y, Carol: Z'."
+            "Three friends each ordered a different drink (one each, no repeats) "
+            "from {coffee, tea, water}. Use these clues:\n"
+            "  - Alice did not order coffee.\n"
+            "  - Bob ordered the alphabetically-first drink in the set (i.e., coffee).\n"
+            "  - Carol did not order water.\n"
+            "Who ordered what? State each person's drink in your answer."
         ),
-        verify=_make_normalize_match("Alice: water, Bob: tea, Carol: tea"),
+        # Solution: Alice=water (only remaining for her), Bob=coffee (given),
+        # Carol=tea (not water, coffee taken).
+        verify=_make_assignment_verifier(
+            {"Alice": "water", "Bob": "coffee", "Carol": "tea"},
+        ),
     ),
     Task(
         id="closed-book-qa",
@@ -1625,6 +1769,8 @@ def run(
         l3 = L3Governance(l3_reasoner, log) if l3_reasoner is not None else None
 
         cond_results: dict = {"episodes": [], "lambda": {}}
+        # Recent failures (rolling) for L2 to read.
+        recent_failures: list[FailureSummary] = []
 
         for epoch in range(cfg.n_epochs):
             if l2 is not None:
@@ -1637,6 +1783,15 @@ def run(
                         "score": trace.score, "aborted": trace.aborted_reason,
                         "cost": trace.cost_usd, "n_steps": trace.n_steps,
                     })
+                    if trace.score < 1.0:
+                        recent_failures.append(FailureSummary(
+                            task_id=task.id, domain=task.domain,
+                            score=trace.score, aborted_reason=trace.aborted_reason,
+                            n_steps=trace.n_steps,
+                            submitted_answer=trace.final_answer,
+                        ))
+                        # Keep just the last 20 to bound memory.
+                        recent_failures = recent_failures[-20:]
                     # L1 fires per task
                     if l1 is not None:
                         history = list(log._events)
@@ -1648,7 +1803,8 @@ def run(
                                         correlation_id=f"task_{task.id}_e{epoch}_r{repeat}")
             # L2 fires per epoch
             if l2 is not None:
-                state = MetaState.from_log(log, epoch=epoch)
+                state = MetaState.from_log(log, epoch=epoch,
+                                              recent_failures=recent_failures)
                 dec = l2.decide(state)
                 safe = l2.shield(dec, state)
                 apply_decision_downward(2, safe, plant, l1, l2, log)
