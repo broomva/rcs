@@ -2,7 +2,7 @@
 # RCS — Build & Test
 # =============================================================================
 
-.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test params params-check clean
+.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test test-microrcs params params-check clean
 
 # --- Parameters ---
 # data/parameters.toml is the single source of truth for all stability
@@ -76,9 +76,13 @@ papers/p1-stability/main.epub: \
 
 # --- Test ---
 
-test: params-check
+test: params-check test-microrcs
 	python3 tests/test_stability_budget.py
 	python3 tests/test_lyapunov_simulation.py
+
+# microrcs/ — single-file LLM-controller RCS baseline (P0/P1 empirical witness)
+test-microrcs:
+	cd microrcs && python3 -m pytest tests/ -v
 
 # --- Clean ---
 
