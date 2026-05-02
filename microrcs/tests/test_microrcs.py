@@ -1592,6 +1592,89 @@ def test_run_config_persistent_workspace_field():
     assert cfg2.persistent_workspace is None
 
 
+# =====================================================================
+# System-rules persistence (PR #28) — closes cross-run compounding gap
+# =====================================================================
+def test_l0plant_loads_persisted_rules_on_construct(tmp_path):
+    """A workspace with system_rules.jsonl loads them automatically."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1", persist=False)
+    rules_path = ws.path / "memory" / "system_rules.jsonl"
+    rules_path.parent.mkdir(parents=True, exist_ok=True)
+    rules_path.write_text(
+        '{"rule": "Always verify arithmetic", "rationale": "r1"}\n'
+        '{"rule": "Use scratchpad for multi-step", "rationale": "r2"}\n'
+    )
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                        m.EventLog(tmp_path / "e.jsonl"),
+                        m.Caps(model="mock"))
+    assert plant.system_rules == [
+        "Always verify arithmetic", "Use scratchpad for multi-step",
+    ]
+
+
+def test_l0plant_explicit_rules_override_persisted(tmp_path):
+    """Explicit `system_rules` argument bypasses disk loading (e.g. shadow-eval)."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    rules_path = ws.path / "memory" / "system_rules.jsonl"
+    rules_path.parent.mkdir(parents=True, exist_ok=True)
+    rules_path.write_text('{"rule": "from disk"}\n')
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                        m.EventLog(tmp_path / "e.jsonl"),
+                        m.Caps(model="mock"),
+                        system_rules=["from arg"])
+    assert plant.system_rules == ["from arg"]
+
+
+def test_persist_system_rule_writes_to_disk(tmp_path):
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                        m.EventLog(tmp_path / "e.jsonl"),
+                        m.Caps(model="mock"))
+    plant.persist_system_rule("test rule", rationale="testing")
+    rules_path = ws.path / "memory" / "system_rules.jsonl"
+    assert rules_path.exists()
+    line = rules_path.read_text().strip()
+    d = json.loads(line)
+    assert d["rule"] == "test rule"
+    assert d["rationale"] == "testing"
+
+
+def test_apply_decision_downward_persists_rule(tmp_path):
+    """When L2 fires AppendSystemRule, it writes through to disk."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    log = m.EventLog(tmp_path / "e.jsonl")
+    plant = m.L0Plant(_MockReasoner([]), ws, log, m.Caps(model="mock"))
+    dec = m.Decision(action=m.AppendSystemRule(
+        rule="Always check constraints", rationale="from L2"))
+    m.apply_decision_downward(2, dec, plant, None, None, log)
+    rules_path = ws.path / "memory" / "system_rules.jsonl"
+    assert rules_path.exists()
+    assert "Always check constraints" in rules_path.read_text()
+
+
+def test_compounding_round_trip(tmp_path):
+    """Full round-trip: apply rule → re-create plant → rule still present."""
+    ws_path = tmp_path / "compounding-ws"
+    ws1 = m.Workspace.create(ws_path, run_id="r1", persist=False)
+    log1 = m.EventLog(tmp_path / "e1.jsonl")
+    plant1 = m.L0Plant(_MockReasoner([]), ws1, log1, m.Caps(model="mock"))
+    assert plant1.system_rules == []
+
+    # Run 1: L2 promotes a rule
+    m.apply_decision_downward(
+        2, m.Decision(action=m.AppendSystemRule(rule="durable rule", rationale="r")),
+        plant1, None, None, log1,
+    )
+
+    # Run 2: workspace re-created with persist=True; new plant loads the rule
+    ws2 = m.Workspace.create(ws_path, run_id="r2", persist=True)
+    plant2 = m.L0Plant(_MockReasoner([]), ws2,
+                          m.EventLog(tmp_path / "e2.jsonl"),
+                          m.Caps(model="mock"))
+    assert plant2.system_rules == ["durable rule"], \
+        "Cross-run compounding: rule promoted in run 1 must be loaded in run 2"
+
+
 def test_l2_noop_when_no_failures_and_decay(tmp_path):
     """If V₁ is already decaying and there are no failures, L2 should noop."""
     class _R:
