@@ -4,19 +4,22 @@
 > contributors don't relearn what we already know. Each section is dated and
 > traceable to a specific PR + run.
 
-## Headline state (as of PR #25)
+## Headline state (as of PR #25 — POST bench result)
 
 The RCS thesis exists in three forms; current evidence by form:
 
 | Form | Claim | Status | Evidence |
 |---|---|---|---|
-| **Performance (weak)** | "some recursive control improves agent pass-rate when there's headroom" | ✅ **directionally supported** | PR #24: all 3 recursive conditions beat flat on HARDER_SUITE; +autonomic +27% relative |
-| **Performance (statistical)** | `pass^k_recursive > pass^k_flat` with `p<0.05` | ⏳ **pending bench-mode result** (PR #25) | Bench run with N=3 seeds in flight at time of writing |
+| **Performance (weak)** | "some recursive control improves agent pass-rate when there's headroom" | ❌ **REFUTED** | PR #25 bench (3 seeds × 4 conditions × 90 eps): no condition beats flat above noise floor. Mean: full < +meta < +autonomic ≤ flat |
+| **Performance (statistical)** | `pass^k_recursive > pass^k_flat` with `p<0.05` | ❌ **rejected** | All Δ vs flat within 2σ_flat = 0.11 band. PR #24's directional signal was a single-seed lucky outcome |
 | **Stability (λᵢ > 0)** | empirical λ̂ᵢ positive at every level | ⚠️ **partial** | Only λ̂_2 numerically positive across runs; L0/L1 hover near 0; L3 degenerate |
 | **Stability (paper-magnitude)** | λ̂ᵢ ≈ paper analytic λᵢ within bootstrap CI | ❌ **3 orders off** | Construct gap — see §"Why λ̂ doesn't match paper" |
-| **Strong (monotone-by-level)** | `full > +meta > +autonomic > flat`, with λᵢ matching paper | ❌ **refuted** | PR #24: +autonomic > full; H3 violated |
+| **Strong (monotone-by-level)** | `full > +meta > +autonomic > flat`, with λᵢ matching paper | ❌ **refuted** | PR #25 bench: full = 0.277 < flat = 0.357 |
+| **Shadow-eval load-bearing** | "without budget shields, +meta < flat" | ✅ **SUPPORTED** | PR #25 H4: +meta = 0.282 < flat = 0.327 with shadow eval disabled (vs +meta = 0.325 with eval enabled) |
 
-**The defensible claim today:** _on the current benchmark with the current model tier, recursive control with proper safety hooks (shadow eval) directionally improves agent performance over a bitter-lesson baseline; specifically, L1 (autonomic mode-switching) drives most of the gain, and L2/L3 add value only when shadow eval is enabled._
+**The defensible claim today:** _on HARDER_SUITE with Haiku at 30-min runs, the recursive structure provides **no statistically significant performance benefit** over a bitter-lesson baseline. The shadow eval safety mechanism, however, IS load-bearing — without it, recursion measurably hurts (confirmed via H4)._
+
+**The weak-form thesis is empirically refuted at this scale, model, and benchmark.** Whether it holds at higher capability tiers (Sonnet/Opus) or longer time scales (multi-day Life runtime) or harder benchmarks (SWE-bench) remains open and is the path forward.
 
 ## Cumulative empirical runs (pinned)
 
@@ -29,19 +32,52 @@ The RCS thesis exists in three forms; current evidence by form:
 | #23 (2nd) | reference | flat ≈ full | 1.000 | 1.000 | 0% | $1.78 | shadow eval working at delta=2; suite ceiling — H1 untestable |
 | **#24** | **HARDER_SUITE** | **+autonomic** | **0.296** | **0.377** | **+27%** | **$2.60** | **first H1 directional signal** |
 | **#25 H4** | HARDER_SUITE --break-budgets | **+meta worst** | 0.327 | 0.282 (+meta) | -14% (vs flat) | ~$3 | **shadow eval IS load-bearing** — without it, +meta < flat (bad-rule injection returns) |
-| **#25 bench** | HARDER_SUITE × 3 seeds | TBD | TBD | TBD | TBD | TBD | noise-floor + cross-condition significance test |
+| **#25 bench** | HARDER_SUITE × 3 seeds | **flat** | **0.357 (mean)** | **flat best (mean)** | recursion HURTS or is noise | $8.65 | **noise-floor refutes H1**; PR #24's signal was lucky single-seed |
 
-Total spend so far: ~$17 across ~1450 episodes.
+Total spend so far: ~$30 across ~2530 episodes.
+
+## Per-seed bench result (PR #25 bench)
+
+3 seeds × HARDER_SUITE × 4 conditions = 1080 episodes:
+
+| Condition | per-seed pass^3 | mean | std | Δ vs flat | verdict |
+|---|---|---|---|---|---|
+| **flat** | [0.413, 0.377, 0.282] | **0.357** | 0.055 | — | baseline |
+| +autonomic | [0.360, 0.327, 0.343] | 0.343 | 0.013 | -0.014 | within noise (HURTS slightly) |
+| +meta | [0.254, 0.343, 0.377] | 0.325 | 0.052 | -0.032 | within noise (HURTS) |
+| **full** | [0.282, 0.254, 0.296] | **0.277** | 0.018 | **-0.080** | within noise (HURTS clearly) |
+
+**Noise floor: 2σ_flat = 0.110.** All deltas are within this band. **No condition statistically beats flat.**
+
+Cost: flat $1.71 vs full $2.39 (+40% cost for −0.080 performance).
 
 ## H1-H4 verdicts as of this commit
 
 ### H1 — full > flat on pass^k (paired bootstrap, p<0.05)
 
-**Status: directionally supported, statistically pending.**
+**Status: REFUTED.**
 
-PR #24: Δ = +0.047 absolute (+16% relative) for full over flat. All 3 recursive conditions beat flat. CIs heavily overlap at n=90/condition.
+PR #25 bench (3 seeds × 4 conditions × 90 eps × HARDER_SUITE):
 
-PR #25 bench result will determine if Δ exceeds the noise floor of repeated `flat`-vs-`flat` runs. If `2σ_flat < 0.04` (i.e., flat-to-flat variance is small), H1 is statistically supported. If `2σ_flat > 0.05`, the +0.047 effect from PR #24 is within sampling noise.
+```
+flat       mean=0.357 ± 0.055    [0.282, 0.413]
++autonomic mean=0.343 ± 0.013    Δ=−0.014  (within 2σ_flat = 0.110)
++meta      mean=0.325 ± 0.052    Δ=−0.032  (within noise)
+full       mean=0.277 ± 0.018    Δ=−0.080  (within noise but trending HURTS)
+```
+
+The directional signal in PR #24 (+autonomic +0.081 over flat) was a single-seed run that happened to hit a favorable point in the high-variance flat distribution. Mean across seeds shows recursion provides no systematic benefit — and `full` measurably underperforms (Δ=−0.080), albeit within the wide noise floor.
+
+**Implication: the bitter lesson is winning at this scale.** Recursion adds API cost (full +40% cost) without proportional benefit.
+
+H1 might still hold under different conditions (untested):
+- Higher capability model tier (Sonnet/Opus instead of Haiku)
+- Longer time scales (Life multi-day runs)
+- Harder benchmarks where L0 alone fails most of the time (SWE-bench Lite, AIME)
+- Different L2 surface (helper promotion only, no rule injection)
+- Cross-run memory persistence (knowledge compounding)
+
+These are the next experiments. None are validated yet.
 
 ### H2 — λ̂ᵢ > 0 at every level
 
