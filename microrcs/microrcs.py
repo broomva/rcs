@@ -3139,6 +3139,12 @@ def cli_bench(args: argparse.Namespace) -> int:
         microrcs bench --suite harder --n-seeds 3 --conditions flat,full
     """
     cfg = _build_run_config(args.quick, args.paper, args.suite)
+    model_l0 = getattr(args, "model_l0_l1", None)
+    if model_l0:
+        cfg = replace(cfg, model_l0_l1=model_l0)
+    model_l2 = getattr(args, "model_l2_l3", None)
+    if model_l2:
+        cfg = replace(cfg, model_l2_l3=model_l2)
     out_root = Path(args.out) / f"bench-{new_event_id()}"
     out_root.mkdir(parents=True, exist_ok=True)
 
@@ -3146,7 +3152,9 @@ def cli_bench(args: argparse.Namespace) -> int:
     n_seeds = int(args.n_seeds)
     quiet = getattr(args, "quiet", False)
 
-    _emit_progress(quiet, f"BENCH: {n_seeds} seeds × {conditions} on suite={args.suite}")
+    _emit_progress(quiet,
+        f"BENCH: {n_seeds} seeds × {conditions} on suite={args.suite} "
+        f"(L0/L1={cfg.model_l0_l1}, L2/L3={cfg.model_l2_l3})")
 
     aggregate: dict[str, list] = {c: [] for c in conditions}
     seed_run_ids: list[str] = []
@@ -3332,6 +3340,15 @@ def main() -> int:
     p_bench.add_argument("--quick", action="store_true")
     p_bench.add_argument("--paper", action="store_true")
     p_bench.add_argument("--quiet", action="store_true")
+    p_bench.add_argument(
+        "--model-l0-l1", default=None,
+        help="Override model used at L0/L1 (default: claude-haiku-4-5). "
+             "Used by BRO-945 capacity sweep.",
+    )
+    p_bench.add_argument(
+        "--model-l2-l3", default=None,
+        help="Override model used at L2/L3 (default: claude-sonnet-4-6).",
+    )
 
     p_trace = sub.add_parser("trace", help="Walk parent chain from event_id")
     p_trace.add_argument("event_id")
