@@ -1462,6 +1462,52 @@ def test_condition_from_workspace_path_full(tmp_path):
     assert m._condition_from_workspace_path(p) == "full"
 
 
+# =====================================================================
+# bench / multi-seed support — D1+D2
+# =====================================================================
+def test_run_config_accepts_seed():
+    cfg = m.RunConfig(seed=42)
+    assert cfg.seed == 42
+
+
+def test_cli_bench_runs_multiple_seeds(tmp_path, monkeypatch):
+    """Verify cli_bench produces a bench_summary.json with per-seed data."""
+    class _MockUni:
+        def __init__(self, **k): pass
+        def reason(self, req):
+            if any(t.name == "submit" for t in req.tools):
+                return _resp_submit("13:18")
+            return m.ReasoningResponse(
+                text="noop", thinking="", tool_calls=(),
+                stop_reason="end_turn", usage=m.TokenUsage(10, 5),
+                latency_ms=1.0, model="mock",
+            )
+    monkeypatch.setattr(m, "make_reasoner", lambda *a, **k: _MockUni(**k))
+
+    args = type("A", (), {})()
+    args.suite = "reference"
+    args.conditions = "flat"
+    args.n_seeds = 2
+    args.base_seed = 1
+    args.out = tmp_path / "bench-out"
+    args.quick = True  # smallest run
+    args.paper = False
+    args.quiet = True
+
+    rc = m.cli_bench(args)
+    assert rc == 0
+    bench_dirs = list((tmp_path / "bench-out").iterdir())
+    assert len(bench_dirs) == 1  # single bench-{id} dir
+    summary_path = bench_dirs[0] / "bench_summary.json"
+    assert summary_path.exists()
+    summary = json.loads(summary_path.read_text())
+    assert summary["n_seeds"] == 2
+    assert summary["conditions"] == ["flat"]
+    assert "flat" in summary["per_condition"]
+    assert summary["per_condition"]["flat"]["n_seeds"] == 2
+    assert len(summary["per_condition"]["flat"]["pass_pow_k_per_seed"]) == 2
+
+
 def test_l2_noop_when_no_failures_and_decay(tmp_path):
     """If V₁ is already decaying and there are no failures, L2 should noop."""
     class _R:
