@@ -10,7 +10,7 @@ The RCS thesis exists in three forms; current evidence by form:
 
 | Form | Claim | Status | Evidence |
 |---|---|---|---|
-| **Performance (weak)** | "some recursive control improves agent pass-rate when there's headroom" | ❌ **REFUTED on TWO testbeds** | microRCS PR #25 + microgrid PR #2: same null result on text tasks AND physical control |
+| **Performance (weak)** | "some recursive control improves agent pass-rate when there's headroom" | ❌ **REFUTED on THREE regimes** | microRCS PR #25 + microgrid PR #2 + **microRCS PR #28 (cross-run compounding with Opus L2 + disk persistence)**: same null result on text tasks AND physical control AND temporal compounding |
 | **Performance (statistical)** | `pass^k_recursive > pass^k_flat` with `p<0.05` | ❌ **rejected** | All Δ vs flat within 2σ_flat = 0.11 band on microRCS; Δ < 0.1% on microgrid |
 | **Stability (λᵢ > 0)** | empirical λ̂ᵢ positive at every level | ⚠️ **partial** | Only λ̂_2 numerically positive on microRCS; microgrid hourly sim cannot resolve sub-second decay |
 | **Stability (paper-magnitude)** | λ̂ᵢ ≈ paper analytic λᵢ within bootstrap CI | ❌ **3 orders off** | Construct gap — see §"Why λ̂ doesn't match paper" |
@@ -34,8 +34,41 @@ The RCS thesis exists in three forms; current evidence by form:
 | **#25 H4** | HARDER_SUITE --break-budgets | **+meta worst** | 0.327 | 0.282 (+meta) | -14% (vs flat) | ~$3 | **shadow eval IS load-bearing** — without it, +meta < flat (bad-rule injection returns) |
 | **#25 bench** | HARDER_SUITE × 3 seeds | **flat** | **0.357 (mean)** | **flat best (mean)** | recursion HURTS or is noise | $8.65 | **noise-floor refutes H1**; PR #24's signal was lucky single-seed |
 | **microgrid #2** | TestVillage × 3 seeds × 720h | **flat ≈ all** | n/a (diesel L: 1124) | n/a (1123 ± 39) | recursion **identical** to flat (Δ=−0.1%) | ~$0 (no LLM) | **H1 REFUTED on a SECOND testbed** — real physics, hard physical metrics, same null result. 69/69 L2 mutations correctly vetoed by shadow eval. |
+| **#27 cross-run v1** | HARDER × 5 iter × full × Opus L2 (--quick) | n/a | mean ~1.0 (saturated) | flat trend | suite ceiling masked compounding signal | ~$0.05 | inconclusive — `--quick` gave only 2 tasks per iter; canonical=0 (compounding mechanism wired but not exercised because L2 NoOp'd) |
+| **#27 cross-run v2** | HARDER × 5 iter × full × Opus L2 (full suite) | n/a | n/a | Δ = -0.061 (declining) | **structural gap discovered**: AppendSystemRule mutates in-memory list only, doesn't persist | ~$3 | revealed that PR #27's persistence mechanism wasn't being exercised by the L2 actions Opus chose; led to PR #28 |
+| **#28 cross-run final** | HARDER × 5 iter × full × Opus L2 + disk-persisted rules | flat ≈ iter1 | ~0.36 (mean across iter) | iter1 0.360 → iter5 0.431 (+0.072) | within-iter σ=0.045, 2σ=0.09 — **NOT significant** | ~$3.4 | 4 high-quality Opus rules accumulated to disk and loaded across iterations. Mechanism works perfectly. **Compounding still doesn't measurably improve pass^k**. |
 
-Total spend so far: ~$30 across ~2530 episodes (microRCS) + 2160 hours (microgrid).
+Total spend so far: ~$36 across ~3000 episodes (microRCS) + 2160 hours (microgrid).
+
+## Cross-run compounding result (PR #28 / final test)
+
+Closed the structural gap exposed by PR #27's first cross-run experiment: `AppendSystemRule` now writes through to `memory/system_rules.jsonl`. New `L0Plant` instances load these rules on construct. Cross-run iterations now actually compound knowledge.
+
+**5 iterations on the same workspace, full HARDER_SUITE, Opus 4.7 at L2:**
+
+| iter | pass^3 | mean pass rate | rules accumulated |
+|---|---|---|---|
+| 1 | 0.360 | 0.722 | 0 (cold start) |
+| 2 | 0.394 | 0.733 | 1 |
+| 3 | 0.343 | 0.711 | 2 |
+| 4 | 0.296 | 0.667 | 3 |
+| 5 | 0.431 | 0.756 | 4 |
+
+**Δ = +0.072 — within within-iteration variance** (σ_iter ≈ 0.045 → 2σ ≈ 0.09). Bootstrap CIs heavily overlap. **Not statistically significant.**
+
+The 4 accumulated rules are *high quality* — specific, actionable, addressing real failure patterns:
+- "Enumerate all required facts before submitting"
+- "Cross-check each fact before finalizing"
+- "Enumerate ALL constraints as numbered list, verify each"
+- "Re-verify each slot satisfies ALL stated constraints"
+
+The mechanism works. Opus generates thoughtful rules. The rules persist correctly and load on the next iteration. Yet pass^k doesn't measurably improve.
+
+**This is the cleanest refutation we can produce at this scale.** No structural excuses remain. The thesis weak form is empirically refuted across:
+
+1. Single-run × 3 seeds (PR #25)
+2. Real physics (microgrid PR #2)
+3. **Compounding × Opus L2 × disk persistence (PR #28)**
 
 ## Cross-testbed validation (microgrid #2 — broomva/microgrid-agent)
 
