@@ -900,9 +900,52 @@ class L0Plant:
         self.log = log
         self.caps = caps
         self.mode = mode or AgentMode.BASE
-        self.system_rules: list[str] = list(system_rules or [])
+        # Cross-run compounding: load any persisted rules from prior runs.
+        # If `system_rules` is provided explicitly (e.g. by shadow-eval), use
+        # those AS-IS. Otherwise, load from `memory/system_rules.jsonl` if it
+        # exists in the workspace. New rules appended via apply_decision_downward
+        # are also persisted to disk so they survive across runs.
+        if system_rules is None:
+            persisted = self._load_persisted_system_rules()
+            self.system_rules: list[str] = persisted
+        else:
+            self.system_rules = list(system_rules)
         # Off by default — bitter-lesson aligned. L2 may flip it on as a rule when warranted.
         self.memory_invitation = memory_invitation
+
+    @property
+    def _system_rules_path(self) -> Path:
+        return self.workspace.path / "memory" / "system_rules.jsonl"
+
+    def _load_persisted_system_rules(self) -> list[str]:
+        p = self._system_rules_path
+        if not p.exists():
+            return []
+        rules: list[str] = []
+        for line in p.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                d = json.loads(line)
+                if isinstance(d.get("rule"), str):
+                    rules.append(d["rule"])
+            except json.JSONDecodeError:
+                continue
+        return rules
+
+    def persist_system_rule(self, rule: str, rationale: str = "") -> None:
+        """Append a system rule to `memory/system_rules.jsonl` (durable).
+
+        Called by apply_decision_downward when L2 emits AppendSystemRule.
+        Writes-through to disk so the rule survives across runs when
+        Workspace.persist=True.
+        """
+        p = self._system_rules_path
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a") as f:
+            f.write(json.dumps({"rule": rule, "rationale": rationale,
+                                  "ts": time.time()}) + "\n")
 
     def _has_memory_entries(self) -> bool:
         try:
@@ -1727,6 +1770,12 @@ def apply_decision_downward(
     elif isinstance(a, AppendSystemRule):
         if plant is not None:
             plant.system_rules.append(a.rule)
+            # Cross-run compounding: write-through to disk so the rule
+            # survives across runs (when persistent_workspace is set).
+            try:
+                plant.persist_system_rule(a.rule, a.rationale)
+            except Exception:  # noqa: BLE001 — disk failures shouldn't crash the run
+                pass
             if l2 is not None:
                 l2.mutations_this_epoch += 1
                 l2.accepted_mutations.append(a)
