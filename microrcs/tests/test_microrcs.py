@@ -1508,6 +1508,93 @@ def test_cli_bench_runs_multiple_seeds(tmp_path, monkeypatch):
     assert len(summary["per_condition"]["flat"]["pass_pow_k_per_seed"]) == 2
 
 
+def test_cli_bench_model_overrides_propagate(tmp_path, monkeypatch):
+    """BRO-945: --model-l0-l1 / --model-l2-l3 flags must reach RunConfig.
+
+    Captures the cfg passed into m.run() and asserts the model fields match
+    the args. Without flag plumbing, cfg keeps the RunConfig defaults
+    (haiku-4-5 / sonnet-4-6).
+    """
+    captured: list[m.RunConfig] = []
+
+    def _fake_run(cfg, out_dir, conditions, quiet=False):
+        captured.append(cfg)
+        # Return a minimal RunResult with the schema cli_bench reads.
+        return m.RunResult(
+            run_id="fake",
+            config=cfg,
+            metrics={
+                c: {
+                    "pass_pow_k": 0.5,
+                    "episodes": [{"score": 0.5, "cost": 0.0}],
+                }
+                for c in conditions
+            },
+            workspace_paths={c: tmp_path / c for c in conditions},
+        )
+
+    monkeypatch.setattr(m, "run", _fake_run)
+
+    args = type("A", (), {})()
+    args.suite = "harder"
+    args.conditions = "flat,full"
+    args.n_seeds = 1
+    args.base_seed = 42
+    args.out = tmp_path / "bench-out"
+    args.quick = True
+    args.paper = False
+    args.quiet = True
+    args.model_l0_l1 = "claude-sonnet-4-6"
+    args.model_l2_l3 = "claude-opus-4-7"
+
+    rc = m.cli_bench(args)
+    assert rc == 0
+    assert len(captured) == 1
+    cfg = captured[0]
+    assert cfg.model_l0_l1 == "claude-sonnet-4-6"
+    assert cfg.model_l2_l3 == "claude-opus-4-7"
+
+
+def test_cli_bench_model_overrides_default_when_absent(tmp_path, monkeypatch):
+    """When the model-tier args are missing, cfg keeps RunConfig defaults."""
+    captured: list[m.RunConfig] = []
+
+    def _fake_run(cfg, out_dir, conditions, quiet=False):
+        captured.append(cfg)
+        return m.RunResult(
+            run_id="fake",
+            config=cfg,
+            metrics={
+                c: {
+                    "pass_pow_k": 0.5,
+                    "episodes": [{"score": 0.5, "cost": 0.0}],
+                }
+                for c in conditions
+            },
+            workspace_paths={c: tmp_path / c for c in conditions},
+        )
+
+    monkeypatch.setattr(m, "run", _fake_run)
+
+    args = type("A", (), {})()
+    args.suite = "harder"
+    args.conditions = "flat"
+    args.n_seeds = 1
+    args.base_seed = 42
+    args.out = tmp_path / "bench-out"
+    args.quick = True
+    args.paper = False
+    args.quiet = True
+    # No model_* attrs: getattr() should default to None and leave cfg alone.
+
+    rc = m.cli_bench(args)
+    assert rc == 0
+    cfg = captured[0]
+    # Defaults from RunConfig dataclass
+    assert cfg.model_l0_l1 == "claude-haiku-4-5"
+    assert cfg.model_l2_l3 == "claude-sonnet-4-6"
+
+
 # =====================================================================
 # Cross-run memory persistence (PR #27)
 # =====================================================================
