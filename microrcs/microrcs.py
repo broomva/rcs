@@ -670,20 +670,87 @@ class Workspace:
     run_id: str
 
     @classmethod
-    def create(cls, path: Path | str, run_id: str) -> "Workspace":
+    def create(cls, path: Path | str, run_id: str,
+               persist: bool = False) -> "Workspace":
+        """Create or reuse a workspace at `path`.
+
+        When `persist=False` (default — current behavior), starter helpers/
+        and memory/README are written every time, overwriting any existing
+        files at those paths. The `scratch/` directory is always wiped.
+
+        When `persist=True`, an existing helpers/starter.py and memory/
+        files are PRESERVED. Only missing files are populated from starter
+        templates. This enables cross-run knowledge compounding: helpers
+        promoted by L2 in run N are available to L0 in run N+1, and memory
+        entries with status=canonical accumulate across runs.
+
+        scratch/ is always wiped between runs, even with persist=True
+        (it's ephemeral by design).
+        """
         p = Path(path)
+        already_exists = p.exists() and (p / "helpers").is_dir()
         p.mkdir(parents=True, exist_ok=True)
         for sub in ("helpers", "memory/concept", "memory/pattern", "memory/task",
                     "scratch", ".rcs"):
             (p / sub).mkdir(parents=True, exist_ok=True)
-        # Copy starter helpers + READMEs (best-effort; missing source ok)
+        # scratch/ always wiped — ephemeral by design
+        scratch = p / "scratch"
+        for f in scratch.iterdir():
+            if f.is_file():
+                f.unlink()
+            elif f.is_dir():
+                import shutil
+                shutil.rmtree(f)
+        # Copy starter helpers + READMEs.
+        # In persist mode, only write if files don't already exist (preserve
+        # any L2-promoted helpers from prior runs).
         if _STARTER_HELPERS_PATH.exists():
-            (p / "helpers" / "starter.py").write_text(_STARTER_HELPERS_PATH.read_text())
+            target = p / "helpers" / "starter.py"
+            if not (persist and target.exists()):
+                target.write_text(_STARTER_HELPERS_PATH.read_text())
         if _STARTER_HELPERS_README.exists():
-            (p / "helpers" / "README.md").write_text(_STARTER_HELPERS_README.read_text())
+            target = p / "helpers" / "README.md"
+            if not (persist and target.exists()):
+                target.write_text(_STARTER_HELPERS_README.read_text())
         if _STARTER_MEMORY_README.exists():
-            (p / "memory" / "README.md").write_text(_STARTER_MEMORY_README.read_text())
+            target = p / "memory" / "README.md"
+            if not (persist and target.exists()):
+                target.write_text(_STARTER_MEMORY_README.read_text())
         return cls(path=p, run_id=run_id)
+
+    def snapshot_canonical_count(self) -> int:
+        """Count memory entries with status=canonical (durable cross-run knowledge)."""
+        n = 0
+        for sub in ("concept", "pattern", "task"):
+            d = self.path / "memory" / sub
+            if not d.is_dir():
+                continue
+            for f in d.rglob("*.md"):
+                if f.name in ("README.md", "SCHEMA.md"):
+                    continue
+                try:
+                    text = f.read_text()
+                    if text.startswith("---"):
+                        # Quick frontmatter scan for status: canonical
+                        for line in text.splitlines()[:20]:
+                            if line.strip().startswith("status:"):
+                                if "canonical" in line.lower():
+                                    n += 1
+                                break
+                except OSError:
+                    continue
+        return n
+
+    def helper_count(self) -> int:
+        """Count user-promoted helper files (excludes README and starter.py)."""
+        d = self.path / "helpers"
+        if not d.is_dir():
+            return 0
+        return sum(
+            1 for f in d.rglob("*")
+            if f.is_file() and f.suffix == ".py"
+            and f.name not in ("starter.py",)
+        )
 
     def snapshot(self) -> dict[str, str]:
         """Return {relative_path: sha256} for helpers/ and memory/."""
@@ -2248,6 +2315,11 @@ class RunConfig:
     workspace_root: Path = field(default_factory=lambda: Path("/tmp"))
     seed: int | None = None
     break_budgets: bool = False  # H4: force λ_2 < 0 by removing mutation budget
+    # Cross-run memory persistence: when persistent_workspace is set, the
+    # workspace at this path is REUSED across runs (helpers + memory survive),
+    # allowing L2-promoted artifacts to compound. Default None = each run gets
+    # a fresh /tmp workspace.
+    persistent_workspace: Path | None = None
     # Shadow-evaluation config for L2 mutations (Noesis-pattern hook).
     # Default: enabled — L2 candidates must beat baseline on a small task set
     # before commit. The bad-mutation injection that hurt PR #22's `full`
@@ -2292,8 +2364,17 @@ def run(
     workspace_paths: dict = {}
 
     for cond in conditions:
-        ws_path = cfg.workspace_root / f"microrcs-{run_id}-{cond.replace('+','plus_')}"
-        ws = Workspace.create(ws_path, run_id)
+        # Cross-run memory: if a persistent workspace path is configured,
+        # use it (PRESERVING helpers/ + memory/ from prior runs). Each
+        # condition still gets its own subdirectory so the ablations don't
+        # cross-contaminate.
+        if cfg.persistent_workspace is not None:
+            ws_path = cfg.persistent_workspace / cond.replace("+", "plus_")
+            persist = True
+        else:
+            ws_path = cfg.workspace_root / f"microrcs-{run_id}-{cond.replace('+','plus_')}"
+            persist = False
+        ws = Workspace.create(ws_path, run_id, persist=persist)
         log = EventLog(ws.path / ".rcs" / "events.jsonl")
 
         l0_reasoner = make_reasoner(cfg.model_l0_l1)
@@ -2423,12 +2504,17 @@ def run(
                 "pass_pow_k": 0.0, "pass_at_k": 0.0,
                 "bootstrap_std": 0.0, "bootstrap_ci": (0.0, 0.0),
             })
+        # Cross-run compounding signals: count durable artifacts at end of run
+        cond_results["canonical_memory_count"] = ws.snapshot_canonical_count()
+        cond_results["promoted_helper_count"] = ws.helper_count()
         metrics[cond] = cond_results
         workspace_paths[cond] = str(ws.path)
         _emit_progress(quiet,
             f"  ╰─ {cond} done: pass^3={cond_results.get('pass_pow_k', 0):.3f}  "
             f"cost=${sum(e['cost'] for e in cond_results['episodes']):.4f}  "
-            f"n={len(cond_results['episodes'])}"
+            f"n={len(cond_results['episodes'])}  "
+            f"canonical={cond_results['canonical_memory_count']}  "
+            f"helpers+={cond_results['promoted_helper_count']}"
         )
 
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2, default=str))
@@ -2892,6 +2978,15 @@ def cli_run(args: argparse.Namespace) -> int:
     seed = getattr(args, "seed", None)
     if seed is not None:
         cfg = replace(cfg, seed=int(seed))
+    persistent_ws = getattr(args, "workspace", None)
+    if persistent_ws is not None:
+        cfg = replace(cfg, persistent_workspace=Path(persistent_ws))
+    model_l0 = getattr(args, "model_l0_l1", None)
+    if model_l0:
+        cfg = replace(cfg, model_l0_l1=model_l0)
+    model_l2 = getattr(args, "model_l2_l3", None)
+    if model_l2:
+        cfg = replace(cfg, model_l2_l3=model_l2)
     out = getattr(args, "out", Path("reports"))
     conditions = ("flat", "+autonomic", "+meta", "full")
     if args.quick:
@@ -2906,6 +3001,82 @@ def cli_run(args: argparse.Namespace) -> int:
 
 
 # === Bench: multi-seed runs for noise-floor + statistical-significance ======
+def cli_cross_run(args: argparse.Namespace) -> int:
+    """Run N consecutive sessions on the same workspace.
+
+    Tests the cross-run compounding hypothesis: if the recursive structure
+    enables knowledge to compound across runs (helpers promoted by L2 in
+    run k are reused at L0 in run k+1, canonical memory entries accumulate),
+    then pass^k(iter_N) should grow with N.
+
+    If pass^k is flat or declining, the compounding hypothesis is refuted.
+    """
+    cfg = _build_run_config(args.quick, paper=False, suite=args.suite)
+    cfg = replace(cfg, persistent_workspace=Path(args.workspace), seed=args.seed)
+    if args.model_l0_l1:
+        cfg = replace(cfg, model_l0_l1=args.model_l0_l1)
+    if args.model_l2_l3:
+        cfg = replace(cfg, model_l2_l3=args.model_l2_l3)
+
+    out_root = Path(args.out) / f"crossrun-{new_event_id()}"
+    out_root.mkdir(parents=True, exist_ok=True)
+    conditions = tuple(c.strip() for c in args.conditions.split(",") if c.strip())
+    quiet = getattr(args, "quiet", False)
+
+    _emit_progress(quiet,
+        f"CROSS-RUN: workspace={args.workspace} iterations={args.n_iterations} "
+        f"conditions={conditions} suite={args.suite}")
+
+    iterations: list[dict] = []
+    for i in range(args.n_iterations):
+        _emit_progress(quiet, f"CROSS-RUN iteration {i+1}/{args.n_iterations}")
+        result = run(cfg, out_root / f"iter-{i+1}", conditions=conditions, quiet=quiet)
+        for cond, m in result.metrics.items():
+            iterations.append({
+                "iteration": i + 1,
+                "condition": cond,
+                "pass_pow_k": m.get("pass_pow_k", 0.0),
+                "pass_at_k": m.get("pass_at_k", 0.0),
+                "bootstrap_ci": m.get("bootstrap_ci", (0.0, 0.0)),
+                "canonical_memory_count": m.get("canonical_memory_count", 0),
+                "promoted_helper_count": m.get("promoted_helper_count", 0),
+                "total_cost": sum(e["cost"] for e in m.get("episodes", [])),
+                "n_episodes": len(m.get("episodes", [])),
+            })
+
+    summary = {
+        "workspace": str(args.workspace),
+        "n_iterations": args.n_iterations,
+        "conditions": list(conditions),
+        "suite": args.suite,
+        "iterations": iterations,
+    }
+    summary_path = out_root / "crossrun_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2, default=str))
+    print(f"\nCROSS-RUN report: {summary_path}")
+
+    print("\n=== CROSS-RUN HEADLINE — does pass^k compound? ===")
+    print(f"{'iter':>4}  {'cond':>14}  {'pass^k':>7}  {'95% CI':>17}  "
+          f"{'canonical':>9}  {'helpers':>7}  {'cost':>7}")
+    by_cond: dict[str, list[dict]] = {}
+    for it in iterations:
+        by_cond.setdefault(it["condition"], []).append(it)
+    for cond, its in by_cond.items():
+        for it in its:
+            lo, hi = it["bootstrap_ci"]
+            print(f"  {it['iteration']:>2}  {it['condition']:>14}  "
+                  f"{it['pass_pow_k']:>7.3f}  {lo:>6.3f}-{hi:>6.3f}    "
+                  f"{it['canonical_memory_count']:>9}  "
+                  f"{it['promoted_helper_count']:>7}  "
+                  f"${it['total_cost']:>6.4f}")
+        # Compute trend: pass^k(last) - pass^k(first)
+        if len(its) >= 2:
+            d = its[-1]["pass_pow_k"] - its[0]["pass_pow_k"]
+            print(f"  Δ pass^k for {cond}: {d:+.3f} ({'COMPOUNDING' if d > 0.05 else 'flat/declining'})")
+    print("==========================================\n")
+    return 0
+
+
 def cli_bench(args: argparse.Namespace) -> int:
     """Run the same configuration N times with different seeds; aggregate
     pass^k across seeds with proper bootstrap CIs.
@@ -3060,6 +3231,41 @@ def main() -> int:
         "--seed", type=int, default=None,
         help="Optional fixed seed for reproducible runs (default: stochastic)",
     )
+    p_run.add_argument(
+        "--workspace", type=Path, default=None,
+        help="Persistent workspace path. When set, helpers/ and memory/ "
+             "from prior runs are preserved (cross-run compounding test).",
+    )
+    p_run.add_argument(
+        "--model-l0-l1", default=None,
+        help="Override model used at L0/L1 (default: claude-haiku-4-5)",
+    )
+    p_run.add_argument(
+        "--model-l2-l3", default=None,
+        help="Override model used at L2/L3 (default: claude-sonnet-4-6)",
+    )
+
+    p_xrun = sub.add_parser(
+        "cross-run",
+        help="Run N consecutive sessions on the same persistent workspace; "
+             "measures whether pass^k grows as memory + helpers compound",
+    )
+    p_xrun.add_argument("--workspace", type=Path, required=True,
+                          help="Persistent workspace path (created if missing)")
+    p_xrun.add_argument("--n-iterations", type=int, default=5,
+                          help="Number of consecutive sessions (default 5)")
+    p_xrun.add_argument("--suite", choices=("reference", "harder", "both"),
+                          default="harder")
+    p_xrun.add_argument("--conditions", default="full",
+                          help="Comma-separated conditions (default: full only — "
+                               "compounding test focuses on the recursive case)")
+    p_xrun.add_argument("--seed", type=int, default=42)
+    p_xrun.add_argument("--quick", action="store_true",
+                          help="Use --quick run config per iteration")
+    p_xrun.add_argument("--out", type=Path, default=Path("reports"))
+    p_xrun.add_argument("--quiet", action="store_true")
+    p_xrun.add_argument("--model-l0-l1", default=None)
+    p_xrun.add_argument("--model-l2-l3", default=None)
 
     p_bench = sub.add_parser(
         "bench",
@@ -3123,6 +3329,8 @@ def main() -> int:
         return cli_watch(args)
     if args.cmd == "bench":
         return cli_bench(args)
+    if args.cmd == "cross-run":
+        return cli_cross_run(args)
     return 0
 
 
