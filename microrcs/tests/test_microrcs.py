@@ -1508,6 +1508,90 @@ def test_cli_bench_runs_multiple_seeds(tmp_path, monkeypatch):
     assert len(summary["per_condition"]["flat"]["pass_pow_k_per_seed"]) == 2
 
 
+# =====================================================================
+# Cross-run memory persistence (PR #27)
+# =====================================================================
+def test_workspace_persist_preserves_helpers(tmp_path):
+    """With persist=True, an existing helpers/starter.py is preserved."""
+    ws_path = tmp_path / "persistent"
+    # First create
+    ws1 = m.Workspace.create(ws_path, run_id="r1", persist=False)
+    # Simulate L2 promoting a custom helper
+    custom = ws1.path / "helpers" / "starter.py"
+    custom.write_text("# CUSTOM PROMOTED HELPER\nx = 42\n")
+    # Re-create with persist=True
+    ws2 = m.Workspace.create(ws_path, run_id="r2", persist=True)
+    # Custom content preserved
+    assert "CUSTOM PROMOTED HELPER" in (ws2.path / "helpers" / "starter.py").read_text()
+
+
+def test_workspace_persist_false_overwrites(tmp_path):
+    """Default persist=False overwrites starter.py (current behavior)."""
+    ws_path = tmp_path / "ephemeral"
+    ws1 = m.Workspace.create(ws_path, run_id="r1")
+    custom = ws1.path / "helpers" / "starter.py"
+    custom.write_text("# CUSTOM CONTENT\n")
+    ws2 = m.Workspace.create(ws_path, run_id="r2")  # persist defaults to False
+    # Custom content overwritten
+    assert "CUSTOM CONTENT" not in (ws2.path / "helpers" / "starter.py").read_text()
+
+
+def test_workspace_persist_preserves_memory(tmp_path):
+    """Memory entries persist across runs when persist=True."""
+    ws_path = tmp_path / "persistent"
+    ws1 = m.Workspace.create(ws_path, run_id="r1", persist=False)
+    # Add a canonical memory entry
+    entry = ws1.path / "memory" / "concept" / "fact1.md"
+    entry.write_text("---\nname: fact1\nstatus: canonical\n---\n\nbody\n")
+    # Re-create with persist=True
+    ws2 = m.Workspace.create(ws_path, run_id="r2", persist=True)
+    assert (ws2.path / "memory" / "concept" / "fact1.md").exists()
+    assert "fact1" in (ws2.path / "memory" / "concept" / "fact1.md").read_text()
+
+
+def test_workspace_scratch_always_wiped(tmp_path):
+    """scratch/ is ephemeral by design — wiped even with persist=True."""
+    ws_path = tmp_path / "ws"
+    ws1 = m.Workspace.create(ws_path, run_id="r1")
+    (ws1.path / "scratch" / "tmp.txt").write_text("old")
+    ws2 = m.Workspace.create(ws_path, run_id="r2", persist=True)
+    assert not (ws2.path / "scratch" / "tmp.txt").exists()
+
+
+def test_workspace_canonical_count(tmp_path):
+    """snapshot_canonical_count counts only status=canonical entries."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    (ws.path / "memory" / "concept" / "draft.md").write_text(
+        "---\nname: a\nstatus: draft\n---\n\nbody\n"
+    )
+    (ws.path / "memory" / "concept" / "canon1.md").write_text(
+        "---\nname: b\nstatus: canonical\n---\n\nbody\n"
+    )
+    (ws.path / "memory" / "pattern" / "canon2.md").write_text(
+        "---\nname: c\nstatus: canonical\n---\n\nbody\n"
+    )
+    assert ws.snapshot_canonical_count() == 2
+
+
+def test_workspace_helper_count(tmp_path):
+    """helper_count excludes starter.py and counts user-promoted helpers."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    # Just starter.py present
+    assert ws.helper_count() == 0
+    # Add a promoted helper
+    (ws.path / "helpers" / "safe_eval.py").write_text("def safe_eval(x): return eval(x)")
+    assert ws.helper_count() == 1
+
+
+def test_run_config_persistent_workspace_field():
+    """RunConfig accepts persistent_workspace path."""
+    p = Path("/tmp/test-ws")
+    cfg = m.RunConfig(persistent_workspace=p)
+    assert cfg.persistent_workspace == p
+    cfg2 = m.RunConfig()
+    assert cfg2.persistent_workspace is None
+
+
 def test_l2_noop_when_no_failures_and_decay(tmp_path):
     """If V₁ is already decaying and there are no failures, L2 should noop."""
     class _R:
