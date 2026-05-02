@@ -2889,6 +2889,9 @@ def _format_event_for_watch(event: dict, cond: str,
 def cli_run(args: argparse.Namespace) -> int:
     cfg = _build_run_config(args.quick, args.paper, getattr(args, "suite", "reference"))
     cfg = replace(cfg, break_budgets=getattr(args, "break_budgets", False))
+    seed = getattr(args, "seed", None)
+    if seed is not None:
+        cfg = replace(cfg, seed=int(seed))
     out = getattr(args, "out", Path("reports"))
     conditions = ("flat", "+autonomic", "+meta", "full")
     if args.quick:
@@ -2899,6 +2902,104 @@ def cli_run(args: argparse.Namespace) -> int:
     render_report(result.metrics, report_path)
     print(f"Report: {report_path}")
     _print_headline(result.metrics)
+    return 0
+
+
+# === Bench: multi-seed runs for noise-floor + statistical-significance ======
+def cli_bench(args: argparse.Namespace) -> int:
+    """Run the same configuration N times with different seeds; aggregate
+    pass^k across seeds with proper bootstrap CIs.
+
+    This is the noise-floor measurement: repeated `flat`-only runs tell us the
+    intra-condition variance from temperature=1.0 sampling. Then we know what
+    Δpass^k counts as signal vs noise.
+
+    Usage:
+        microrcs bench --suite harder --n-seeds 3 --conditions flat
+        microrcs bench --suite harder --n-seeds 3 --conditions flat,full
+    """
+    cfg = _build_run_config(args.quick, args.paper, args.suite)
+    out_root = Path(args.out) / f"bench-{new_event_id()}"
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    conditions = tuple(c.strip() for c in args.conditions.split(",") if c.strip())
+    n_seeds = int(args.n_seeds)
+    quiet = getattr(args, "quiet", False)
+
+    _emit_progress(quiet, f"BENCH: {n_seeds} seeds × {conditions} on suite={args.suite}")
+
+    aggregate: dict[str, list] = {c: [] for c in conditions}
+    seed_run_ids: list[str] = []
+    for s in range(n_seeds):
+        seed = (args.base_seed or 0) + s * 1009  # spread seeds; coprime spacing
+        cfg_s = replace(cfg, seed=seed)
+        _emit_progress(quiet, f"BENCH seed[{s+1}/{n_seeds}] = {seed}")
+        result = run(cfg_s, out_root, conditions=conditions, quiet=quiet)
+        seed_run_ids.append(result.run_id)
+        for cond in conditions:
+            aggregate[cond].append(result.metrics[cond])
+
+    # Cross-seed aggregate: each seed produces one pass^k per condition.
+    # Bootstrap that distribution to get noise-floor + cross-seed CI.
+    summary: dict = {}
+    for cond, runs_metrics in aggregate.items():
+        pass_powks = [r["pass_pow_k"] for r in runs_metrics]
+        means = [
+            float(np.mean([e["score"] for e in r["episodes"]])) for r in runs_metrics
+        ]
+        costs = [sum(e["cost"] for e in r["episodes"]) for r in runs_metrics]
+        # Bootstrap over seed-level pass^k values
+        if len(pass_powks) >= 2:
+            ci = bootstrap_ci(pass_powks, alpha=0.05, n=2000)
+            std = bootstrap_std(pass_powks, n_resamples=2000)
+        else:
+            ci = (pass_powks[0], pass_powks[0]) if pass_powks else (0.0, 0.0)
+            std = 0.0
+        summary[cond] = {
+            "n_seeds": len(pass_powks),
+            "pass_pow_k_per_seed": pass_powks,
+            "pass_pow_k_mean": float(np.mean(pass_powks)) if pass_powks else 0.0,
+            "pass_pow_k_std": float(np.std(pass_powks)) if pass_powks else 0.0,
+            "pass_pow_k_bootstrap_ci": ci,
+            "pass_pow_k_bootstrap_std": std,
+            "mean_score_per_seed": means,
+            "cost_per_seed": costs,
+            "total_cost": sum(costs),
+        }
+
+    bench_summary = {
+        "bench_id": out_root.name,
+        "n_seeds": n_seeds,
+        "conditions": list(conditions),
+        "suite": args.suite,
+        "seed_run_ids": seed_run_ids,
+        "per_condition": summary,
+    }
+    (out_root / "bench_summary.json").write_text(
+        json.dumps(bench_summary, indent=2, default=str)
+    )
+
+    print(f"\nBENCH report: {out_root / 'bench_summary.json'}")
+    print("\n=== BENCH HEADLINE ===")
+    print(f"{'cond':>14}  {'seeds':>5}  {'mean':>6}  {'std':>6}  {'95% CI':>17}  {'cost':>7}")
+    for cond, s in summary.items():
+        lo, hi = s["pass_pow_k_bootstrap_ci"]
+        print(f"{cond:>14}  {s['n_seeds']:>5}  "
+              f"{s['pass_pow_k_mean']:>6.3f}  "
+              f"{s['pass_pow_k_std']:>6.3f}  "
+              f"{lo:>6.3f}-{hi:>6.3f}    "
+              f"${s['total_cost']:>6.4f}")
+    # Cross-condition Δ comparison
+    if len(conditions) >= 2:
+        baseline_cond = conditions[0]
+        baseline_mean = summary[baseline_cond]["pass_pow_k_mean"]
+        baseline_std = summary[baseline_cond]["pass_pow_k_std"]
+        print(f"\nΔ vs '{baseline_cond}' (significant if |Δ| > 2σ_baseline):")
+        for cond in conditions[1:]:
+            d = summary[cond]["pass_pow_k_mean"] - baseline_mean
+            sig = "✓ above noise" if abs(d) > 2 * baseline_std else "noise-level"
+            print(f"  {cond:>14}: Δ = {d:+.3f}  ({sig})")
+    print("=======================\n")
     return 0
 
 
@@ -2955,6 +3056,27 @@ def main() -> int:
              "'harder' (10 problems calibrated to ~50%% pass rate), "
              "or 'both' (15 tasks)",
     )
+    p_run.add_argument(
+        "--seed", type=int, default=None,
+        help="Optional fixed seed for reproducible runs (default: stochastic)",
+    )
+
+    p_bench = sub.add_parser(
+        "bench",
+        help="Multi-seed benchmark for noise-floor + statistical-significance",
+    )
+    p_bench.add_argument("--suite", choices=("reference", "harder", "both"),
+                          default="harder")
+    p_bench.add_argument("--conditions", default="flat",
+                          help="Comma-separated conditions, e.g. 'flat' or 'flat,+meta,full'")
+    p_bench.add_argument("--n-seeds", type=int, default=3,
+                          help="Number of seeds to run (default 3)")
+    p_bench.add_argument("--base-seed", type=int, default=42,
+                          help="Starting seed (subsequent seeds spaced by 1009)")
+    p_bench.add_argument("--out", default=Path("reports"), type=Path)
+    p_bench.add_argument("--quick", action="store_true")
+    p_bench.add_argument("--paper", action="store_true")
+    p_bench.add_argument("--quiet", action="store_true")
 
     p_trace = sub.add_parser("trace", help="Walk parent chain from event_id")
     p_trace.add_argument("event_id")
@@ -2989,6 +3111,7 @@ def main() -> int:
             args.out = Path("reports")
             args.quiet = False
             args.suite = "reference"
+            args.seed = None
         return cli_run(args)
     if args.cmd == "trace":
         return cli_trace(args)
@@ -2998,6 +3121,8 @@ def main() -> int:
         return cli_replay(args)
     if args.cmd == "watch":
         return cli_watch(args)
+    if args.cmd == "bench":
+        return cli_bench(args)
     return 0
 
 
