@@ -4,13 +4,13 @@
 > contributors don't relearn what we already know. Each section is dated and
 > traceable to a specific PR + run.
 
-## Headline state (as of PR #30 — POST capacity sweep result)
+## Headline state (as of PR #31 — POST capacity sweep result)
 
 The RCS thesis exists in three forms; current evidence by form:
 
 | Form | Claim | Status | Evidence |
 |---|---|---|---|
-| **Performance (weak)** | "some recursive control improves agent pass-rate when there's headroom" | ⚠️ **TIER-DEPENDENT** | Refuted at Haiku × HARDER (PR #25), Sonnet × HARDER (NEW PR #30); **directionally supported at Opus × HARDER (NEW PR #30)** with 3/3 seeds showing +meta and +full > flat. Refuted on microgrid (PR #2) and cross-run compounding (PR #28). |
+| **Performance (weak)** | "some recursive control improves agent pass-rate when there's headroom" | ⚠️ **TIER-DEPENDENT** | Refuted at Haiku × HARDER (PR #25), Sonnet × HARDER (NEW PR #31); **directionally supported at Opus × HARDER (NEW PR #31)** with 3/3 seeds showing +meta and +full > flat. Refuted on microgrid (PR #2) and cross-run compounding (PR #28). |
 | **Performance (statistical)** | `pass^k_recursive > pass^k_flat` with `p<0.05` | ❌ **rejected at Haiku, Sonnet (negative)**, ⚠️ **inconclusive at Opus** | Sonnet bench: Δ=−0.07 to −0.09, all above 2σ_flat=0.020 → recursion *significantly hurts*. Opus bench: Δ=+0.13 to +0.14 but 2σ_flat=0.16 → effect within noise band but consistently positive directionally (n=3). |
 | **Stability (λᵢ > 0)** | empirical λ̂ᵢ positive at every level | ⚠️ **partial** | Only λ̂_2 numerically positive on microRCS; microgrid hourly sim cannot resolve sub-second decay |
 | **Stability (paper-magnitude)** | λ̂ᵢ ≈ paper analytic λᵢ within bootstrap CI | ❌ **3 orders off** | Construct gap — see §"Why λ̂ doesn't match paper" |
@@ -38,15 +38,15 @@ The RCS thesis exists in three forms; current evidence by form:
 | **#27 cross-run v1** | HARDER × 5 iter × full × Opus L2 (--quick) | n/a | mean ~1.0 (saturated) | flat trend | suite ceiling masked compounding signal | ~$0.05 | inconclusive — `--quick` gave only 2 tasks per iter; canonical=0 (compounding mechanism wired but not exercised because L2 NoOp'd) |
 | **#27 cross-run v2** | HARDER × 5 iter × full × Opus L2 (full suite) | n/a | n/a | Δ = -0.061 (declining) | **structural gap discovered**: AppendSystemRule mutates in-memory list only, doesn't persist | ~$3 | revealed that PR #27's persistence mechanism wasn't being exercised by the L2 actions Opus chose; led to PR #28 |
 | **#28 cross-run final** | HARDER × 5 iter × full × Opus L2 + disk-persisted rules | flat ≈ iter1 | ~0.36 (mean across iter) | iter1 0.360 → iter5 0.431 (+0.072) | within-iter σ=0.045, 2σ=0.09 — **NOT significant** | ~$3.4 | 4 high-quality Opus rules accumulated to disk and loaded across iterations. Mechanism works perfectly. **Compounding still doesn't measurably improve pass^k**. |
-| **#30 Sonnet bench** | HARDER × 3 seeds × Sonnet L0/L1 + Opus L2/L3 | **flat** | **0.505 ± 0.010** | full=0.431 (Δ=−0.074) | recursion **significantly HURTS** (3/3 conditions Δ > 2σ_flat=0.020) | $17.78 | first regime where recursion is measurably bad. Tight baseline (σ=0.010) makes effect detectable. Bitter-lesson signal at Sonnet tier. |
-| **#30 Opus bench** | HARDER × 3 seeds × Opus L0/L1 + Opus L2/L3 | **+meta** | **0.495 ± 0.079** | +meta=0.636 (Δ=+0.141), full=0.626 (Δ=+0.131) | recursion **directionally HELPS** but per-seed σ=0.079 makes it inconclusive at n=3 | $63.04 | 3/3 seeds show +meta > flat AND full > flat. **The bitter-lesson reverses at Opus.** +autonomic alone (L1 mode-switching, no L2) ≈ flat. The L2 layer is what helps Opus. |
+| **#31 Sonnet bench** | HARDER × 3 seeds × Sonnet L0/L1 + Opus L2/L3 | **flat** | **0.505 ± 0.010** | full=0.431 (Δ=−0.074) | recursion **significantly HURTS** (3/3 conditions Δ > 2σ_flat=0.020) | $17.78 | first regime where recursion is measurably bad. Tight baseline (σ=0.010) makes effect detectable. Bitter-lesson signal at Sonnet tier. |
+| **#31 Opus bench** | HARDER × 3 seeds × Opus L0/L1 + Opus L2/L3 | **+meta** | **0.495 ± 0.079** | +meta=0.636 (Δ=+0.141), full=0.626 (Δ=+0.131) | recursion **directionally HELPS** but per-seed σ=0.079 makes it inconclusive at n=3 | $63.04 | 3/3 seeds show +meta > flat AND full > flat. **The bitter-lesson reverses at Opus.** +autonomic alone (L1 mode-switching, no L2) ≈ flat. The L2 layer is what helps Opus. |
 
 Total spend so far: ~$117 across ~5160 episodes (microRCS) + 2160 hours (microgrid).
 
-## Capacity-tier sweep result (PR #30 / BRO-945)
+## Capacity-tier sweep result (PR #31 / BRO-945)
 
 The bitter-lesson interpretation predicts that recursive scaffolding should help weaker
-models more and hurt stronger ones. PR #30 tests this directly by sweeping L0/L1 across
+models more and hurt stronger ones. PR #31 tests this directly by sweeping L0/L1 across
 Anthropic's full capability tier (Haiku → Sonnet → Opus), holding L2/L3 constant at Opus
 (highest available meta-controller). The result refutes the simple bitter-lesson story.
 
@@ -100,8 +100,8 @@ either doesn't profit from rule injection or actively gets confused by it.
 | Tier | Cost | Per-condition mean cost |
 |---|---|---|
 | Haiku (PR #25) | $8.65 | $2.16 |
-| Sonnet (PR #30) | $17.78 | $4.45 |
-| Opus (PR #30) | $63.04 | $15.76 |
+| Sonnet (PR #31) | $17.78 | $4.45 |
+| Opus (PR #31) | $63.04 | $15.76 |
 
 Opus +meta was the most expensive condition ($20.72 across 3 seeds, ~$6.91/seed) because
 the shadow-eval mechanism spawns extra Opus inference for trial episodes. Despite the cost,
@@ -128,12 +128,12 @@ this is also the condition that helps most.
 python3 microrcs.py bench --suite harder --conditions flat,+autonomic,+meta,full \
     --n-seeds 3 --base-seed 42
 
-# Sonnet capacity test (PR #30):
+# Sonnet capacity test (PR #31):
 python3 microrcs.py bench --suite harder --conditions flat,+autonomic,+meta,full \
     --n-seeds 3 --base-seed 42 \
     --model-l0-l1 claude-sonnet-4-6 --model-l2-l3 claude-opus-4-7
 
-# Opus capacity test (PR #30):
+# Opus capacity test (PR #31):
 python3 microrcs.py bench --suite harder --conditions flat,+autonomic,+meta,full \
     --n-seeds 3 --base-seed 42 \
     --model-l0-l1 claude-opus-4-7 --model-l2-l3 claude-opus-4-7
@@ -218,7 +218,7 @@ Cost: flat $1.71 vs full $2.39 (+40% cost for −0.080 performance).
 
 **Haiku baseline — PR #25 bench (3 seeds × 4 conditions × 90 eps × HARDER_SUITE):**
 
-```
+```text
 flat       mean=0.357 ± 0.055    [0.282, 0.413]
 +autonomic mean=0.343 ± 0.013    Δ=−0.014  (within 2σ_flat = 0.110)
 +meta      mean=0.325 ± 0.052    Δ=−0.032  (within noise)
@@ -228,9 +228,9 @@ full       mean=0.277 ± 0.018    Δ=−0.080  (within noise but trending HURTS)
 At Haiku, the noise floor is too wide to declare any conclusion — recursion neither
 significantly helps nor hurts.
 
-**Sonnet — PR #30 bench (3 seeds × 4 conditions × 90 eps × HARDER_SUITE), L0/L1=Sonnet, L2/L3=Opus:**
+**Sonnet — PR #31 bench (3 seeds × 4 conditions × 90 eps × HARDER_SUITE), L0/L1=Sonnet, L2/L3=Opus:**
 
-```
+```text
 flat       mean=0.505 ± 0.010    [0.491, 0.512]   ← strikingly tight σ
 +autonomic mean=0.420 ± 0.039    Δ=−0.085  (✓ above 2σ_flat = 0.020 — significantly HURTS)
 +meta      mean=0.427 ± 0.046    Δ=−0.078  (✓ above noise — HURTS)
@@ -241,9 +241,9 @@ The Sonnet flat baseline is unusually tight (σ=0.010, 5× narrower than Haiku).
 recursion conditions cross the 2σ noise band. **At Sonnet, recursion measurably hurts.**
 This is the bitter lesson holding cleanly.
 
-**Opus — PR #30 bench (3 seeds × 4 conditions × 90 eps × HARDER_SUITE), L0/L1=Opus, L2/L3=Opus:**
+**Opus — PR #31 bench (3 seeds × 4 conditions × 90 eps × HARDER_SUITE), L0/L1=Opus, L2/L3=Opus:**
 
-```
+```text
 flat       mean=0.495 ± 0.079    [0.413, 0.602]   ← variance balloons
 +autonomic mean=0.495 ± 0.071    Δ=−0.000  (within noise; L1 mode-switching = neutral)
 +meta      mean=0.636 ± 0.133    Δ=+0.141  (within 2σ_flat=0.158 but 3/3 seeds positive)
@@ -289,7 +289,7 @@ Per-level analytic λᵢ from `parameters.toml` are 1.45, 0.41, 0.07, 0.006 — 
 **Status: REFUTED.**
 
 PR #24 ordering on HARDER_SUITE:
-```
+```text
 +autonomic = 0.377 (best)
 full       = 0.343
 +meta      = 0.327
@@ -306,10 +306,10 @@ Possible interpretations:
 
 **Honest reading:** the strong-form thesis as stated in the paper doesn't hold on Haiku-class models with 30-min runs on a 10-task benchmark. Whether it holds at higher capability tiers / longer time scales / harder benchmarks is open.
 
-**Update from PR #30 capacity sweep:**
+**Update from PR #31 capacity sweep:**
 
 Sonnet cross-seed means (3 seeds, HARDER):
-```
+```text
 flat       = 0.505 (best)
 +meta      = 0.427
 full       = 0.431
@@ -317,7 +317,7 @@ full       = 0.431
 ```
 
 Opus cross-seed means (3 seeds, HARDER):
-```
+```text
 +meta      = 0.636 (best)
 full       = 0.626
 flat       = 0.495
@@ -357,7 +357,7 @@ The direction matches H4 prediction (V_1 should not decay when L2 mutations are 
 
 The paper's λᵢ values (1.45, 0.41, 0.07, 0.006) describe **exponential decay rates of perturbations** in the Lyapunov function. They are derived from the budget formula:
 
-```
+```text
 λᵢ = γᵢ − L_θᵢ·ρᵢ − L_dᵢ·ηᵢ − βᵢ·τ̄ᵢ − (ln νᵢ)/τ_{a,i}
 ```
 
