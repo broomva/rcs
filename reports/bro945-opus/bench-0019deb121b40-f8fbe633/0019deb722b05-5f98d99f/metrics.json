@@ -1,0 +1,3366 @@
+{
+  "flat": {
+    "episodes": [
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02559,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.02535,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02397,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07897499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.024855,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0357,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.041985,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.078015,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061815,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.039915,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02589,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.02535,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02292,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07897499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.059145,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.035175,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.044385,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07944000000000001,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061815,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.039915,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02589,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.02535,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.022095,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07897499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.024855,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0336,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.055185,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08064,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061815,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.022515,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025665,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.02535,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.023745,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079335,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.024855,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.035025,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07449,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.076845,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061815,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.022515,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02559,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.02535,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02292,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07897499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.024855,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.033525,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.078405,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07692,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061815,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.039915,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02559,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.02535,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02292,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079335,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.059145,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0342,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.04536,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.074445,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061815,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.039915,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02559,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.02535,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.023895,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07897499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.024855,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.032625,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.07552500000000001,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07452,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061815,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.022515,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02559,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.02535,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02292,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07897499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.024855,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05079,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.044385,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.080295,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061725,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.039915,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02559,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.05172,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02292,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07897499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.024855,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.033,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.05556,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.075345,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061725,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.039915,
+        "n_steps": 2
+      }
+    ],
+    "lambda": {
+      "L0": [
+        -0.001223613411316843,
+        0.0008511072637008755
+      ],
+      "L1": [
+        null,
+        null
+      ],
+      "L2": [
+        null,
+        null
+      ],
+      "L3": [
+        null,
+        null
+      ]
+    },
+    "pass_pow_k": 0.4705075445816187,
+    "pass_at_k": 0.9902962206332993,
+    "bootstrap_std": 0.04411653339189876,
+    "bootstrap_ci": [
+      0.6888888888888889,
+      0.8555555555555555
+    ],
+    "canonical_memory_count": 0,
+    "promoted_helper_count": 0
+  },
+  "+autonomic": {
+    "episodes": [
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025815,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.024675,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02397,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079125,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025005,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.06489,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.067035,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.04509,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061965,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.040065,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025815,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.025425,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.046755000000000005,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079485,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02493,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07974,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.057885,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.051465,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061965,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02259,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025965,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.024675,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.046755000000000005,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079485,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02493,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07224,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.07519500000000001,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.049065,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061965,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.040065,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025815,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05169,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02217,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.03141,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02493,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05745,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.09876,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.050565,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061965,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.040065,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025665,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.051915,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.046215000000000006,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.03141,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.059295,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.033225,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.102105,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.044115,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061965,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.040065,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025965,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.024675,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02397,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079485,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02493,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05808,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.05721,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.044115,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061965,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.040065,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025815,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.025425,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.050879999999999995,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079125,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02493,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.06922500000000001,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.04371,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.124305,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.101415,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.121905,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061185,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08481,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08406,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.126165,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07317,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08784,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.149955,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.131475,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10782,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.11061,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08328,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08545499999999999,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08577000000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.125085,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10656000000000002,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.090975,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.14334,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.12897,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10303499999999999,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.066165,
+        "n_steps": 2
+      }
+    ],
+    "lambda": {
+      "L0": [
+        -0.0008478583905133142,
+        0.00031302766708783756
+      ],
+      "L1": [
+        -0.0009734014117148785,
+        0.0003781931043293081
+      ],
+      "L2": [
+        null,
+        null
+      ],
+      "L3": [
+        null,
+        null
+      ]
+    },
+    "pass_pow_k": 0.5558628257887517,
+    "pass_at_k": 0.9952332311882873,
+    "bootstrap_std": 0.04075672935423451,
+    "bootstrap_ci": [
+      0.7444444444444445,
+      0.8888888888888888
+    ],
+    "canonical_memory_count": 0,
+    "promoted_helper_count": 0
+  },
+  "+meta": {
+    "episodes": [
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025635,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.053895,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.077385,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.133065,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09468,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0408,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.10338,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.15578999999999998,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.12213,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.056415,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.03009,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.053775,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.053235000000000005,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.132075,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09576,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.039,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.104865,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.143805,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.148515,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07368,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.029565,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.054525000000000004,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.088575,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.13161,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09459,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.038925,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.079425,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.158325,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.112545,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07218,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02874,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05295,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.082095,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.13492500000000002,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0945,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.045975,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.089145,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.135345,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.12163500000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05814,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02934,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.053775,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079575,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.13870500000000002,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09477000000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0441,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.079305,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.16479,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.113325,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.06633,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02949,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.054150000000000004,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.092655,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.16269,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09498000000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.03585,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.08403,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.14785500000000001,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.090825,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.06858,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.029715,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.053925,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05301,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.131655,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09423000000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.042675,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.10278,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.16623,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.12304499999999999,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.059805,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.054419999999999996,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05385,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.054360000000000006,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.104325,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09622499999999999,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0411,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.085605,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.14244,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.120525,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.06897,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02949,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05412,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.080475,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08332500000000001,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09578999999999999,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07305,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.10743,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.15154499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.115425,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.055575,
+        "n_steps": 2
+      }
+    ],
+    "lambda": {
+      "L0": [
+        -0.00015060754264905506,
+        0.0001670087388435567
+      ],
+      "L1": [
+        -0.0005078029809677461,
+        0.00021800712487865092
+      ],
+      "L2": [
+        0.0030353301907086543,
+        0.0016817180239926204
+      ],
+      "L3": [
+        null,
+        null
+      ]
+    },
+    "pass_pow_k": 0.7563347050754458,
+    "pass_at_k": 0.9995233231188287,
+    "bootstrap_std": 0.030234145932156144,
+    "bootstrap_ci": [
+      0.8444444444444444,
+      0.9666666666666667
+    ],
+    "canonical_memory_count": 0,
+    "promoted_helper_count": 0
+  },
+  "full": {
+    "episodes": [
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025575,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.046695,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02373,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.079305,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02484,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.033585,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05427,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.04455,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061785,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.039885000000000004,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.025575,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.046695,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.02388,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07894499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.054345000000000004,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.035985,
+        "n_steps": 1
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.072165,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.13161,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.102045,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.068505,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05884500000000001,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.083475,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0837,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.121035,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.06417,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.084735,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10074,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.172395,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10627500000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07469999999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.060825000000000004,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.082515,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08478,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.121305,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07074,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08902499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.067125,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.130365,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10737,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.06703500000000001,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07974,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.084315,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.054885,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.12259500000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.066255,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.087,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.067305,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.1635,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10132500000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07084499999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.062085,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.083565,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08559,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.134925,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061035000000000006,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.089895,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.069105,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.13449,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.102585,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 1,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.05193,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.059655,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.083475,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08307,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.12148499999999998,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.069135,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.089565,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.13455,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.146265,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10575,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07281,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.059475,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.084225,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.08352000000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.12801,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.07586999999999999,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09087,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.078315,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.165195,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10150499999999998,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.073725,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-mixture",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.061184999999999996,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-math-rate",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.083835,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-math-combinatorics",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.083415,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-binsearch",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.13359,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-code-fibonacci",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.090255,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-logic-houses",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.09558,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-logic-meeting",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.07188,
+        "n_steps": 2
+      },
+      {
+        "task": "harder-qa-multifact",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.13746,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-hanoi5",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.10422000000000001,
+        "n_steps": 3
+      },
+      {
+        "task": "harder-planning-queens4",
+        "epoch": 2,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.070305,
+        "n_steps": 2
+      }
+    ],
+    "lambda": {
+      "L0": [
+        -0.0007462589717345421,
+        0.00017178793654040815
+      ],
+      "L1": [
+        -0.0019066080707753252,
+        0.000236374319166083
+      ],
+      "L2": [
+        0.0013708503348158255,
+        1.639408229994935e-05
+      ],
+      "L3": [
+        0.0,
+        0.0
+      ]
+    },
+    "pass_pow_k": 0.7563347050754458,
+    "pass_at_k": 0.9995233231188287,
+    "bootstrap_std": 0.02953001402632688,
+    "bootstrap_ci": [
+      0.8444444444444444,
+      0.9666666666666667
+    ],
+    "canonical_memory_count": 0,
+    "promoted_helper_count": 0
+  }
+}
