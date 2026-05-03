@@ -1097,6 +1097,15 @@ class L0Plant:
                     obs = f"Unknown action {type(shielded).__name__}"
                     is_error = True
 
+                # Anthropic rejects tool_result with empty content + is_error=true.
+                # Bash actions can produce zero stdout/stderr (e.g. `cd somewhere`,
+                # `> file.txt`); guarantee a non-empty content string in all cases.
+                if not obs:
+                    obs = (
+                        "[no stderr / no stdout]"
+                        if is_error
+                        else "[command produced no output]"
+                    )
                 messages.append({"role": "user", "content": [{
                     "type": "tool_result", "tool_use_id": tc.id,
                     "content": obs, "is_error": is_error,

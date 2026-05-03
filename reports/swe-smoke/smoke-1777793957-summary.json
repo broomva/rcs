@@ -1,0 +1,21 @@
+{
+  "run_id": "smoke-1777793957",
+  "model": "claude-haiku-4-5",
+  "instance_ids": [
+    "pallets__flask-4992"
+  ],
+  "results": [
+    {
+      "instance_id": "pallets__flask-4992",
+      "score": 0.0,
+      "n_steps": 50,
+      "cost_usd": 0.7687939999999999,
+      "wall_s": 190.52936950000003,
+      "aborted": "step_budget",
+      "agent_workspace": "/Users/broomva/.cache/microrcs-swe/workspaces/smoke-1777793957/pallets__flask-4992"
+    }
+  ],
+  "total_cost_usd": 0.7687939999999999,
+  "total_wall_s": 190.52940583298914,
+  "pass_at_1": 0.0
+}
