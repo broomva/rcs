@@ -183,7 +183,24 @@ def _run_condition(
     recent_failures: list[m.FailureSummary] = []
 
     for task in tasks:
-        agent_ws_path = Path(task.metadata["swe_agent_workspace"])
+        # `_broken_task` (when sandbox setup fails for an instance) returns a
+        # Task without `swe_agent_workspace` in metadata — handle that path
+        # cleanly so a broken instance doesn't crash the whole condition.
+        agent_ws_str = task.metadata.get("swe_agent_workspace")
+        if not agent_ws_str:
+            err = task.metadata.get("swe_setup_error", "unknown setup error")
+            cond_results.append({
+                "instance_id": task.id, "score": 0.0, "n_steps": 0,
+                "cost_usd": 0.0, "wall_s": 0.0,
+                "aborted": f"setup_failed: {err}",
+            })
+            if not quiet:
+                print(
+                    f"[pilot] │  {task.id:<35} ✗ setup_failed: {err[:60]}",
+                    flush=True,
+                )
+            continue
+        agent_ws_path = Path(agent_ws_str)
         workspace = m.Workspace(path=agent_ws_path, run_id=cond_run_id)
         plant = m.L0Plant(
             reasoner=l0_reasoner,

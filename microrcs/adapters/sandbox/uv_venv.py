@@ -60,7 +60,15 @@ class UvVenvBackend:
         return self.cache_root / "repos" / f"{instance.repo_slug}--{instance.base_commit}"
 
     def venv_dir(self, instance: SweInstance) -> Path:
-        return self.cache_root / "venvs" / f"{instance.repo_slug}--{instance.base_commit}"
+        # CodeRabbit catch: key venv cache by python_version too — otherwise
+        # changing the default Python (e.g., 3.12 → 3.11) silently reuses an
+        # incompatible cached venv from a prior config.
+        py = self.python_version.replace(".", "")
+        return (
+            self.cache_root
+            / "venvs"
+            / f"{instance.repo_slug}--{instance.base_commit}--py{py}"
+        )
 
     def workspace_dir(
         self, instance: SweInstance, run_id: str, suffix: str = ""

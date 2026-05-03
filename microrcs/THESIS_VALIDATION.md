@@ -41,7 +41,7 @@ The RCS thesis exists in three forms; current evidence by form:
 | **#31 Sonnet bench** | HARDER × 3 seeds × Sonnet L0/L1 + Opus L2/L3 | **flat** | **0.505 ± 0.010** | full=0.431 (Δ=−0.074) | recursion **significantly HURTS** (3/3 conditions Δ > 2σ_flat=0.020) | $17.78 | first regime where recursion is measurably bad. Tight baseline (σ=0.010) makes effect detectable. Bitter-lesson signal at Sonnet tier. |
 | **#31 Opus bench** | HARDER × 3 seeds × Opus L0/L1 + Opus L2/L3 | **+meta** | **0.495 ± 0.079** | +meta=0.636 (Δ=+0.141), full=0.626 (Δ=+0.131) | recursion **directionally HELPS** but per-seed σ=0.079 makes it inconclusive at n=3 | $63.04 | 3/3 seeds show +meta > flat AND full > flat. **The bitter-lesson reverses at Opus.** +autonomic alone (L1 mode-switching, no L2) ≈ flat. The L2 layer is what helps Opus. |
 | **#32 SWE-bench-Lite smoke** | 2 instances × Haiku × flat × max_steps=50 | n/a (engineering smoke) | n/a (smoke goal: pipeline) | flask=0.0 / pylint=0.0 (both step_budget) | not statistical — pipeline validation only | ~$2 | Pipeline validated end-to-end. Verifier checked against ground-truth patch: score=1.0 on flask-4992 (FAIL_TO_PASS 1/1 + PASS_TO_PASS 10/10). Two real bugs caught + fixed: empty-tool-result API rejection in microrcs.py mainline; test_patch leaking into agent diff in adapter. Cost-per-instance baseline: ~$1 Haiku × flat. **Ready for BRO-946 full bench scoping.** |
-| **#?? SWE-bench-Lite pilot** | 4 instances × 4 conditions × 1 seed × Haiku L0/L1 + Sonnet L2/L3 × max_steps=50 | none (all 0.000) | flat=0.000 | all conditions = 0.000 | recursion overhead negligible (~$0.50/condition); recursion benefit also zero — **L0 capacity is the binding constraint** | $13.46 | Pilot confirms smoke: Haiku × 50 steps below the SWE-bench floor. All 16 episodes step-budget abort or no_action abort. Recursion wraps a flat that scores 0/4 → still 0/4. The recursion question is NOT testable in this regime. To probe H1 productively on SWE-bench, need either (a) higher tier (Sonnet/Opus L0), (b) higher max_steps (≥100), or (c) easier instances (SWE-bench Verified subset). |
+| **#34 SWE-bench-Lite pilot** | 4 instances × 4 conditions × 1 seed × Haiku L0/L1 + Sonnet L2/L3 × max_steps=50 | none (all 0.000) | flat=0.000 | all conditions = 0.000 | recursion overhead negligible (~$0.50/condition); recursion benefit also zero — **L0 capacity is the binding constraint** | $13.46 | Pilot confirms smoke: Haiku × 50 steps below the SWE-bench floor. All 16 episodes step-budget abort or no_action abort. Recursion wraps a flat that scores 0/4 → still 0/4. The recursion question is NOT testable in this regime. To probe H1 productively on SWE-bench, need either (a) higher tier (Sonnet/Opus L0), (b) higher max_steps (≥100), or (c) easier instances (SWE-bench Verified subset). |
 
 Total spend so far: ~$132 across ~5276 episodes (microRCS) + 2160 hours (microgrid).
 
@@ -227,7 +227,7 @@ observed costs before kicking off, or start with a tighter pilot (5
 instances × 4 conditions × 1 seed at Haiku ≈ $30) to confirm the recursion
 ablation produces a directional signal before the full N=3 seeds run.
 
-## SWE-bench-Lite pilot result (BRO-946 phase 2)
+## SWE-bench-Lite pilot result (PR #34 / BRO-946 phase 2)
 
 The smoke (PR #32) validated the adapter pipeline. The pilot tests the actual
 recursion thesis: **does any recursion condition beat `flat` on SWE-bench
