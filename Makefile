@@ -2,7 +2,7 @@
 # RCS — Build & Test
 # =============================================================================
 
-.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test test-microrcs swe-smoke swe-smoke-dry swe-clean params params-check clean
+.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test test-microrcs swe-smoke swe-smoke-dry swe-pilot swe-clean params params-check clean
 
 # --- Parameters ---
 # data/parameters.toml is the single source of truth for all stability
@@ -96,7 +96,13 @@ swe-smoke:
 swe-smoke-dry:
 	cd microrcs && python3 -m scripts.swe_smoke --dry-run
 
-# Wipe the SWE smoke cache (canonical clones + venvs + workspaces).
+# BRO-946 pilot: 5 instances × 4 conditions × 1 seed at Haiku × Sonnet meta.
+# Tests whether recursion produces a directional signal on SWE-bench-Lite
+# before committing to the full bench. ~$30-50 cost, ~1.5-2.5h wall.
+swe-pilot:
+	cd microrcs && python3 -m scripts.swe_pilot
+
+# Wipe the SWE smoke + pilot cache (canonical clones + venvs + workspaces).
 swe-clean:
 	rm -rf ~/.cache/microrcs-swe
 

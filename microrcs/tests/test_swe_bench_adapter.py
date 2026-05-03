@@ -263,7 +263,9 @@ class TestUvVenvBackendPaths:
             / f"owner--repo--{valid_instance.base_commit}"
         )
         assert backend.venv_dir(valid_instance) == (
-            tmp_path / "venvs" / f"owner--repo--{valid_instance.base_commit}"
+            tmp_path
+            / "venvs"
+            / f"owner--repo--{valid_instance.base_commit}--py311"
         )
         assert backend.workspace_dir(valid_instance, "smoke-1") == (
             tmp_path / "workspaces" / "smoke-1" / "owner__repo-12345"
