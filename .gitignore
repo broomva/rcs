@@ -54,3 +54,7 @@ __pycache__/
 
 # microRCS SWE-bench smoke artifacts (machine-specific absolute paths)
 reports/swe-smoke/
+
+# microRCS SWE-bench pilot artifacts (machine-specific paths)
+reports/swe-pilot/
+microrcs/reports/

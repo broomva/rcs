@@ -33,12 +33,20 @@ class UvVenvBackend:
     `cache_root` is typically `~/.cache/microrcs-swe/`. Set `prefer_clonefile`
     to False to force a regular `cp -r` (useful in CI on non-APFS volumes).
     Set `uv_path` to override the discovered `uv` binary.
+
+    `python_version` controls the venv's Python toolchain. Default 3.11 is
+    the common-denominator: most 2022-vintage SWE-bench-Lite repos pin
+    setuptools/wheel versions that don't survive Python 3.12 (which removed
+    `pkgutil.ImpImporter`), but Python 3.11 still works with the older
+    setuptools and is also recent enough for modern pyproject.toml-only
+    builds. uv auto-downloads the toolchain if not installed locally.
     """
 
     cache_root: Path
     uv_path: str = "uv"
     git_path: str = "git"
     prefer_clonefile: bool = True
+    python_version: str = "3.11"
 
     def __post_init__(self) -> None:
         self.cache_root = Path(self.cache_root).expanduser().resolve()
@@ -153,9 +161,11 @@ class UvVenvBackend:
                 return
             shutil.rmtree(venv_dir, ignore_errors=True)
         venv_dir.parent.mkdir(parents=True, exist_ok=True)
-        # Create venv (uv picks a Python automatically).
+        # Create venv with the configured Python toolchain. uv will download
+        # the toolchain if not installed. Default 3.11 maximizes compat with
+        # 2022-vintage SWE-bench-Lite repos (see python_version docstring).
         subprocess.run(
-            [self.uv_path, "venv", str(venv_dir)],
+            [self.uv_path, "venv", "--python", self.python_version, str(venv_dir)],
             check=True,
             capture_output=True,
             text=True,

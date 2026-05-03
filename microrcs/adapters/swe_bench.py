@@ -62,6 +62,35 @@ def curated_pilot_instances() -> list[str]:
     ]
 
 
+def curated_pilot5_instances() -> list[str]:
+    """4 hand-picked instances for the BRO-946 pilot bench (originally 5,
+    one rejected during dry-run validation).
+
+    All candidates: pure-Python, modern (≥2022), 1 FAIL_TO_PASS test,
+    ≤30-line patch, install cleanly in a Python 3.11 venv via uv.
+
+    Used by `make swe-pilot` (4-condition × 4-instance × 1-seed pilot).
+
+    Note: kept the legacy name `curated_pilot5_instances` to avoid a
+    rename across docs/spec; the 5th candidate was `pylint-dev__pylint-7993`
+    but its pinned `setuptools~=62.6` lacks PEP 660 `build_editable`,
+    blocking modern editable installs.
+    """
+    return [
+        # Smoke-validated (PR #32):
+        "pallets__flask-4992",
+        "pylint-dev__pylint-7080",
+        # New for the pilot — sphinx + modern requests:
+        # Sphinx — viewcode creates pages for epub even if disabled.
+        # 1 F2P, 3 P2P, 14-line patch (smallest of the picks).
+        "sphinx-doc__sphinx-8721",
+        # Requests — content/text vs iter_content(decode_unicode=). 1 F2P,
+        # 75 P2P, 29-line patch. Modern requests (avoids the 2014-vintage
+        # urllib3 issue from `psf__requests-863`).
+        "psf__requests-3362",
+    ]
+
+
 # === Prompt builder =====================================================
 _FAILING_TEST_RE = re.compile(r"^\+\+\+ b/(.+\.py)\b", re.MULTILINE)
 _TEST_FUNC_RE = re.compile(r"^\+\s*def (test_\w+)\(", re.MULTILINE)
@@ -444,6 +473,7 @@ def _broken_task(instance: SweInstance, error: str) -> m.Task:
 
 __all__ = [
     "curated_pilot_instances",
+    "curated_pilot5_instances",
     "make_swe_task",
     "load_swe_bench_lite_subset",
     "_build_swe_prompt",
