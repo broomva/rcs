@@ -2,7 +2,7 @@
 # RCS — Build & Test
 # =============================================================================
 
-.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test test-microrcs params params-check clean
+.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test test-microrcs swe-smoke swe-smoke-dry swe-clean params params-check clean
 
 # --- Parameters ---
 # data/parameters.toml is the single source of truth for all stability
@@ -83,6 +83,22 @@ test: params-check test-microrcs
 # microrcs/ — single-file LLM-controller RCS baseline (P0/P1 empirical witness)
 test-microrcs:
 	cd microrcs && python3 -m pytest tests/ -v
+
+# --- SWE-bench-Lite smoke (BRO-946) ---
+# Smoke test: 2 hand-picked instances × Haiku × flat-only. Validates the
+# adapter pipeline end-to-end (HF dataset → repo clone → venv → agent loop →
+# patch verify). Live API call required; ~$1–5 cost. See
+# microrcs/adapters/AGENTS.md for caching, instance curation, and isolation.
+swe-smoke:
+	cd microrcs && python3 -m scripts.swe_smoke
+
+# Dry-run path: provisions workspaces, exercises adapter wiring, no LLM calls.
+swe-smoke-dry:
+	cd microrcs && python3 -m scripts.swe_smoke --dry-run
+
+# Wipe the SWE smoke cache (canonical clones + venvs + workspaces).
+swe-clean:
+	rm -rf ~/.cache/microrcs-swe
 
 # --- Clean ---
 
