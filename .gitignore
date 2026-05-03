@@ -51,3 +51,6 @@ node_modules/
 __pycache__/
 *.pyc
 .venv/
+
+# microRCS SWE-bench smoke artifacts (machine-specific absolute paths)
+reports/swe-smoke/

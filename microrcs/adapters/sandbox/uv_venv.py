@@ -108,8 +108,19 @@ class UvVenvBackend:
 
     def _ensure_canonical_clone(self, instance: SweInstance) -> None:
         repo_dir = self.repo_dir(instance)
+        # CodeRabbit catch: a half-initialized cache (`.git` exists but
+        # checkout failed mid-way during a prior run) was being reused as
+        # if it were healthy. Verify the working tree is actually at
+        # base_commit before declaring the cache valid.
         if (repo_dir / ".git").is_dir():
-            return  # already cached
+            head = subprocess.run(
+                [self.git_path, "-C", str(repo_dir), "rev-parse", "HEAD"],
+                capture_output=True, text=True,
+            )
+            if head.returncode == 0 and head.stdout.strip() == instance.base_commit:
+                return
+            # Half-init: nuke and re-clone.
+            shutil.rmtree(repo_dir, ignore_errors=True)
         repo_dir.parent.mkdir(parents=True, exist_ok=True)
         url = f"https://github.com/{instance.repo}.git"
         # Shallow clone of the base_commit only — far smaller than a full clone.
@@ -128,8 +139,19 @@ class UvVenvBackend:
 
     def _ensure_venv(self, instance: SweInstance) -> None:
         venv_dir = self.venv_dir(instance)
+        # Half-init detection: `bin/python` exists but the package wasn't
+        # installed (no `.dist-info` directories). Nuke and rebuild rather
+        # than silently reuse the broken venv.
         if (venv_dir / "bin" / "python").exists():
-            return  # already built
+            site_packages = list(
+                (venv_dir / "lib").glob("python*/site-packages")
+            )
+            has_install = any(
+                any(sp.glob("*.dist-info")) for sp in site_packages
+            )
+            if has_install:
+                return
+            shutil.rmtree(venv_dir, ignore_errors=True)
         venv_dir.parent.mkdir(parents=True, exist_ok=True)
         # Create venv (uv picks a Python automatically).
         subprocess.run(
@@ -184,8 +206,10 @@ class UvVenvBackend:
                 )
                 copied = True
             except subprocess.CalledProcessError:
-                # cp -c can fail on non-APFS volumes; fall through.
-                pass
+                # cp -c can fail on non-APFS volumes; flip the flag off so
+                # we don't pay for a doomed `cp -c` on every subsequent
+                # workspace setup. (CodeRabbit perf catch.)
+                self.prefer_clonefile = False
         if not copied:
             shutil.copytree(repo_dir, ws, symlinks=True)
         # Write the venv marker so run_in_workspace can locate the venv from

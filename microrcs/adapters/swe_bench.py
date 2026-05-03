@@ -46,8 +46,8 @@ def curated_pilot_instances() -> list[str]:
     - Repo clone < 200 MB
 
     These IDs are locked here after live HF verification (see Phase 7 of
-    the implementation plan). To re-curate: run `make swe-curate` (which
-    inspects HF and prints viable candidates), pick 2, replace this list.
+    the implementation plan). To re-curate, follow the workflow in
+    `microrcs/adapters/AGENTS.md` § "Instance curation".
     """
     return [
         # Flask — add file-mode param to Config.from_file (Python 3.11 TOML).
@@ -424,12 +424,17 @@ def load_swe_bench_lite_subset(
 
 
 def _broken_task(instance: SweInstance, error: str) -> m.Task:
-    """Stand-in Task for instances that failed sandbox setup."""
+    """Stand-in Task for instances that failed sandbox setup.
+
+    Verifier signature must match `task.verify(answer)` — the call site in
+    L0Plant.run_episode passes a single argument. (CodeRabbit caught this:
+    a 2-arg lambda would have raised TypeError on first invocation.)
+    """
     return m.Task(
         id=instance.instance_id,
         domain="swe-bench-lite",
         prompt=f"Task setup failed: {error}\n\nReturn an empty submission.",
-        verify=lambda answer, workspace: 0.0,
+        verify=lambda answer: 0.0,
         metadata={
             "swe_repo": instance.repo,
             "swe_setup_error": error,

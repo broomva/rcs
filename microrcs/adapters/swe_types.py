@@ -81,7 +81,15 @@ class SweInstance:
 
         def _as_str_tuple(value: object) -> tuple[str, ...]:
             if isinstance(value, str):
-                parsed = json.loads(value) if value.strip() else []
+                if not value.strip():
+                    parsed = []
+                else:
+                    try:
+                        parsed = json.loads(value)
+                    except json.JSONDecodeError as exc:
+                        raise SweInstanceError(
+                            f"test list value is not valid JSON: {exc.msg}"
+                        ) from exc
             elif isinstance(value, (list, tuple)):
                 parsed = list(value)
             elif value is None:
@@ -171,7 +179,7 @@ class SweScore:
                 f"total={self.pass_to_pass_total}"
             )
         if self.pytest_duration_s < 0:
-            raise ValueError(f"pytest_duration_s must be >= 0")
+            raise ValueError("pytest_duration_s must be >= 0")
 
     @property
     def fully_passed(self) -> bool:

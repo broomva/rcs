@@ -33,7 +33,7 @@ Before committing to BRO-946's full bench (~$240, ~1 week, 20 instances × 4 con
 
 ## Architectural decisions (locked)
 
-1. **Zero edits to `microrcs.py`.** Adapter consumes the existing public surface (`Task`, `Caps`, `Workspace`, `L0Plant`, `EpisodeTrace`, `Reasoner`). Mainline only changes if BRO-946 proper needs a `--suite swe-lite` flag.
+1. **Minimal edits to `microrcs.py`.** Adapter consumes the existing public surface (`Task`, `Caps`, `Workspace`, `L0Plant`, `EpisodeTrace`, `Reasoner`). The smoke surfaced one mainline bug (empty `tool_result` content with `is_error=true` rejected by Anthropic API) which is fixed in this PR — the only mainline change. Future BRO-946 work may need a `--suite swe-lite` flag; out of scope for the smoke.
 2. **Bash-only L0** (mini-swe-agent style). Agent uses `cat`, `sed`, `pytest`, `git diff` via existing `BashAction` + `submit`. No new tools, no `read_file`/`edit_file` surface. Bitter-lesson aligned.
 3. **Three-layer sandbox cache:** immutable RO repo clone + immutable RO venv + COW per-episode workspace via APFS `clonefile()`. Pattern lifted from Flue's MountableFs.
 4. **Pluggable `SandboxBackend` protocol.** One implementation now (`UvVenvBackend`); future Docker / sandbox-exec / Lima / Daytona slots in unchanged.
