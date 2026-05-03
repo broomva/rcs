@@ -40,8 +40,9 @@ The RCS thesis exists in three forms; current evidence by form:
 | **#28 cross-run final** | HARDER × 5 iter × full × Opus L2 + disk-persisted rules | flat ≈ iter1 | ~0.36 (mean across iter) | iter1 0.360 → iter5 0.431 (+0.072) | within-iter σ=0.045, 2σ=0.09 — **NOT significant** | ~$3.4 | 4 high-quality Opus rules accumulated to disk and loaded across iterations. Mechanism works perfectly. **Compounding still doesn't measurably improve pass^k**. |
 | **#31 Sonnet bench** | HARDER × 3 seeds × Sonnet L0/L1 + Opus L2/L3 | **flat** | **0.505 ± 0.010** | full=0.431 (Δ=−0.074) | recursion **significantly HURTS** (3/3 conditions Δ > 2σ_flat=0.020) | $17.78 | first regime where recursion is measurably bad. Tight baseline (σ=0.010) makes effect detectable. Bitter-lesson signal at Sonnet tier. |
 | **#31 Opus bench** | HARDER × 3 seeds × Opus L0/L1 + Opus L2/L3 | **+meta** | **0.495 ± 0.079** | +meta=0.636 (Δ=+0.141), full=0.626 (Δ=+0.131) | recursion **directionally HELPS** but per-seed σ=0.079 makes it inconclusive at n=3 | $63.04 | 3/3 seeds show +meta > flat AND full > flat. **The bitter-lesson reverses at Opus.** +autonomic alone (L1 mode-switching, no L2) ≈ flat. The L2 layer is what helps Opus. |
+| **#32 SWE-bench-Lite smoke** | 2 instances × Haiku × flat × max_steps=50 | n/a (engineering smoke) | n/a (smoke goal: pipeline) | flask=0.0 / pylint=0.0 (both step_budget) | not statistical — pipeline validation only | ~$2 | Pipeline validated end-to-end. Verifier checked against ground-truth patch: score=1.0 on flask-4992 (FAIL_TO_PASS 1/1 + PASS_TO_PASS 10/10). Two real bugs caught + fixed: empty-tool-result API rejection in microrcs.py mainline; test_patch leaking into agent diff in adapter. Cost-per-instance baseline: ~$1 Haiku × flat. **Ready for BRO-946 full bench scoping.** |
 
-Total spend so far: ~$117 across ~5160 episodes (microRCS) + 2160 hours (microgrid).
+Total spend so far: ~$119 across ~5260 episodes (microRCS) + 2160 hours (microgrid).
 
 ## Capacity-tier sweep result (PR #31 / BRO-945)
 
@@ -138,6 +139,92 @@ python3 microrcs.py bench --suite harder --conditions flat,+autonomic,+meta,full
     --n-seeds 3 --base-seed 42 \
     --model-l0-l1 claude-opus-4-7 --model-l2-l3 claude-opus-4-7
 ```
+
+## SWE-bench-Lite smoke result (PR #32 / BRO-946 phase 1)
+
+The capacity sweep (PR #31) tested H1 on single-shot independent reasoning
+tasks. The thesis is fundamentally about long-horizon multi-step recursive
+control — exactly the regime SWE-bench-Lite is built for. Before committing
+to BRO-946's full bench (~$240, ~1 week, 20 instances × 4 conditions × 3
+seeds), PR #32 ships an engineering smoke to validate the pipeline.
+
+### Setup
+
+- 2 hand-curated instances: `pallets__flask-4992`, `pylint-dev__pylint-7080`
+- Both pure-Python, modern (≥2022), pass venv-no-Docker compatibility
+- Haiku × `flat` only × `max_steps=50` × `max_cost_usd=5.0`
+- New module: `microrcs/adapters/{swe_bench,swe_types}.py` + pluggable
+  `SandboxBackend` protocol with one `UvVenvBackend` impl
+- Three-layer cache: `~/.cache/microrcs-swe/{repos,venvs,workspaces}` with
+  APFS `clonefile` for COW per-episode workspaces
+
+### Live smoke results
+
+| Instance | Score | Steps | Cost | Wall | Aborted |
+|---|---|---|---|---|---|
+| `pallets__flask-4992` | 0.0 | 50 | $0.77 | 190s | step_budget |
+| `pylint-dev__pylint-7080` | 0.0 | 50 | $1.25 | 142s | step_budget |
+
+Both instances exhausted their step budget without submitting. **Expected
+for Haiku × flat × 50 steps on real SWE-bench bugs.** The smoke goal was
+pipeline validation, not signal — both instances produced clean verdicts
+through the verifier path.
+
+### Verifier correctness
+
+The verifier was exercised end-to-end against the **ground-truth patch**
+(via `instance.patch`) for `flask-4992`. Result:
+
+```text
+score=1.0
+fail_to_pass_passing=1, fail_to_pass_total=1
+pass_to_pass_passing=10, pass_to_pass_total=10
+pytest_duration_s=0.74
+```
+
+This proves: (1) the pipeline applies a candidate patch to a fresh sibling
+workspace, (2) pytest runs in the per-repo venv with the right Python and
+deps, (3) FAIL_TO_PASS and PASS_TO_PASS counts are extracted correctly,
+(4) the binary scoring rule matches the official SWE-bench convention.
+
+### Bugs found via the smoke (both fixed in PR #32)
+
+1. **`microrcs.py`: empty `tool_result` content with `is_error=true` rejected
+   by Anthropic API.** A bash command producing no stdout/stderr (e.g.
+   `cd somewhere`) was crashing the agent loop after ~30 messages. Fix:
+   substitute `[no stderr / no stdout]` placeholder when `obs` is empty.
+   Affects all microRCS runs, not just SWE-bench.
+
+2. **Adapter: `test_patch` leaking into agent's `git diff HEAD`.** Verifier
+   reads agent edits via `git diff HEAD`, but `test_patch` was applied at
+   setup time without committing — so the diff conflated test setup + agent
+   edits. Applying the combined diff to the verify-sibling workspace (which
+   already has `test_patch` applied) failed. Fix: commit `test_patch` as a
+   new HEAD during setup so subsequent `git diff HEAD` captures only agent
+   changes.
+
+### Implications for BRO-946 full bench
+
+| Parameter | Smoke observation | Full-bench projection |
+|---|---|---|
+| Cost per Haiku × flat × instance | ~$1.00 | ~$1.00/instance × 20 × 1 condition = $20 |
+| Wall per instance | ~3 min agent + ~20s verify (ground-truth) | ~3 min × 20 = ~1h per condition |
+| Step budget hit rate (Haiku × flat) | 2/2 (100%) | suggests Haiku alone can't solve real SWE-bench at flat |
+| Cold-cache setup | ~14s for 2 instances | ~3-5 min for 20 instances first run |
+| Verifier correctness | confirmed against ground-truth | no further calibration needed |
+
+**Projected BRO-946 full bench cost** (20 instances × 4 conditions × 3 seeds):
+- flat × 20 × 3 = 60 episodes × $1 = $60
+- +autonomic / +meta / full × 20 × 3 = 180 episodes; recursion overhead via
+  PR #31 calibration is ~1.5–4× per condition, so ~$90–$180 × 3 conditions
+- **Total: $300–$600 at Haiku** (above the $240 ticket estimate; the ticket
+  underestimated the recursion overhead from the HARDER bench)
+- Sonnet/Opus full benches would be 3×–15× this (proportional to PR #31)
+
+The full bench is feasible. Recommendation: re-scope BRO-946 with the
+observed costs before kicking off, or start with a tighter pilot (5
+instances × 4 conditions × 1 seed at Haiku ≈ $30) to confirm the recursion
+ablation produces a directional signal before the full N=3 seeds run.
 
 ## Cross-run compounding result (PR #28 / final test)
 
