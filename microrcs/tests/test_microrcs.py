@@ -604,6 +604,63 @@ def test_l0_plant_runs_episode_to_submit(tmp_path):
     assert trace.aborted_reason is None
 
 
+def test_l0_plant_eywa_python_hint_appears_in_system_prompt(tmp_path):
+    """When eywa_python_hint=True, the system prompt should include the
+    modality-native compute guidance. Verifies the hint reaches the
+    reasoner via the system message."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(ws.path / ".rcs" / "events.jsonl")
+    captured: dict = {}
+
+    class _CapturingReasoner:
+        def reason(self, req: m.ReasoningRequest) -> m.ReasoningResponse:
+            captured["system"] = req.system
+            return _resp_submit("42")
+
+    plant = m.L0Plant(
+        reasoner=_CapturingReasoner(),
+        workspace=ws, log=log,
+        caps=m.Caps(max_steps=2, max_cost_usd=1.0, model="mock"),
+        eywa_python_hint=True,
+    )
+    task = m.Task(id="t1", domain="math", prompt="x",
+                    verify=lambda a: 1.0)
+    plant.run_episode(task)
+    assert "COMPUTE GUIDANCE" in captured["system"]
+    assert "python -c" in captured["system"]
+
+
+def test_l0_plant_eywa_python_hint_off_by_default(tmp_path):
+    """Without eywa_python_hint, the system prompt should NOT include the
+    modality-native compute block."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(ws.path / ".rcs" / "events.jsonl")
+    captured: dict = {}
+
+    class _CapturingReasoner:
+        def reason(self, req: m.ReasoningRequest) -> m.ReasoningResponse:
+            captured["system"] = req.system
+            return _resp_submit("42")
+
+    plant = m.L0Plant(
+        reasoner=_CapturingReasoner(),
+        workspace=ws, log=log,
+        caps=m.Caps(max_steps=2, max_cost_usd=1.0, model="mock"),
+    )
+    task = m.Task(id="t1", domain="math", prompt="x",
+                    verify=lambda a: 1.0)
+    plant.run_episode(task)
+    assert "COMPUTE GUIDANCE" not in captured["system"]
+
+
+def test_run_config_carries_eywa_python_hint():
+    """RunConfig should default eywa_python_hint=False and accept True."""
+    cfg = m.RunConfig()
+    assert cfg.eywa_python_hint is False
+    cfg2 = m.RunConfig(eywa_python_hint=True)
+    assert cfg2.eywa_python_hint is True
+
+
 def test_l0_plant_repeat_loop_detection(tmp_path):
     ws = m.Workspace.create(tmp_path / "ws", run_id="t")
     log = m.EventLog(ws.path / ".rcs" / "events.jsonl")
@@ -1055,6 +1112,7 @@ def test_l0_system_prompt_does_not_force_memory_by_default(tmp_path):
                                             plant._has_memory_entries()),
         mode_fragment=m._mode_fragment(plant.mode),
         rules_addendum="",
+        eywa_python_block="",
     )
     assert "DOCUMENT AS YOU WORK" not in sys_prompt
     assert "frontmatter" not in sys_prompt.lower()
@@ -1071,6 +1129,7 @@ def test_l0_system_prompt_includes_memory_when_invited(tmp_path):
                                             plant._has_memory_entries()),
         mode_fragment="",
         rules_addendum="",
+        eywa_python_block="",
     )
     assert "MEMORY" in sys_prompt
     assert "frontmatter" in sys_prompt.lower()
@@ -1090,6 +1149,7 @@ def test_l0_system_prompt_includes_memory_when_entries_exist(tmp_path):
                                             plant._has_memory_entries()),
         mode_fragment="",
         rules_addendum="",
+        eywa_python_block="",
     )
     assert "MEMORY" in sys_prompt
     assert "search" in sys_prompt.lower() or "grep" in sys_prompt.lower()
