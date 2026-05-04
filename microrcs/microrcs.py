@@ -1091,8 +1091,26 @@ ENVIRONMENT
 
 TASK
   See the user message.
-{memory_section}{mode_fragment}{rules_addendum}
+{memory_section}{mode_fragment}{rules_addendum}{eywa_python_block}
 Submit your final answer with submit() when done.
+"""
+
+
+# Eywa-style modality-native compute hint. Tells the agent to offload arithmetic
+# and structured computation to Python via bash, instead of reasoning in tokens.
+# Per the Eywa paper (arXiv:2604.27351): language-only L0 fundamentally limits
+# applicability to non-linguistic data; the cure is modality-native compute with
+# language as glue. For microRCS, bash → python is the degenerate "Tsaheylu bond".
+EYWA_PYTHON_HINT = """
+COMPUTE GUIDANCE (modality-native)
+  For ANY arithmetic, time math, list manipulation, or structured computation,
+  call `bash` with `python -c '<expression>'` rather than reasoning in tokens.
+  Examples:
+    bash: python -c 'print(7 * 8)'
+    bash: python3 -c "from datetime import timedelta, time; t = time(9,47); print(t)"
+    bash: python -c 'import math; print(math.sqrt(2))'
+  Do NOT compute multi-digit arithmetic in your head — call python. Reasoning
+  in plain text is for planning, not for computing.
 """
 
 
@@ -1132,12 +1150,18 @@ class L0Plant:
         mode: AgentMode | None = None,
         system_rules: list[str] | None = None,
         memory_invitation: bool = False,
+        eywa_python_hint: bool = False,
     ):
         self.reasoner = reasoner
         self.workspace = workspace
         self.log = log
         self.caps = caps
         self.mode = mode or AgentMode.BASE
+        # Eywa-style modality-native compute hint: when True, the system prompt
+        # nudges the agent to offload arithmetic to `python -c` via bash. Tests
+        # the hypothesis that math/computation failures are a modality mismatch
+        # rather than a reasoning failure (arXiv:2604.27351).
+        self.eywa_python_hint = eywa_python_hint
         # Cross-run compounding: load any persisted rules from prior runs.
         # If `system_rules` is provided explicitly (e.g. by shadow-eval), use
         # those AS-IS. Otherwise, load from `memory/system_rules.jsonl` if it
@@ -1206,6 +1230,7 @@ class L0Plant:
             memory_section=_memory_section(self.memory_invitation, self._has_memory_entries()),
             mode_fragment=_mode_fragment(self.mode),
             rules_addendum=rules,
+            eywa_python_block=EYWA_PYTHON_HINT if self.eywa_python_hint else "",
         )
 
         messages: list[dict] = [{"role": "user", "content": task.prompt}]
@@ -1843,6 +1868,11 @@ def make_shadow_eval_hook(
             workspace=shadow_ws, log=shadow_log,
             caps=shadow_caps, system_rules=shadow_rules,
             memory_invitation=plant_template.memory_invitation,
+            # CodeRabbit catch: live & shadow plants must share the
+            # modality-hint state, otherwise L2 evaluates rule candidates
+            # under a different system prompt than the live agent uses,
+            # producing incorrect accept/veto decisions.
+            eywa_python_hint=plant_template.eywa_python_hint,
         )
 
         shadow_passes = 0
@@ -2621,6 +2651,11 @@ class RunConfig:
     # before commit. The bad-mutation injection that hurt PR #22's `full`
     # condition is exactly what this prevents.
     shadow_eval: ShadowEvalConfig = field(default_factory=ShadowEvalConfig)
+    # Eywa-style modality hint: when True, the L0 system prompt nudges the
+    # agent to offload arithmetic/structured-compute to `python -c` via bash.
+    # Tests Eywa's claim (arXiv:2604.27351) that math/computation failures
+    # are modality mismatches rather than reasoning failures.
+    eywa_python_hint: bool = False
 
 
 @dataclass
@@ -2683,6 +2718,7 @@ def run(
             Caps(max_steps=cfg.max_steps_per_episode,
                  max_cost_usd=cfg.max_cost_usd_per_episode,
                  model=cfg.model_l0_l1),
+            eywa_python_hint=cfg.eywa_python_hint,
         )
         l1 = L1Autonomic(l1_reasoner, log, HysteresisThreshold(0.2, 0.6)) \
             if l1_reasoner is not None else None
@@ -3283,6 +3319,8 @@ def cli_run(args: argparse.Namespace) -> int:
     model_l2 = getattr(args, "model_l2_l3", None)
     if model_l2:
         cfg = replace(cfg, model_l2_l3=model_l2)
+    if getattr(args, "eywa_python", False):
+        cfg = replace(cfg, eywa_python_hint=True)
     out = getattr(args, "out", Path("reports"))
     conditions = ("flat", "+autonomic", "+meta", "full")
     if args.quick:
@@ -3547,6 +3585,13 @@ def main() -> int:
     p_run.add_argument(
         "--model-l2-l3", default=None,
         help="Override model used at L2/L3 (default: claude-sonnet-4-6)",
+    )
+    p_run.add_argument(
+        "--eywa-python", action="store_true",
+        help="Eywa-style modality hint: nudge the agent to offload arithmetic "
+             "and structured compute to `python -c` via bash. Tests the "
+             "hypothesis that math/compute failures are modality mismatch "
+             "rather than reasoning failure (arXiv:2604.27351).",
     )
 
     p_xrun = sub.add_parser(
