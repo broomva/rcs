@@ -42,8 +42,10 @@ The RCS thesis exists in three forms; current evidence by form:
 | **#31 Opus bench** | HARDER × 3 seeds × Opus L0/L1 + Opus L2/L3 | **+meta** | **0.495 ± 0.079** | +meta=0.636 (Δ=+0.141), full=0.626 (Δ=+0.131) | recursion **directionally HELPS** but per-seed σ=0.079 makes it inconclusive at n=3 | $63.04 | 3/3 seeds show +meta > flat AND full > flat. **The bitter-lesson reverses at Opus.** +autonomic alone (L1 mode-switching, no L2) ≈ flat. The L2 layer is what helps Opus. |
 | **#32 SWE-bench-Lite smoke** | 2 instances × Haiku × flat × max_steps=50 | n/a (engineering smoke) | n/a (smoke goal: pipeline) | flask=0.0 / pylint=0.0 (both step_budget) | not statistical — pipeline validation only | ~$2 | Pipeline validated end-to-end. Verifier checked against ground-truth patch: score=1.0 on flask-4992 (FAIL_TO_PASS 1/1 + PASS_TO_PASS 10/10). Two real bugs caught + fixed: empty-tool-result API rejection in microrcs.py mainline; test_patch leaking into agent diff in adapter. Cost-per-instance baseline: ~$1 Haiku × flat. **Ready for BRO-946 full bench scoping.** |
 | **#34 SWE-bench-Lite pilot** | 4 instances × 4 conditions × 1 seed × Haiku L0/L1 + Sonnet L2/L3 × max_steps=50 | none (all 0.000) | flat=0.000 | all conditions = 0.000 | recursion overhead negligible (~$0.50/condition); recursion benefit also zero — **L0 capacity is the binding constraint** | $13.46 | Pilot confirms smoke: Haiku × 50 steps below the SWE-bench floor. All 16 episodes step-budget abort or no_action abort. Recursion wraps a flat that scores 0/4 → still 0/4. The recursion question is NOT testable in this regime. To probe H1 productively on SWE-bench, need either (a) higher tier (Sonnet/Opus L0), (b) higher max_steps (≥100), or (c) easier instances (SWE-bench Verified subset). |
+| **Path 1: Haiku × max_steps=150 SWE** | 4 instances × 4 conditions × 1 seed × Haiku L0/L1 + Sonnet L2/L3 × max_steps=150 | flat ≈ full | flat=0.250, full=0.250 | +autonomic=0.000 (Δ=−0.25), +meta=0.000 (Δ=−0.25), full=0.250 (Δ=0.00) | step-budget bump unlocked one solve; recursion at L1-only and L1+L2 LOSES the solve, full re-finds it | $24.36 (Path 1 only) | First non-zero SWE-bench result. `psf__requests-3362` solved by flat AND full but NOT +autonomic / +meta. Could be real "L1 mode-switch noise breaks the solve, L3 governance recovers" OR per-instance variance at n=1 paired (only 1 of 4 instances solvable). Need ≥3 seeds to disambiguate. |
+| **Path 2: Sonnet × max_steps=50 SWE** | 4 instances × 4 conditions × 1 seed × Sonnet L0/L1 + Opus L2/L3 × max_steps=50 | flat partial only | n/a (incomplete) | invalid (credit balance + connectivity) | inconclusive — API credits ran out mid-flat condition, all recursion conditions aborted on the next call | ~$3 | flat got 2/4 instances run (flask: 0.00 in 10 steps, pylint: 0.00 in 43 steps); requests-3362 + sphinx not run; +autonomic/+meta/full all aborted with API errors. **Re-run pending budget refresh.** |
 
-Total spend so far: ~$132 across ~5276 episodes (microRCS) + 2160 hours (microgrid).
+Total spend so far: ~$159 across ~5300 episodes (microRCS) + 2160 hours (microgrid).
 
 ## Capacity-tier sweep result (PR #31 / BRO-945)
 
@@ -226,6 +228,99 @@ The full bench is feasible. Recommendation: re-scope BRO-946 with the
 observed costs before kicking off, or start with a tighter pilot (5
 instances × 4 conditions × 1 seed at Haiku ≈ $30) to confirm the recursion
 ablation produces a directional signal before the full N=3 seeds run.
+
+## Step-budget step-up + Sonnet attempt (BRO-946 phase 3 — partial)
+
+After PR #34's pilot showed Haiku × max_steps=50 below the floor, this phase
+tested two separate hypotheses in parallel: (a) step-up to max_steps=150 at
+Haiku (Path 1), and (b) tier-up to Sonnet at max_steps=50 (Path 2). A
+parallel agent simultaneously scaffolded the BRO-947 `life-perturb` Rust
+crate (life PR #1088) — the only path to closing the construct-validity
+gap with the paper.
+
+### Path 1: Haiku × max_steps=150 — first non-zero SWE-bench result
+
+| Condition | pass^1 | Cost | Notes |
+|---|---|---|---|
+| flat | **0.250** (1/4) | $6.08 | `psf__requests-3362` solved in 83 steps |
+| +autonomic | 0.000 (0/4) | $5.19 | Lost the solve flat had |
+| +meta | 0.000 (0/4) | $6.21 | Lost the solve too; L2 → NoOp (shadow eval gated) |
+| full | **0.250** (1/4) | $6.88 | Re-found the solve in 54 steps (faster than flat) |
+
+**Headline**: Per-condition Δ vs flat = [−0.25, −0.25, 0.00] for [+autonomic,
++meta, full]. **Recursion at intermediate stacks (L1-only, L1+L2) hurts;
+full stack matches flat.** The "U-shape" is striking but n=1 paired observation
+per condition can't distinguish signal from per-instance variance.
+
+Cost: $24.36 (initial $11.28 + retry $13.09 because the first attempt's
++meta/full died on a transient API connection error).
+
+#### What's confirmed by Path 1
+
+- The PR #34 pilot null was a step-budget artifact, not a hard floor.
+  Haiku CAN solve some SWE-bench-Lite instances given enough bash room.
+- Step budget more than tripled (50 → 150) to unlock 1 solve out of 4.
+  Marginal returns from more steps are real but limited at Haiku tier.
+- The recursion overhead pattern from PR #34 holds: ~$5–$7 per condition,
+  spread is small relative to total cost.
+
+#### What's NOT confirmed (small-N caveats)
+
+- The flat-and-full-but-not-recursion-middle pattern at n=1 paired could
+  be: (a) real "L1 mode-switch noise + L3 recovery" dynamics, (b) random
+  task-level variance (only requests-3362 is solvable in this configuration
+  for Haiku), or (c) noise from temperature=1.0 sampling.
+- A faithful test needs ≥3 seeds × the same 4 instances. Cost projection:
+  ~3× this run = ~$70 at Haiku × 150 steps.
+
+### Path 2: Sonnet × max_steps=50 — INCOMPLETE (credit exhaustion)
+
+The Anthropic API credit balance ran out mid-`flat` condition:
+
+| Condition | Status | Notes |
+|---|---|---|
+| flat | partial (2/4 episodes ran) | flask=0.00 (10 steps), pylint=0.00 (43 steps), then credit error |
+| +autonomic | invalid | API connection errors on all 4 episodes |
+| +meta | invalid | API connection errors on all 4 episodes |
+| full | invalid | API connection errors on all 4 episodes |
+
+Total Path 2 spend: $3.19 (essentially wasted). **Path 2 needs full re-run
+once credits refresh.**
+
+### Parallel workstream: BRO-947 life-perturb scaffold (life PR #1088)
+
+While the live runs were executing, a worktree-isolated agent scaffolded
+the `life-perturb` Rust crate. Deliverables:
+
+- 340-line design spec at `core/life/docs/superpowers/specs/2026-05-04-life-perturb-design.md`
+- New crate at `core/life/crates/life-perturb/` with: `Cargo.toml`, public
+  trait surface (`Perturbation`, `Injector`, `LambdaEstimator`), data
+  structs, error types, smoke test
+- 12/12 unit tests pass; `cargo check`, `cargo clippy --tests -- -D warnings`,
+  full workspace check all green
+- Bonus: working OLS log-linear `fit_recovery` (recovers λ=0.5 from synthetic
+  exp(−0.5·t) trace to <1e-6) — not just a stub
+- Linear comment posted on BRO-947 (id `2aa9d347-7b66-48ac-8553-4328e5693268`)
+
+Implementation phasing per the spec:
+- v0.1: sandbox-only L0 + L1 + L2 perturbations (1 week impl)
+- v0.5: single-level closed-loop validation (~3 weeks)
+- v1.0: all 4 levels + cross-validation against paper analytic λᵢ (~3 months)
+
+The crate compiles + tests cleanly. The next agent can pick up v0.1
+implementation cleanly with the spec and trait surface as guide.
+
+### Open follow-ups
+
+1. **Path 2 full re-run** at Sonnet × max_steps=50 once credit refreshed
+   (~$50, ~2h). Tests whether the PR #31 Sonnet "recursion hurts" pattern
+   replicates on SWE-bench long-horizon.
+2. **Path 1 N=3 seeds** at Haiku × max_steps=150 to disambiguate the
+   "+autonomic loses solve, full recovers" pattern from per-instance
+   variance (~$70, ~3h).
+3. **BRO-947 v0.1 implementation** — first level (L0) of perturbation
+   injection on the autonomic daemon. Spec + scaffold ready in life
+   PR #1088.
 
 ## SWE-bench-Lite pilot result (PR #34 / BRO-946 phase 2)
 
