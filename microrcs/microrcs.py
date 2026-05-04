@@ -270,11 +270,249 @@ class OpenAIReasoner:
 
 
 class OllamaReasoner:
-    def __init__(self, **kwargs: Any) -> None:
-        self._kwargs = kwargs
+    """Ollama implementation of the Reasoner Protocol.
+
+    Translates microRCS's Anthropic-shape `ReasoningRequest` into Ollama's
+    chat API (`POST http://<host>:<port>/api/chat`) and back. Supports tool
+    calls (mapping our `bash` + `submit` definitions to Ollama's tool schema)
+    and tool-result messages. No cost tracking — local inference is free; the
+    pricing-table prefix-match returns (0,0,0,0) for unknown model strings.
+
+    The model must be one Ollama exposes with the `tools` capability, or the
+    agent loop will get raw text instead of tool calls and abort with
+    `no_action`. Verify via `curl http://<host>/api/show -d '{"name":"<m>"}'`.
+
+    Args (kwargs):
+      default_model: Ollama model tag (e.g., "gemma4:latest").
+      base_url: defaults to env OLLAMA_HOST or "http://localhost:11434".
+      max_retries: transient-failure retries (default 2; local rarely needs more).
+      retry_base_seconds: exponential-backoff base (default 0.5).
+      timeout_seconds: per-request HTTP timeout (default 600 for slow models).
+    """
+
+    def __init__(
+        self,
+        default_model: str = "gemma4:latest",
+        base_url: str | None = None,
+        max_retries: int = 2,
+        retry_base_seconds: float = 0.5,
+        timeout_seconds: float = 600.0,
+        max_num_predict: int = 1024,
+        **_: Any,
+    ):
+        self.default_model = default_model
+        self.base_url = (
+            base_url or os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        ).rstrip("/")
+        self.max_retries = max_retries
+        self.retry_base = retry_base_seconds
+        self.timeout = timeout_seconds
+        self.max_num_predict = max_num_predict
+
+    # ---- public Reasoner Protocol method --------------------------------
 
     def reason(self, req: ReasoningRequest) -> ReasoningResponse:
-        raise NotImplementedError("OllamaReasoner is a V1 stub.")
+        payload = self._build_payload(req)
+        url = f"{self.base_url}/api/chat"
+        t0 = time.perf_counter()
+        last_exc: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                raw = self._http_post(url, payload)
+                latency_ms = (time.perf_counter() - t0) * 1000.0
+                return self._parse_response(raw, req.model or self.default_model, latency_ms)
+            except (TransientError, ConnectionError, TimeoutError) as exc:
+                last_exc = exc
+                if attempt < self.max_retries:
+                    sleep_s = self.retry_base * (2 ** attempt) + random.random() * 0.1
+                    time.sleep(sleep_s)
+                    continue
+                raise
+        # Unreachable but keeps mypy happy.
+        raise last_exc if last_exc else TransientError("ollama: unknown failure")
+
+    # ---- request translation -------------------------------------------
+
+    def _build_payload(self, req: ReasoningRequest) -> dict:
+        messages: list[dict] = []
+        if req.system:
+            messages.append({"role": "system", "content": req.system})
+        for m in req.messages:
+            messages.extend(self._convert_message(m))
+        # Strip an `ollama:` prefix if the request model carries one (the
+        # `make_reasoner` factory stores the full provider-prefixed string,
+        # which Ollama itself rejects as "invalid model name").
+        model = req.model or self.default_model
+        if model.startswith("ollama:"):
+            model = model.split(":", 1)[1]
+        # Cap num_predict for local models. Anthropic's default of 4096 lets
+        # smaller local models (gemma4-8B, qwen2.5-7b) ramble in plain text
+        # before emitting tool calls. 1024 is plenty for a single agent step
+        # and stops "thinking out loud" runaway. Override via `max_num_predict`
+        # constructor arg if a stronger model needs more.
+        num_predict = min(req.max_tokens, self.max_num_predict)
+        payload: dict = {
+            "model": model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": req.temperature,
+                "num_predict": num_predict,
+            },
+        }
+        if req.tools:
+            payload["tools"] = [self._convert_tool(t) for t in req.tools]
+        return payload
+
+    def _convert_tool(self, tool: ToolDef) -> dict:
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.input_schema,
+            },
+        }
+
+    def _convert_message(self, m: Message) -> list[dict]:
+        """Render a microRCS Message as 1+ Ollama messages.
+
+        Anthropic puts tool_use blocks in assistant content and tool_result
+        blocks in user content. Ollama uses a separate `tool` role for
+        results and an assistant message with `tool_calls` for calls. So
+        one Anthropic message can map to several Ollama messages.
+        """
+        if isinstance(m.content, str):
+            return [{"role": m.role, "content": m.content}]
+        if not isinstance(m.content, list):
+            return [{"role": m.role, "content": str(m.content)}]
+        # Mixed-block content. Walk and emit per-block.
+        if m.role == "assistant":
+            text_parts: list[str] = []
+            tool_calls: list[dict] = []
+            for block in m.content:
+                if not isinstance(block, dict):
+                    continue
+                btype = block.get("type")
+                if btype == "text":
+                    text_parts.append(block.get("text", ""))
+                elif btype == "tool_use":
+                    tool_calls.append({
+                        "id": block.get("id", ""),
+                        "type": "function",
+                        "function": {
+                            "name": block.get("name", ""),
+                            "arguments": block.get("input", {}),
+                        },
+                    })
+                # `thinking` blocks are dropped — Ollama doesn't surface them.
+            msg: dict = {"role": "assistant", "content": "".join(text_parts)}
+            if tool_calls:
+                msg["tool_calls"] = tool_calls
+            return [msg]
+        # role == "user": tool_result blocks become role=tool messages.
+        out: list[dict] = []
+        text_parts = []
+        for block in m.content:
+            if not isinstance(block, dict):
+                continue
+            btype = block.get("type")
+            if btype == "text":
+                text_parts.append(block.get("text", ""))
+            elif btype == "tool_result":
+                content = block.get("content", "")
+                if isinstance(content, list):
+                    # Nested blocks inside a tool_result. Flatten.
+                    content = "\n".join(
+                        b.get("text", "") if isinstance(b, dict) else str(b)
+                        for b in content
+                    )
+                out.append({
+                    "role": "tool",
+                    "content": str(content),
+                    "tool_call_id": block.get("tool_use_id", ""),
+                })
+        if text_parts:
+            out.insert(0, {"role": "user", "content": "".join(text_parts)})
+        return out or [{"role": "user", "content": ""}]
+
+    # ---- response parsing ----------------------------------------------
+
+    def _parse_response(
+        self, raw: dict, model: str, latency_ms: float
+    ) -> ReasoningResponse:
+        msg = raw.get("message", {}) or {}
+        text = msg.get("content", "") or ""
+        tool_calls_raw = msg.get("tool_calls", []) or []
+        tool_calls = []
+        for tc in tool_calls_raw:
+            fn = tc.get("function", {}) or {}
+            args = fn.get("arguments", {})
+            if isinstance(args, str):
+                # Some models stringify; try to parse.
+                try:
+                    args = json.loads(args)
+                except (json.JSONDecodeError, TypeError):
+                    args = {"_raw": args}
+            tool_calls.append(ToolCall(
+                id=str(tc.get("id") or f"call_{new_event_id()[:8]}"),
+                name=str(fn.get("name", "")),
+                arguments=args if isinstance(args, dict) else {"_raw": args},
+            ))
+        usage = TokenUsage(
+            input=int(raw.get("prompt_eval_count") or 0),
+            output=int(raw.get("eval_count") or 0),
+            cache_read=0,
+            cache_create=0,
+        )
+        # Ollama "done_reason" is "stop" | "length" | etc. Map to Anthropic-ish.
+        done_reason = raw.get("done_reason") or ("end_turn" if raw.get("done") else "")
+        stop_reason = {
+            "stop": "end_turn",
+            "length": "max_tokens",
+        }.get(done_reason, done_reason or "end_turn")
+        # If we got tool calls, override stop_reason (Anthropic uses "tool_use").
+        if tool_calls:
+            stop_reason = "tool_use"
+        return ReasoningResponse(
+            text=text,
+            tool_calls=tuple(tool_calls),
+            thinking="",  # Ollama "thinking" capability is model-specific; not exposed here.
+            stop_reason=stop_reason,
+            usage=usage,
+            latency_ms=latency_ms,
+            model=model,
+            raw=raw,
+        )
+
+    # ---- HTTP -----------------------------------------------------------
+
+    def _http_post(self, url: str, payload: dict) -> dict:
+        """POST JSON to Ollama. Uses stdlib urllib to avoid extra deps."""
+        from urllib import error, request
+
+        body = json.dumps(payload).encode("utf-8")
+        req = request.Request(
+            url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=self.timeout) as resp:
+                raw = resp.read().decode("utf-8")
+        except error.HTTPError as exc:
+            # Ollama returns 4xx for missing model, malformed payload, etc.
+            detail = exc.read().decode("utf-8", errors="replace")[:500]
+            if 500 <= exc.code < 600:
+                raise TransientError(f"ollama 5xx {exc.code}: {detail}") from exc
+            raise ReasoningError(f"ollama {exc.code}: {detail}") from exc
+        except (error.URLError, ConnectionError, TimeoutError) as exc:
+            raise TransientError(f"ollama transport: {exc}") from exc
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ReasoningError(f"ollama: bad JSON: {raw[:300]}") from exc
 
 
 def make_reasoner(model: str, **kwargs: Any) -> Reasoner:
