@@ -158,10 +158,182 @@ def test_openai_reasoner_stub_raises():
         r.reason(m.ReasoningRequest(messages=(m.Message("user", "x"),)))
 
 
-def test_ollama_reasoner_stub_raises():
-    r = m.OllamaReasoner(default_model="llama3")
-    with pytest.raises(NotImplementedError):
-        r.reason(m.ReasoningRequest(messages=(m.Message("user", "x"),)))
+# --- OllamaReasoner unit tests (mocked HTTP, no live calls) ----------------
+
+
+def _mock_ollama_response(message: dict, **fields) -> dict:
+    """Build a canonical Ollama /api/chat response dict."""
+    return {
+        "model": "gemma4:latest",
+        "message": message,
+        "done": True,
+        "done_reason": "stop",
+        "prompt_eval_count": 42,
+        "eval_count": 7,
+        **fields,
+    }
+
+
+def test_ollama_reasoner_translates_request_and_response(monkeypatch):
+    """End-to-end: request shape → HTTP body, response → ReasoningResponse."""
+    captured = {}
+
+    def fake_post(self, url, payload):
+        captured["url"] = url
+        captured["payload"] = payload
+        return _mock_ollama_response(
+            {"role": "assistant", "content": "hello world", "tool_calls": []}
+        )
+
+    monkeypatch.setattr(m.OllamaReasoner, "_http_post", fake_post)
+    r = m.OllamaReasoner(default_model="gemma4:latest")
+    resp = r.reason(m.ReasoningRequest(
+        messages=(m.Message("user", "hi"),),
+        system="be terse",
+        model="gemma4:latest",
+    ))
+    # URL points at /api/chat
+    assert captured["url"].endswith("/api/chat")
+    # System prompt becomes a system message
+    msgs = captured["payload"]["messages"]
+    assert msgs[0] == {"role": "system", "content": "be terse"}
+    assert msgs[1] == {"role": "user", "content": "hi"}
+    # Response parsed correctly
+    assert resp.text == "hello world"
+    assert resp.tool_calls == ()
+    assert resp.usage.input == 42
+    assert resp.usage.output == 7
+    assert resp.stop_reason == "end_turn"
+    # Local cost is $0
+    assert resp.usage.cost_usd("gemma4:latest") == 0.0
+
+
+def test_ollama_reasoner_parses_tool_calls(monkeypatch):
+    def fake_post(self, url, payload):
+        return _mock_ollama_response({
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{
+                "id": "call_xyz",
+                "function": {"name": "bash", "arguments": {"command": "echo hi"}},
+            }],
+        })
+
+    monkeypatch.setattr(m.OllamaReasoner, "_http_post", fake_post)
+    r = m.OllamaReasoner()
+    resp = r.reason(m.ReasoningRequest(
+        messages=(m.Message("user", "echo hi"),),
+        tools=(m.ToolDef(name="bash", description="run shell",
+                         input_schema={"type": "object",
+                                       "properties": {"command": {"type": "string"}}}),),
+    ))
+    assert len(resp.tool_calls) == 1
+    tc = resp.tool_calls[0]
+    assert tc.name == "bash"
+    assert tc.arguments == {"command": "echo hi"}
+    assert tc.id == "call_xyz"
+    # Tool calls override stop_reason
+    assert resp.stop_reason == "tool_use"
+
+
+def test_ollama_reasoner_parses_stringified_tool_args(monkeypatch):
+    """Some Ollama models stringify the arguments dict — we should parse it."""
+    def fake_post(self, url, payload):
+        return _mock_ollama_response({
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [{
+                "id": "call_1",
+                "function": {"name": "bash",
+                             "arguments": '{"command": "ls"}'},
+            }],
+        })
+
+    monkeypatch.setattr(m.OllamaReasoner, "_http_post", fake_post)
+    r = m.OllamaReasoner()
+    resp = r.reason(m.ReasoningRequest(messages=(m.Message("user", "x"),)))
+    assert resp.tool_calls[0].arguments == {"command": "ls"}
+
+
+def test_ollama_reasoner_translates_tool_result_to_tool_role(monkeypatch):
+    """Anthropic-shape tool_result blocks → Ollama role=tool messages."""
+    captured = {}
+
+    def fake_post(self, url, payload):
+        captured["payload"] = payload
+        return _mock_ollama_response(
+            {"role": "assistant", "content": "ok", "tool_calls": []}
+        )
+
+    monkeypatch.setattr(m.OllamaReasoner, "_http_post", fake_post)
+    r = m.OllamaReasoner()
+    # Build a conversation that includes an assistant tool_use + a user tool_result.
+    r.reason(m.ReasoningRequest(messages=(
+        m.Message("user", "list files"),
+        m.Message("assistant", [
+            {"type": "text", "text": "running"},
+            {"type": "tool_use", "id": "call_1", "name": "bash",
+             "input": {"command": "ls"}},
+        ]),
+        m.Message("user", [
+            {"type": "tool_result", "tool_use_id": "call_1", "content": "a.txt\nb.txt"},
+        ]),
+    )))
+    msgs = captured["payload"]["messages"]
+    # Should have: user(list files), assistant(running + tool_call), tool(result)
+    assert msgs[0]["role"] == "user"
+    assistant_msg = msgs[1]
+    assert assistant_msg["role"] == "assistant"
+    assert assistant_msg["content"] == "running"
+    assert assistant_msg["tool_calls"][0]["function"]["name"] == "bash"
+    tool_msg = msgs[2]
+    assert tool_msg["role"] == "tool"
+    assert tool_msg["content"] == "a.txt\nb.txt"
+    assert tool_msg["tool_call_id"] == "call_1"
+
+
+def test_ollama_reasoner_retries_on_transient(monkeypatch):
+    calls = {"n": 0}
+
+    def fake_post(self, url, payload):
+        calls["n"] += 1
+        if calls["n"] < 2:
+            raise m.TransientError("503 try again")
+        return _mock_ollama_response(
+            {"role": "assistant", "content": "ok", "tool_calls": []}
+        )
+
+    monkeypatch.setattr(m.OllamaReasoner, "_http_post", fake_post)
+    monkeypatch.setattr(m.time, "sleep", lambda _: None)  # don't actually sleep
+    r = m.OllamaReasoner(max_retries=2, retry_base_seconds=0.0)
+    resp = r.reason(m.ReasoningRequest(messages=(m.Message("user", "x"),)))
+    assert calls["n"] == 2
+    assert resp.text == "ok"
+
+
+def test_ollama_reasoner_translates_tool_to_function_schema(monkeypatch):
+    """ToolDef should be wrapped in `{"type": "function", "function": {...}}`."""
+    captured = {}
+
+    def fake_post(self, url, payload):
+        captured["payload"] = payload
+        return _mock_ollama_response(
+            {"role": "assistant", "content": "", "tool_calls": []}
+        )
+
+    monkeypatch.setattr(m.OllamaReasoner, "_http_post", fake_post)
+    r = m.OllamaReasoner()
+    r.reason(m.ReasoningRequest(
+        messages=(m.Message("user", "x"),),
+        tools=(m.ToolDef(name="submit", description="submit answer",
+                         input_schema={"type": "object",
+                                       "properties": {"answer": {"type": "string"}}}),),
+    ))
+    tools = captured["payload"]["tools"]
+    assert len(tools) == 1
+    assert tools[0]["type"] == "function"
+    assert tools[0]["function"]["name"] == "submit"
+    assert tools[0]["function"]["parameters"]["properties"]["answer"] is not None
 
 
 # =====================================================================
