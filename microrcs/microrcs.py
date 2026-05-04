@@ -1868,6 +1868,11 @@ def make_shadow_eval_hook(
             workspace=shadow_ws, log=shadow_log,
             caps=shadow_caps, system_rules=shadow_rules,
             memory_invitation=plant_template.memory_invitation,
+            # CodeRabbit catch: live & shadow plants must share the
+            # modality-hint state, otherwise L2 evaluates rule candidates
+            # under a different system prompt than the live agent uses,
+            # producing incorrect accept/veto decisions.
+            eywa_python_hint=plant_template.eywa_python_hint,
         )
 
         shadow_passes = 0

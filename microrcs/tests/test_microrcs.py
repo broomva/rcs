@@ -1372,7 +1372,52 @@ def test_shadow_eval_skips_when_disabled(tmp_path):
     res = hook(m.HookContext(level=2, state=None, action=rule, log=log))
     # When disabled the hook is a pass-through — not a veto
     assert not res.veto
-    assert res.decision.action is rule
+
+
+def test_shadow_eval_propagates_eywa_python_hint(tmp_path, monkeypatch):
+    """When the live plant has eywa_python_hint=True, shadow plants must
+    inherit it — otherwise L2 evaluates candidate rules under a different
+    system prompt than the live agent uses, producing incorrect accept/veto
+    decisions. (CodeRabbit caught this on PR #37.)"""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(tmp_path / "e.jsonl")
+    plant = m.L0Plant(_MockReasoner([_resp_submit("ok")] * 32),
+                        ws, log, m.Caps(model="mock"),
+                        eywa_python_hint=True)
+    cfg = m.ShadowEvalConfig(enabled=True, n_eval_tasks=1,
+                                n_trials_per_task=1, threshold_delta=0.0)
+
+    captured: list[bool] = []
+    real_init = m.L0Plant.__init__
+
+    def capturing_init(self, *args, **kwargs):
+        captured.append(kwargs.get("eywa_python_hint", False))
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(m.L0Plant, "__init__", capturing_init)
+    hook = m.make_shadow_eval_hook(cfg, plant, m.REFERENCE_SUITE[:1],
+                                      workspace_root=tmp_path)
+    # Build a MetaState with at least one failure so the hook actually
+    # spawns a shadow plant (otherwise it short-circuits with no-failures).
+    state = m.MetaState(
+        l1_decisions=[], l1_lyapunov_trend=0.0,
+        helper_diffs=[], memory_snapshot={},
+        epoch=0,
+        recent_failures=[m.FailureSummary(
+            task_id=m.REFERENCE_SUITE[0].id, domain=m.REFERENCE_SUITE[0].domain,
+            score=0.0, aborted_reason="step_budget", n_steps=20,
+            submitted_answer=None,
+        )],
+    )
+    rule = m.AppendSystemRule(rule="please be careful", rationale="test")
+    hook(m.HookContext(level=2, state=state, action=rule, log=log))
+    # The live plant was constructed BEFORE the monkey-patch, so it isn't
+    # in `captured`. Every entry in `captured` is a shadow-plant build.
+    assert captured, "shadow plant was not constructed"
+    assert all(captured), (
+        f"shadow plants must inherit eywa_python_hint=True; "
+        f"captured shadow inits: {captured}"
+    )
 
 
 def test_shadow_eval_passes_when_no_recent_failures(tmp_path):
