@@ -2039,6 +2039,211 @@ def test_compounding_round_trip(tmp_path):
         "Cross-run compounding: rule promoted in run 1 must be loaded in run 2"
 
 
+# =====================================================================
+# Stigmergic primitives on system_rules.jsonl (PR #43 Tier 1-C)
+# =====================================================================
+def test_stigmergy_default_behavior_unchanged(tmp_path):
+    """Defaults (decay=1.0, min_strength=0.0) must preserve legacy semantics:
+    rules are loaded as strings exactly as before, and rewriting the file
+    isn't triggered until decay is explicitly opted in."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1", persist=False)
+    rules_path = ws.path / "memory" / "system_rules.jsonl"
+    rules_path.parent.mkdir(parents=True, exist_ok=True)
+    # Pre-stigmergy record (no strength field) — must canonicalize to alive.
+    rules_path.write_text('{"rule": "legacy rule", "rationale": "r"}\n')
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                      m.EventLog(tmp_path / "e.jsonl"),
+                      m.Caps(model="mock"))
+    assert plant.system_rules == ["legacy rule"]
+    assert plant.stigmergy_decay_factor == 1.0
+    assert plant.stigmergy_min_strength == 0.0
+
+
+def test_stigmergy_persist_writes_full_schema(tmp_path):
+    """A freshly persisted rule carries every stigmergy field."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                      m.EventLog(tmp_path / "e.jsonl"),
+                      m.Caps(model="mock"))
+    plant.current_episode = 7
+    plant.persist_system_rule("rule X", rationale="why",
+                              peer_id="peer_2",
+                              ttl_episodes=10,
+                              signal_type="warning")
+    rec = json.loads((ws.path / "memory" / "system_rules.jsonl")
+                     .read_text().strip())
+    assert rec["rule"] == "rule X"
+    assert rec["strength"] == 1.0
+    assert rec["peer_id"] == "peer_2"
+    assert rec["deposited_at_episode"] == 7
+    assert rec["ttl_episodes"] == 10
+    assert rec["reinforcement_count"] == 0
+    assert rec["signal_type"] == "warning"
+    assert rec["schema_version"] == m.STIGMERGY_SCHEMA_VERSION
+
+
+def test_stigmergy_reinforcement_resets_strength(tmp_path):
+    """Persisting the same rule text twice increments reinforcement_count
+    and re-anchors strength to 1.0 (Grassé-style positive feedback)."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                      m.EventLog(tmp_path / "e.jsonl"),
+                      m.Caps(model="mock"),
+                      stigmergy_decay_factor=0.5)
+    plant.current_episode = 0
+    plant.persist_system_rule("R", rationale="first")
+    plant.decay_system_rules()  # strength → 0.5
+    records = plant._read_rule_records()
+    assert records[0]["strength"] == 0.5
+    plant.current_episode = 2
+    plant.persist_system_rule("R", rationale="second")
+    records = plant._read_rule_records()
+    assert len(records) == 1, "dedupe: latest record wins"
+    assert records[0]["strength"] == 1.0
+    assert records[0]["reinforcement_count"] == 1
+    assert records[0]["deposited_at_episode"] == 2
+
+
+def test_stigmergy_decay_multiplies_strength(tmp_path):
+    """End-of-epoch decay multiplies every record's strength by the factor."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                      m.EventLog(tmp_path / "e.jsonl"),
+                      m.Caps(model="mock"),
+                      stigmergy_decay_factor=0.8)
+    plant.persist_system_rule("rule A")
+    plant.persist_system_rule("rule B")
+    summary = plant.decay_system_rules()
+    assert summary["decayed"] == 2
+    assert summary["expired"] == 0
+    records = plant._read_rule_records()
+    assert all(r["strength"] == pytest.approx(0.8) for r in records)
+
+
+def test_stigmergy_min_strength_filters_prompt_view(tmp_path):
+    """Once a rule's strength drops below min_strength, it disappears from
+    L0's prompt-facing `system_rules` list — but stays on disk until TTL."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                      m.EventLog(tmp_path / "e.jsonl"),
+                      m.Caps(model="mock"),
+                      stigmergy_decay_factor=0.5,
+                      stigmergy_min_strength=0.4)
+    plant.persist_system_rule("rule alive")
+    plant.persist_system_rule("rule dies")
+    # First decay → 0.5, both above threshold (0.4)
+    plant.decay_system_rules()
+    assert plant.system_rules == ["rule alive", "rule dies"]
+    # Reinforce the survivor; dies-rule keeps decaying.
+    plant.persist_system_rule("rule alive")  # reset to 1.0
+    # Second decay → alive=0.5, dies=0.25 (below 0.4)
+    plant.decay_system_rules()
+    assert plant.system_rules == ["rule alive"]
+
+
+def test_stigmergy_ttl_drops_expired_records(tmp_path):
+    """A rule with finite TTL gets deleted from disk once
+    current_episode - deposited_at_episode > ttl_episodes."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                      m.EventLog(tmp_path / "e.jsonl"),
+                      m.Caps(model="mock"))
+    plant.current_episode = 0
+    plant.persist_system_rule("short-lived", ttl_episodes=2)
+    plant.persist_system_rule("immortal")  # ttl=None → ∞
+    summary = plant.decay_system_rules(current_episode=3)
+    assert summary["expired"] == 1
+    records = plant._read_rule_records()
+    assert [r["rule"] for r in records] == ["immortal"]
+
+
+def test_stigmergy_canonicalize_handles_pre_stigmergy_records(tmp_path):
+    """Records written before stigmergy land with sensible defaults when
+    decay reads them back — no migration script needed."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    rules_path = ws.path / "memory" / "system_rules.jsonl"
+    rules_path.parent.mkdir(parents=True, exist_ok=True)
+    rules_path.write_text(
+        '{"rule": "legacy", "rationale": "r", "ts": 0}\n'
+    )
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                      m.EventLog(tmp_path / "e.jsonl"),
+                      m.Caps(model="mock"),
+                      stigmergy_decay_factor=0.9)
+    plant.decay_system_rules()
+    records = plant._read_rule_records()
+    assert records[0]["strength"] == pytest.approx(0.9)
+    assert records[0]["peer_id"] == "self"
+    assert records[0]["signal_type"] == "guideline"
+    assert records[0]["ttl_episodes"] is None
+
+
+def test_stigmergy_decay_no_op_under_default_config(tmp_path):
+    """decay=1.0 and no TTLs → strengths unchanged, file content stable."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="r1")
+    plant = m.L0Plant(_MockReasoner([]), ws,
+                      m.EventLog(tmp_path / "e.jsonl"),
+                      m.Caps(model="mock"))
+    plant.persist_system_rule("R")
+    plant.decay_system_rules()  # decay defaults to 1.0
+    rec = plant._read_rule_records()[0]
+    assert rec["strength"] == 1.0
+
+
+def test_stigmergy_run_config_carries_fields():
+    cfg = m.RunConfig()
+    assert cfg.stigmergy_decay_factor == 1.0
+    assert cfg.stigmergy_min_strength == 0.0
+    cfg2 = m.RunConfig(stigmergy_decay_factor=0.85,
+                       stigmergy_min_strength=0.1)
+    assert cfg2.stigmergy_decay_factor == 0.85
+    assert cfg2.stigmergy_min_strength == 0.1
+
+
+def test_shadow_eval_propagates_stigmergy_config(tmp_path, monkeypatch):
+    """Shadow plants must inherit stigmergy config so L2 evaluates rule
+    candidates under matched substrate (same reasoning as eywa_python_hint
+    propagation: divergent prompt → wrong veto/accept decisions)."""
+    ws = m.Workspace.create(tmp_path / "ws", run_id="t")
+    log = m.EventLog(tmp_path / "e.jsonl")
+    plant = m.L0Plant(_MockReasoner([_resp_submit("ok")] * 32),
+                      ws, log, m.Caps(model="mock"),
+                      stigmergy_decay_factor=0.7,
+                      stigmergy_min_strength=0.05)
+    cfg = m.ShadowEvalConfig(enabled=True, n_eval_tasks=1,
+                             n_trials_per_task=1, threshold_delta=0.0)
+
+    captured: list[tuple[float, float]] = []
+    real_init = m.L0Plant.__init__
+
+    def capturing_init(self, *args, **kwargs):
+        captured.append((
+            kwargs.get("stigmergy_decay_factor", 1.0),
+            kwargs.get("stigmergy_min_strength", 0.0),
+        ))
+        real_init(self, *args, **kwargs)
+
+    monkeypatch.setattr(m.L0Plant, "__init__", capturing_init)
+    hook = m.make_shadow_eval_hook(cfg, plant, m.REFERENCE_SUITE[:1],
+                                   workspace_root=tmp_path)
+    state = m.MetaState(
+        l1_decisions=[], l1_lyapunov_trend=0.0,
+        helper_diffs=[], memory_snapshot={},
+        epoch=0,
+        recent_failures=[m.FailureSummary(
+            task_id=m.REFERENCE_SUITE[0].id, domain=m.REFERENCE_SUITE[0].domain,
+            score=0.0, aborted_reason="step_budget", n_steps=20,
+            submitted_answer=None,
+        )],
+    )
+    rule = m.AppendSystemRule(rule="please be careful", rationale="t")
+    hook(m.HookContext(level=2, state=state, action=rule, log=log))
+    assert captured, "shadow plant was not constructed"
+    assert all(c == (0.7, 0.05) for c in captured), (
+        f"shadow plants must inherit stigmergy config; captured: {captured}"
+    )
+
+
 def test_l2_noop_when_no_failures_and_decay(tmp_path):
     """If V₁ is already decaying and there are no failures, L2 should noop."""
     class _R:

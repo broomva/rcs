@@ -1114,6 +1114,52 @@ COMPUTE GUIDANCE (modality-native)
 """
 
 
+# === Stigmergic primitives on system_rules.jsonl (PR #43 Tier 1-C) ===========
+# Each rule record carries a pheromone-style payload — strength, TTL, signal
+# type, peer provenance, reinforcement count — so the substrate can support
+# decay, expiration, and relevance filtering. Defaults preserve the legacy
+# append-only semantics: strength=1.0, ttl=∞, decay-factor=1.0 (no-op), and
+# min-strength=0.0, so existing runs see no behavioral change unless explicitly
+# configured. See research/rcs/docs/research-notes/2026-05-05-eclectic-systems-
+# knowledge-substrate.md §"Stigmergic protocols" for the design rationale.
+STIGMERGY_SCHEMA_VERSION = 1
+STIGMERGY_DEFAULT_STRENGTH = 1.0
+STIGMERGY_DEFAULT_PEER_ID = "self"
+STIGMERGY_DEFAULT_SIGNAL_TYPE = "guideline"  # guideline | warning | hint
+STIGMERGY_VALID_SIGNAL_TYPES = ("guideline", "warning", "hint")
+
+
+def _canonicalize_rule_record(d: dict) -> dict:
+    """Fill defaults for backward-compatible JSONL records.
+
+    Any record loaded from disk that's missing a stigmergy field gets a
+    sensible default: strength=1.0, ttl=∞, signal_type="guideline", etc.
+    This keeps pre-stigmergy `system_rules.jsonl` files readable without
+    migration.
+    """
+    return {
+        "rule": d.get("rule", ""),
+        "rationale": d.get("rationale", ""),
+        "ts": float(d.get("ts", 0.0)),
+        "strength": float(d.get("strength", STIGMERGY_DEFAULT_STRENGTH)),
+        "peer_id": str(d.get("peer_id", STIGMERGY_DEFAULT_PEER_ID)),
+        "deposited_at_episode": int(d.get("deposited_at_episode", 0)),
+        "ttl_episodes": d.get("ttl_episodes"),  # None == ∞
+        "reinforcement_count": int(d.get("reinforcement_count", 0)),
+        "signal_type": str(d.get("signal_type", STIGMERGY_DEFAULT_SIGNAL_TYPE)),
+    }
+
+
+def _rule_is_alive(rec: dict, *, min_strength: float, current_episode: int) -> bool:
+    """A rule is alive if strength ≥ threshold AND not past TTL."""
+    if rec["strength"] < min_strength:
+        return False
+    ttl = rec["ttl_episodes"]
+    if ttl is not None and current_episode - rec["deposited_at_episode"] > int(ttl):
+        return False
+    return True
+
+
 def _mode_fragment(mode: "AgentMode") -> str:
     frag = MODE_FRAGMENTS.get(mode, "")
     return f"\nMODE: {mode.value} — {frag}\n" if frag else ""
@@ -1151,6 +1197,8 @@ class L0Plant:
         system_rules: list[str] | None = None,
         memory_invitation: bool = False,
         eywa_python_hint: bool = False,
+        stigmergy_decay_factor: float = 1.0,
+        stigmergy_min_strength: float = 0.0,
     ):
         self.reasoner = reasoner
         self.workspace = workspace
@@ -1162,6 +1210,15 @@ class L0Plant:
         # the hypothesis that math/computation failures are a modality mismatch
         # rather than a reasoning failure (arXiv:2604.27351).
         self.eywa_python_hint = eywa_python_hint
+        # Stigmergic substrate config. Defaults are no-op so legacy runs are
+        # bit-identical. Decay multiplies every rule's strength at end-of-epoch;
+        # min_strength filters them out of the L0 prompt and shadow plants once
+        # they've decayed below the threshold.
+        self.stigmergy_decay_factor = float(stigmergy_decay_factor)
+        self.stigmergy_min_strength = float(stigmergy_min_strength)
+        # Updated by the run loop so `persist_system_rule` can stamp records
+        # with the episode they were deposited in (for TTL bookkeeping).
+        self.current_episode = 0
         # Cross-run compounding: load any persisted rules from prior runs.
         # If `system_rules` is provided explicitly (e.g. by shadow-eval), use
         # those AS-IS. Otherwise, load from `memory/system_rules.jsonl` if it
@@ -1179,35 +1236,161 @@ class L0Plant:
     def _system_rules_path(self) -> Path:
         return self.workspace.path / "memory" / "system_rules.jsonl"
 
-    def _load_persisted_system_rules(self) -> list[str]:
+    def _read_rule_records(self) -> list[dict]:
+        """Read all JSONL records, dedupe by rule (latest record wins).
+
+        Used by both `_load_persisted_system_rules` (which projects to strings)
+        and `decay_system_rules` (which mutates and rewrites).
+        """
         p = self._system_rules_path
         if not p.exists():
             return []
-        rules: list[str] = []
+        # Latest-wins dedup preserving insertion order of first appearance.
+        order: list[str] = []
+        latest: dict[str, dict] = {}
         for line in p.read_text().splitlines():
             line = line.strip()
             if not line:
                 continue
             try:
                 d = json.loads(line)
-                if isinstance(d.get("rule"), str):
-                    rules.append(d["rule"])
             except json.JSONDecodeError:
                 continue
-        return rules
+            if not isinstance(d.get("rule"), str):
+                continue
+            rec = _canonicalize_rule_record(d)
+            key = rec["rule"]
+            if key not in latest:
+                order.append(key)
+            latest[key] = rec
+        return [latest[k] for k in order]
 
-    def persist_system_rule(self, rule: str, rationale: str = "") -> None:
+    def _load_persisted_system_rules(self) -> list[str]:
+        """Load persisted rules, filtering by strength threshold and TTL.
+
+        Returns just the rule text (the prompt-facing projection). The full
+        records remain on disk and are read by `decay_system_rules` when it
+        runs end-of-epoch.
+        """
+        records = self._read_rule_records()
+        return [
+            r["rule"] for r in records
+            if _rule_is_alive(
+                r,
+                min_strength=self.stigmergy_min_strength,
+                current_episode=self.current_episode,
+            )
+        ]
+
+    def persist_system_rule(
+        self,
+        rule: str,
+        rationale: str = "",
+        *,
+        peer_id: str | None = None,
+        ttl_episodes: int | None = None,
+        signal_type: str = STIGMERGY_DEFAULT_SIGNAL_TYPE,
+    ) -> None:
         """Append a system rule to `memory/system_rules.jsonl` (durable).
 
         Called by apply_decision_downward when L2 emits AppendSystemRule.
         Writes-through to disk so the rule survives across runs when
         Workspace.persist=True.
+
+        If a record with the same `rule` text already exists, this is a
+        reinforcement: strength resets to 1.0 and reinforcement_count
+        increments. Otherwise it's a fresh deposit at strength=1.0.
         """
+        if signal_type not in STIGMERGY_VALID_SIGNAL_TYPES:
+            signal_type = STIGMERGY_DEFAULT_SIGNAL_TYPE
+        prior = next(
+            (r for r in self._read_rule_records() if r["rule"] == rule),
+            None,
+        )
+        reinforcement_count = (prior["reinforcement_count"] + 1) if prior else 0
+        # Reinforced rules adopt the new deposit episode (re-anchors TTL).
+        deposited_at_episode = self.current_episode
+        record = {
+            "rule": rule,
+            "rationale": rationale,
+            "ts": time.time(),
+            "strength": STIGMERGY_DEFAULT_STRENGTH,
+            "peer_id": peer_id if peer_id is not None else STIGMERGY_DEFAULT_PEER_ID,
+            "deposited_at_episode": deposited_at_episode,
+            "ttl_episodes": ttl_episodes,
+            "reinforcement_count": reinforcement_count,
+            "signal_type": signal_type,
+            "schema_version": STIGMERGY_SCHEMA_VERSION,
+        }
         p = self._system_rules_path
         p.parent.mkdir(parents=True, exist_ok=True)
         with p.open("a") as f:
-            f.write(json.dumps({"rule": rule, "rationale": rationale,
-                                  "ts": time.time()}) + "\n")
+            f.write(json.dumps(record) + "\n")
+
+    def decay_system_rules(
+        self,
+        decay_factor: float | None = None,
+        current_episode: int | None = None,
+    ) -> dict:
+        """Apply pheromone evaporation to every persisted rule.
+
+        Multiplies each record's strength by `decay_factor`, drops records
+        whose TTL has expired, and rewrites the JSONL file with the survivors
+        (latest-wins dedupe). Refreshes `self.system_rules` to reflect the
+        post-decay relevance-filtered set.
+
+        Returns a small summary dict: {"decayed": int, "expired": int,
+        "filtered_out": int, "alive": int}. Useful for tests and progress
+        emission.
+
+        No-op when `decay_factor` is 1.0 AND no rules have TTLs — preserves
+        legacy behavior under default config.
+        """
+        if decay_factor is None:
+            decay_factor = self.stigmergy_decay_factor
+        if current_episode is not None:
+            self.current_episode = current_episode
+
+        records = self._read_rule_records()
+        if not records:
+            return {"decayed": 0, "expired": 0, "filtered_out": 0, "alive": 0}
+
+        # Apply decay; drop TTL-expired (independent of strength threshold).
+        survivors: list[dict] = []
+        expired = 0
+        for rec in records:
+            rec["strength"] = float(rec["strength"]) * float(decay_factor)
+            ttl = rec["ttl_episodes"]
+            if ttl is not None and self.current_episode - rec["deposited_at_episode"] > int(ttl):
+                expired += 1
+                continue
+            survivors.append(rec)
+
+        # Rewrite the file atomically (write to .tmp, then rename).
+        p = self._system_rules_path
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(p.suffix + ".tmp")
+        with tmp.open("w") as f:
+            for rec in survivors:
+                f.write(json.dumps(rec) + "\n")
+        tmp.replace(p)
+
+        # Refresh L0's prompt-facing view.
+        alive = [
+            r for r in survivors
+            if _rule_is_alive(
+                r,
+                min_strength=self.stigmergy_min_strength,
+                current_episode=self.current_episode,
+            )
+        ]
+        self.system_rules = [r["rule"] for r in alive]
+        return {
+            "decayed": len(records),
+            "expired": expired,
+            "filtered_out": len(survivors) - len(alive),
+            "alive": len(alive),
+        }
 
     def _has_memory_entries(self) -> bool:
         try:
@@ -1871,8 +2054,12 @@ def make_shadow_eval_hook(
             # CodeRabbit catch: live & shadow plants must share the
             # modality-hint state, otherwise L2 evaluates rule candidates
             # under a different system prompt than the live agent uses,
-            # producing incorrect accept/veto decisions.
+            # producing incorrect accept/veto decisions. Same reasoning
+            # applies to the stigmergy substrate: shadow plants must
+            # decay/filter rules under matched config.
             eywa_python_hint=plant_template.eywa_python_hint,
+            stigmergy_decay_factor=plant_template.stigmergy_decay_factor,
+            stigmergy_min_strength=plant_template.stigmergy_min_strength,
         )
 
         shadow_passes = 0
@@ -2656,6 +2843,13 @@ class RunConfig:
     # Tests Eywa's claim (arXiv:2604.27351) that math/computation failures
     # are modality mismatches rather than reasoning failures.
     eywa_python_hint: bool = False
+    # Stigmergic substrate (PR #43 Tier 1-C). Decay multiplies every
+    # system_rule strength at end-of-epoch; min_strength filters them out of
+    # L0's prompt + shadow plants once decayed below threshold. Defaults are
+    # no-op so legacy capacity-sweep / SWE-bench runs are bit-identical;
+    # opt-in by setting both > 0 (e.g. 0.85, 0.05) to enable evaporation.
+    stigmergy_decay_factor: float = 1.0
+    stigmergy_min_strength: float = 0.0
 
 
 @dataclass
@@ -2719,6 +2913,8 @@ def run(
                  max_cost_usd=cfg.max_cost_usd_per_episode,
                  model=cfg.model_l0_l1),
             eywa_python_hint=cfg.eywa_python_hint,
+            stigmergy_decay_factor=cfg.stigmergy_decay_factor,
+            stigmergy_min_strength=cfg.stigmergy_min_strength,
         )
         l1 = L1Autonomic(l1_reasoner, log, HysteresisThreshold(0.2, 0.6)) \
             if l1_reasoner is not None else None
@@ -2743,6 +2939,7 @@ def run(
         _emit_progress(quiet, f"  ╭─ {cond} (workspace={ws.path.name})")
 
         for epoch in range(cfg.n_epochs):
+            plant.current_episode = epoch
             if l2 is not None:
                 l2.mutations_this_epoch = 0
             for repeat in range(cfg.n_repeats):
@@ -2816,6 +3013,20 @@ def run(
                 state = GovernanceState.from_log(log)
                 _emit_lyapunov(log, level=3, controller=l3, state=state,
                                 correlation_id=f"gov_e{epoch}_passive")
+
+            # End-of-epoch stigmergic decay: pheromone evaporation. With
+            # default config (decay=1.0, min_strength=0.0) this is a no-op
+            # over an empty rules file — same observable behavior as before.
+            # When stigmergy is opted in, weakly-reinforced rules fade out
+            # of L0's prompt over epochs, while reinforced ones stay alive.
+            if cfg.stigmergy_decay_factor < 1.0 or cfg.stigmergy_min_strength > 0.0:
+                summary = plant.decay_system_rules(current_episode=epoch)
+                if summary["decayed"] > 0:
+                    _emit_progress(quiet,
+                        f"  │  {cond:<12} stigmergy e{epoch} decayed={summary['decayed']} "
+                        f"expired={summary['expired']} filtered={summary['filtered_out']} "
+                        f"alive={summary['alive']}"
+                    )
 
         # Compute lambdas for all 4 levels
         for level in (0, 1, 2, 3):
