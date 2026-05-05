@@ -44,8 +44,9 @@ The RCS thesis exists in three forms; current evidence by form:
 | **#34 SWE-bench-Lite pilot** | 4 instances × 4 conditions × 1 seed × Haiku L0/L1 + Sonnet L2/L3 × max_steps=50 | none (all 0.000) | flat=0.000 | all conditions = 0.000 | recursion overhead negligible (~$0.50/condition); recursion benefit also zero — **L0 capacity is the binding constraint** | $13.46 | Pilot confirms smoke: Haiku × 50 steps below the SWE-bench floor. All 16 episodes step-budget abort or no_action abort. Recursion wraps a flat that scores 0/4 → still 0/4. The recursion question is NOT testable in this regime. To probe H1 productively on SWE-bench, need either (a) higher tier (Sonnet/Opus L0), (b) higher max_steps (≥100), or (c) easier instances (SWE-bench Verified subset). |
 | **Path 1: Haiku × max_steps=150 SWE** | 4 instances × 4 conditions × 1 seed × Haiku L0/L1 + Sonnet L2/L3 × max_steps=150 | flat ≈ full | flat=0.250, full=0.250 | +autonomic=0.000 (Δ=−0.25), +meta=0.000 (Δ=−0.25), full=0.250 (Δ=0.00) | step-budget bump unlocked one solve; recursion at L1-only and L1+L2 LOSES the solve, full re-finds it | $24.36 (Path 1 only) | First non-zero SWE-bench result. `psf__requests-3362` solved by flat AND full but NOT +autonomic / +meta. Could be real "L1 mode-switch noise breaks the solve, L3 governance recovers" OR per-instance variance at n=1 paired (only 1 of 4 instances solvable). Need ≥3 seeds to disambiguate. |
 | **Path 2: Sonnet × max_steps=50 SWE** | 4 instances × 4 conditions × 1 seed × Sonnet L0/L1 + Opus L2/L3 × max_steps=50 | flat partial only | n/a (incomplete) | invalid (credit balance + connectivity) | inconclusive — API credits ran out mid-flat condition, all recursion conditions aborted on the next call | ~$3 | flat got 2/4 instances run (flask: 0.00 in 10 steps, pylint: 0.00 in 43 steps); requests-3362 + sphinx not run; +autonomic/+meta/full all aborted with API errors. **Re-run pending budget refresh.** |
+| **gemma4 bench (PR #36)** | REFERENCE_SUITE × 4 conditions × 3 epochs × 3 repeats × gemma4:8b local L0+L2 × max_steps=20 = 180 episodes | **full** | flat=0.054 | +autonomic=0.054 (Δ=0.000), +meta=0.045 (Δ=−0.009), full=0.064 (Δ=+0.010) | recursion **directionally HELPS** at full, neutral at +autonomic, slightly hurts at +meta — but CIs heavily overlap; not significant at n=1 seed | $0 (local) | First end-to-end run via OllamaReasoner (PR #36). Validates that the Reasoner Protocol is provider-agnostic; confirms gemma4-8B can tool-call against the bash+submit interface. Per-task pass-rate pattern: math=0% (all no_action — modality mismatch), logic-zebra ~100%, code-bugfix ~50%, qa partial only, planning-hanoi mixed. **3 of 5 tasks are modality-mismatched** — motivates the Eywa flag (PR #37) for follow-up. |
 
-Total spend so far: ~$159 across ~5300 episodes (microRCS) + 2160 hours (microgrid).
+Total spend so far: ~$159 across ~5500 episodes (microRCS, +180 free) + 2160 hours (microgrid).
 
 ## Capacity-tier sweep result (PR #31 / BRO-945)
 
@@ -228,6 +229,83 @@ The full bench is feasible. Recommendation: re-scope BRO-946 with the
 observed costs before kicking off, or start with a tighter pilot (5
 instances × 4 conditions × 1 seed at Haiku ≈ $30) to confirm the recursion
 ablation produces a directional signal before the full N=3 seeds run.
+
+## gemma4-8B local-bench result (BRO-945 weak-L0 closure)
+
+After Path 2 hit API credit exhaustion, PR #36 shipped a real `OllamaReasoner`
+to enable $0 local runs on any tool-call-capable model. PR #37 added the
+Eywa-style `--eywa-python` modality hint flag. PR #38 ran the first
+local-only bench: **REFERENCE_SUITE × 4 conditions × 3 epochs × 3 repeats
+× gemma4:8b × max_steps=20 = 180 episodes, ~8h wall, $0**.
+
+### Result
+
+| Condition | pass^3 | pass@3 | bootstrap CI |
+|---|---|---|---|
+| flat | 0.054 | 0.769 | [0.244, 0.511] |
+| +autonomic | 0.054 | 0.769 | [0.244, 0.533] |
+| +meta | 0.045 | 0.742 | [0.222, 0.511] |
+| **full** | **0.064** | **0.794** | [0.267, 0.533] |
+
+Per-condition Δ vs flat (pass^3): [+0.000, −0.009, **+0.010**] for
+[+autonomic, +meta, full]. The signal is tiny and the CIs heavily overlap
+— **not statistically significant at n=1 seed.** But the directional
+ordering matches what we'd expect if gemma4 were the "weak L0" the
+bitter-lesson interpretation predicts:
+
+- **full > flat** by +0.010 pass^3 / +0.025 pass@3 — recursion provides a
+  small positive nudge
+- **+autonomic = flat** — L1 mode-switching alone doesn't move the needle
+- **+meta < flat** by −0.009 — L2's rule injection at this small N is
+  marginally hurting (shadow eval correctly NoOp'd most candidates per the
+  log: "L2 epoch 0 → NoOp (unparsed_or_noop)")
+
+### Per-task pattern (qualitative observation from the live log)
+
+| Task | Per-task hit rate | Diagnostic |
+|---|---|---|
+| `math-multi-step` | 0% across all conditions | **Modality mismatch** — gemma4 rambles in tokens about time arithmetic, hits no_action abort. Recursion can't fix this. |
+| `code-bugfix` | ~50% | language-native; fluctuates with temperature |
+| `logic-zebra` | ~100% | language-native constraint puzzle gemma4 nails reliably |
+| `closed-book-qa` | partial only | retrieval modality |
+| `planning-hanoi` | mixed | structured-search modality; long episodes |
+
+**Three of five tasks are modality-mismatched.** Recursion (vertical or
+horizontal) sits on top of an L0 that fundamentally cannot solve them
+without offloading to non-language compute. This is exactly Eywa's claim
+(arXiv:2604.27351): language-only L0 is the binding constraint, not the
+control structure.
+
+### What this changes about the H1 verdict
+
+The H1 verdict in this document so far has been:
+- ❌ Refuted at Haiku × HARDER
+- ❌ Refuted at Sonnet × HARDER (recursion HURTS, statistically)
+- ⚠️ Directionally supported at Opus × HARDER (3/3 seeds, n=3 inconclusive)
+- 🚫 Untestable at Haiku × SWE × max_steps=50 (capacity floor)
+
+Adding gemma4-8B × REFERENCE × 1 seed:
+- ⚠️ **Directionally supported, smallest measured tier** (+0.010 pass^3)
+
+**The 4-tier picture (Haiku → Sonnet → Opus → gemma4-8B local):** the
+relationship between recursion and capacity is NOT monotone. Sonnet hurts.
+Opus and gemma4-local both nudge positive but at different magnitudes
+(Opus: +0.13 large; gemma4: +0.01 small). The most charitable reading: at
+the tails (very strong or very weak L0), recursion provides marginal
+help. In the middle (Sonnet), it actively hurts.
+
+### Open follow-ups directly enabled by this bench
+
+1. **Multi-seed gemma4 bench** (3 seeds × 4 conditions × 180 ep = 540
+   episodes, ~24h wall, $0). Tightens CIs and either confirms or refutes
+   the gemma4 directional signal at proper power.
+2. **`--eywa-python` A/B at gemma4 × math-multi-step** (~30 min wall, $0).
+   Tests Eywa's claim directly: does the Python-tool nudge cure the 0%
+   math hit rate? Hypothesis: control = 0/N, treatment > 0.
+3. **gemma4 × HARDER suite** (10 tasks × 4 conditions × 1 seed = 40
+   episodes, ~3h wall, $0). HARDER's calibration vs gemma4 capacity is
+   unknown; expected to be HARDER below the floor (math/planning), but
+   could surface different patterns.
 
 ## Step-budget step-up + Sonnet attempt (BRO-946 phase 3 — partial)
 
