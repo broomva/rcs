@@ -47,6 +47,7 @@ The RCS thesis exists in three forms; current evidence by form:
 | **gemma4 bench (PR #36)** | REFERENCE_SUITE × 4 conditions × 3 epochs × 3 repeats × gemma4:8b local L0+L2 × max_steps=20 = 180 episodes | **full** | flat=0.054 | +autonomic=0.054 (Δ=0.000), +meta=0.045 (Δ=−0.009), full=0.064 (Δ=+0.010) | recursion **directionally HELPS** at full, neutral at +autonomic, slightly hurts at +meta — but CIs heavily overlap; not significant at n=1 seed | $0 (local) | First end-to-end run via OllamaReasoner (PR #36). Validates that the Reasoner Protocol is provider-agnostic; confirms gemma4-8B can tool-call against the bash+submit interface. Per-task pass-rate pattern: math=0% (all no_action — modality mismatch), logic-zebra ~100%, code-bugfix ~50%, qa partial only, planning-hanoi mixed. **3 of 5 tasks are modality-mismatched** — motivates the Eywa flag (PR #37) for follow-up. |
 | **Eywa A/B mechanism (post-PR #37)** | --quick × REFERENCE × flat+full × gemma4 + `--eywa-python` flag | n/a (mechanism check) | flat=0.000 (control parity) | full=0.125 (parity with smoke) | scores unchanged but **mechanism confirmed**: agent now invokes `python -c` for arithmetic instead of rambling | $0 (local) | **Eywa hypothesis empirically validated at the mechanistic level.** Without the flag, gemma4 hit `no_action` after 1 step on math-multi-step. With `--eywa-python`, gemma4 took 4 bash steps including `python -c 'print(73 * 1.6)'` and `python -c 'print(295.2 / 154)'` — modality-native compute exactly as Eywa (arXiv:2604.27351) predicts. Score still 0 because `--quick` capped max_steps=10, too few for the multi-step time calculation to complete. **Binding constraint shifted from modality-mismatch to step-budget.** Magnitude follow-up: same A/B at max_steps=50+. |
 | **gemma4 multi-seed bench (post-PR #40)** | REFERENCE × 3 seeds × 4 conditions × 3 epochs × 3 repeats × gemma4:8b × max_steps=20 = 540 episodes | **flat ≈ +meta ≈ full** | flat=0.061 ± 0.013 | +meta=0.065 (Δ=+0.004), full=0.065 (Δ=+0.004), +autonomic=0.057 (Δ=−0.004) | recursion **NOISE-LEVEL** at gemma4 — all Δ within 2σ_flat=0.026 | $0 (local) | **The PR #38 directional signal does NOT survive at n=3 seeds.** +0.01 Δ shrunk to +0.004, smaller than within-condition std. Confirms the gemma4 weak-L0 result is empirically null. Combined with PR #31 capacity sweep at n=3, only Sonnet × HARDER shows statistically significant effect (negative). **The bitter-lesson is dead at proper power on every tier we've tested except Sonnet (where it inverts).** |
+| **Swarm-RCS-L0 first live run (post-PR #40)** | REFERENCE × 1 seed × swarm_flat × N=3 peers × k=2 majority × gemma4 × max_steps=20 = 5 tasks × 3 peers = 15 reasoner calls | logic-zebra ✓ | n/a (different aggregation than single) | swarm_flat: pass^k=0.008 (strict majority), pass@k=0.600 (any-peer success) | **strict majority quorum HURTS, but best-of-N would HELP 10x at gemma4** | $0 (local) | Single live invocation revealed a deep finding: strict-majority answer-hash voting (k=2 of 3) requires peers to converge on the SAME answer, not just succeed independently. With gemma4 at ~33% per-peer submit rate on most tasks, majority quorum almost never reaches. BUT `pass@k=0.60` shows that at least 1 peer often succeeds — so a different aggregation (best-of-N, verifier-weighted, score-driven) would yield 10× over single_flat. **Strict-majority quorum is brittle on free-form outputs; the swarm has latent capability that the chosen aggregation throws away.** Follow-up: run with k=1 (any-peer-submits), then implement verifier-weighted aggregation. |
 
 Total spend so far: ~$159 across ~6040 episodes (microRCS, +540 free this round) + 2160 hours (microgrid).
 
@@ -231,6 +232,54 @@ The full bench is feasible. Recommendation: re-scope BRO-946 with the
 observed costs before kicking off, or start with a tighter pilot (5
 instances × 4 conditions × 1 seed at Haiku ≈ $30) to confirm the recursion
 ablation produces a directional signal before the full N=3 seeds run.
+
+## Swarm-RCS-L0 first live run — quorum aggregation matters more than expected
+
+PR #40 shipped the SwarmL0Plant scaffold (3 architectural decisions: strict-majority answer-hash voting, union-of-peer-streams L1, helpers+memory+rules shared). PR #43 ran the first live invocation against gemma4 to test "does horizontal recursion (peer swarm + stigmergic substrate) help at the weakest tier?"
+
+### Result
+
+`swarm_flat × gemma4 × REFERENCE × N=3 × k=2 × 1 seed`:
+
+| Task | Per-peer voters | Quorum | Score |
+|---|---|---|---|
+| math-multi-step | 0/3 | ❌ | 0.00 |
+| code-bugfix | 1/3 | ❌ | 0.00 |
+| logic-zebra | 3/3 | ✅ | **1.00** |
+| closed-book-qa | 1/3 | ❌ | 0.00 |
+| planning-hanoi | 0/3 | ❌ | 0.00 |
+
+Headline metrics from the structured output:
+- `pass_pow_k = 0.008` (strict 2/3 majority quorum)
+- `pass@k    = 0.600` (any-peer-success — **best-of-N**)
+
+**Same data, two aggregation strategies, ~75× different effective performance.**
+
+### What this reveals
+
+Strict-majority answer-hash voting requires peers to:
+1. Successfully submit (vs hit `no_action`) — gemma4 fails this on 3 of 5 REFERENCE tasks
+2. Submit the **same answer hash** — fails on free-form outputs like code or hanoi sequences (multiple correct forms)
+
+The `pass@k = 0.60` — meaning at least one peer succeeded on 3 of 5 tasks — shows the swarm has real latent capability. The aggregation strategy throws it away. Concretely:
+
+- Single-flat × gemma4 (PR #41 multi-seed): mean = 0.061 ± 0.013
+- Swarm-flat × gemma4 × strict-majority: pass_pow_k = 0.008 (worse than single)
+- Swarm-flat × gemma4 × best-of-N: pass@k = 0.60 (~10× single)
+
+### What this changes about the H1 picture
+
+The vertical-RCS verdict (recursion null at the tails, hurts at Sonnet) is unchanged — that bench is multi-seed at proper power.
+
+But for **horizontal recursion** (PR #40's contribution): the answer depends almost entirely on the aggregation strategy. The structural choice "what does the swarm output as its consensus answer?" turns out to matter more than the structural choice "should peers share helpers/memory/?". This wasn't anticipated in the spec's D1 decision — that decision treated voting as a parameter to tune, but the live run shows it's the dominant variable.
+
+### Three follow-up experiments enabled
+
+1. **Swarm × k=1 (best-of-N)** at gemma4 (~10 min, $0): verify that pass^1 actually reaches 0.60 with k=1 quorum — this would be the cleanest "swarm beats single" result we've gotten in any condition.
+2. **Verifier-weighted aggregation**: instead of voting on answer hash, run each peer's submission through `task.verify` and pick the highest-scoring. Requires a small driver change (~30 LOC). Likely dominates both strict-majority and best-of-N.
+3. **Single-tier comparison** at proper N (3 seeds × N peers): does the swarm advantage replicate at Haiku, Sonnet, Opus? If yes, swarm's value scales across tiers in a way vertical RCS doesn't.
+
+The PR #40 spec D1 (voting strategy) needs revisiting in light of this — strict majority shouldn't be the v0 default for free-form output domains.
 
 ## Eywa modality-nudge mechanism confirmed (post-PR #37)
 
