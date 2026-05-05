@@ -1,0 +1,334 @@
+{
+  "flat": {
+    "episodes": [
+      {
+        "task": "math-multi-step",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "code-bugfix",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 2
+      },
+      {
+        "task": "logic-zebra",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "closed-book-qa",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "planning-hanoi",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "math-multi-step",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "code-bugfix",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 2
+      },
+      {
+        "task": "logic-zebra",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "closed-book-qa",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 2
+      },
+      {
+        "task": "planning-hanoi",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "math-multi-step",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "code-bugfix",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "logic-zebra",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "closed-book-qa",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 2
+      },
+      {
+        "task": "planning-hanoi",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      }
+    ],
+    "lambda": {
+      "L0": [
+        -0.0004587542745238942,
+        0.0024555814764901274
+      ],
+      "L1": [
+        null,
+        null
+      ],
+      "L2": [
+        null,
+        null
+      ],
+      "L3": [
+        null,
+        null
+      ]
+    },
+    "pass_pow_k": 0.06400000000000002,
+    "pass_at_k": 0.8153846153846154,
+    "bootstrap_std": 0.12776671449690383,
+    "bootstrap_ci": [
+      0.13333333333333333,
+      0.6666666666666666
+    ],
+    "canonical_memory_count": 0,
+    "promoted_helper_count": 0
+  },
+  "full": {
+    "episodes": [
+      {
+        "task": "math-multi-step",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "code-bugfix",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "logic-zebra",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "closed-book-qa",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 2
+      },
+      {
+        "task": "planning-hanoi",
+        "epoch": 0,
+        "repeat": 0,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "math-multi-step",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "code-bugfix",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "logic-zebra",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "closed-book-qa",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 2
+      },
+      {
+        "task": "planning-hanoi",
+        "epoch": 0,
+        "repeat": 1,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "math-multi-step",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "code-bugfix",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "logic-zebra",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 1.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 1
+      },
+      {
+        "task": "closed-book-qa",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": null,
+        "cost": 0.0,
+        "n_steps": 3
+      },
+      {
+        "task": "planning-hanoi",
+        "epoch": 0,
+        "repeat": 2,
+        "score": 0.0,
+        "aborted": "no_action",
+        "cost": 0.0,
+        "n_steps": 1
+      }
+    ],
+    "lambda": {
+      "L0": [
+        0.0012206714995848245,
+        0.003122865689098216
+      ],
+      "L1": [
+        0.0020968996817092183,
+        0.0005305281722473054
+      ],
+      "L2": [
+        null,
+        null
+      ],
+      "L3": [
+        null,
+        null
+      ]
+    },
+    "pass_pow_k": 0.03703703703703703,
+    "pass_at_k": 0.7362637362637363,
+    "bootstrap_std": 0.12154845398715143,
+    "bootstrap_ci": [
+      0.13333333333333333,
+      0.6
+    ],
+    "canonical_memory_count": 0,
+    "promoted_helper_count": 0
+  }
+}

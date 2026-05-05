@@ -1,0 +1,14 @@
+{
+  "flat": {
+    "lambda_hat": null,
+    "n_pairs": 10,
+    "intercept": null,
+    "n_unique_steps": 1
+  },
+  "full": {
+    "lambda_hat": -1.3746565912081405,
+    "n_pairs": 10,
+    "intercept": -2.751935621511995,
+    "n_unique_steps": 2
+  }
+}

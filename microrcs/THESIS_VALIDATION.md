@@ -281,6 +281,59 @@ python3 -m scripts.jepa_a --reports ../reports --out ../reports/jepa-a \
 
 Full results note: `docs/research-notes/2026-05-05-jepa-experiment-a-results.md`.
 
+## JEPA Experiment A v2 — per-step pipeline shipped, data-shape limit identified (PR #45+)
+
+PR #45 (per-step) shipped the `jepa_a per-step` subcommand with full per-step extraction (events.jsonl → StepRecord → StepTrajectory), training (`train_step_jepa`), and two estimators (per-trajectory `lambda_hat_step` + cohort `lambda_hat_step_cohort`). 9 new tests, **246/246 passing** in the full suite.
+
+### Setup
+
+- **Code**: `microrcs/scripts/jepa_a.py` per-step subcommand; 14-d step features
+- **Data run**: gemma4-8B + REFERENCE suite × 1 epoch × 3 repeats × {flat, full}, persistent workspace, 15.9 min wall-clock, $0 cost
+- **Training**: 100 epochs, ~3 s on M4 Pro CPU, no collapse
+
+### Result — data-shape limitation, not a JEPA refutation
+
+After parsing 30 episodes' events.jsonl: **19 trajectories ≥2 steps, 20 step pairs total**. Most gemma4 episodes are 2-step (bash → submit), so per-trajectory λ̂ is undefined for all 19 (need ≥3 positive energy values per trajectory; we have ≤1).
+
+| Cohort λ̂ | n_pairs | unique step_idx | Verdict |
+|---|---|---|---|
+| flat | 10 | 1 | n/a (xs all at 0 → degenerate) |
+| full | 10 | ≥2 | −1.37 (single point, statistically uninformative) |
+
+### What this changes
+
+- **Pipeline**: shipped + validated. Will consume any per-step events.jsonl stream.
+- **JEPA frame**: still alive. Was not given a fair empirical test on this data.
+- **Productive next data run**: SWE-bench-Lite pilot with `--persistent-workspace` (gemma4 + REFERENCE produces 1–2 step episodes; SWE produces 35–98 step episodes per `reports/swe-pilot-step150/pilot-*-summary.json`).
+- **Cohort λ̂ as second-line estimator**: implemented as fallback when per-trajectory λ̂ is undefined, with documented survival-bias caveat.
+
+Full results note: `docs/research-notes/2026-05-05-jepa-experiment-a-perstep-results.md`.
+
+### Reproduction
+
+```bash
+# Generate the data
+cd microrcs
+python3 -c "
+import sys; sys.path.insert(0, '.')
+import microrcs as m
+from pathlib import Path
+cfg = m.RunConfig(
+    suite=m.REFERENCE_SUITE, n_epochs=1, n_repeats=3, n_runs=1,
+    max_steps_per_episode=15, max_cost_usd_per_episode=1e9,
+    model_l0_l1='ollama:gemma4', model_l2_l3='ollama:gemma4',
+    persistent_workspace=Path('../reports/jepa-a-perstep/raw'), seed=42,
+)
+m.run(cfg, '../reports/jepa-a-perstep/runs', conditions=('flat', 'full'))
+"
+
+# Train per-step JEPA (~3 s)
+python3 -m scripts.jepa_a per-step \
+    --workspaces ../reports/jepa-a-perstep/raw \
+    --out ../reports/jepa-a-perstep \
+    --epochs 100 --seed 42
+```
+
 ## Swarm-RCS-L0 first live run — quorum aggregation matters more than expected
 
 PR #40 shipped the SwarmL0Plant scaffold (3 architectural decisions: strict-majority answer-hash voting, union-of-peer-streams L1, helpers+memory+rules shared). PR #43 ran the first live invocation against gemma4 to test "does horizontal recursion (peer swarm + stigmergic substrate) help at the weakest tier?"
