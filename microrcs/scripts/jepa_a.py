@@ -526,24 +526,436 @@ def render_markdown(comparison: dict, train_history: list[dict],
     return "\n".join(out)
 
 
-# === 9. CLI =================================================================
-def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    ap.add_argument("--reports", default="reports",
-                    help="Directory containing bro945-*/bench-*/0019*/metrics.json")
-    ap.add_argument("--out", default="reports/jepa-a",
-                    help="Output directory for trained model + report")
-    ap.add_argument("--epochs", type=int, default=50)
-    ap.add_argument("--batch-size", type=int, default=64)
-    ap.add_argument("--latent-dim", type=int, default=32)
-    ap.add_argument("--hidden", type=int, default=64)
-    ap.add_argument("--lr", type=float, default=1e-3)
-    ap.add_argument("--ema", type=float, default=0.99)
-    ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--device", default="cpu",
-                    help="cpu | mps | cuda — default cpu (deterministic)")
-    args = ap.parse_args()
+# === 9. Per-step extraction (Experiment A v2: step-level data) =============
+# Episode-level v1 (above) hit a null result because pass-rate ceiling on
+# Opus compressed both estimators into the e-3/e-4 band. Per-step data
+# isn't subject to that artifact: within-episode dynamics are richer than
+# the binary score outcome. This section provides the parser + featurizer
+# for events.jsonl streams produced by `microrcs.run` with a persistent
+# workspace.
 
+@dataclass
+class StepRecord:
+    """One agent step within an episode, reconstructed from RCSEvent stream."""
+    cid: str          # episode correlation id (cid="ep_<id>")
+    workspace: str
+    condition: str    # "flat" / "+autonomic" / "+meta" / "full"
+    step: int
+    tool: str         # "bash" / "submit" / "<no-decide>"
+    is_error: bool
+    obs_len: int
+    input_tokens: int
+    output_tokens: int
+    latency_ms: float
+    cost: float       # cumulative cost at this step
+    score: float | None  # only set on terminal step (LYAPUNOV-bearing)
+
+
+@dataclass
+class StepTrajectory:
+    """One per-episode step sequence + its precomputed feature stack."""
+    key: tuple[str, str]   # (condition, cid)
+    steps: list[StepRecord]
+    features: np.ndarray   # shape (T, D)
+
+
+STEP_TOOL_VOCAB: tuple[str, ...] = ("bash", "submit", "<no-decide>")
+
+
+def _step_feature_dim() -> int:
+    # 1 step_norm + 3 tool one-hot + 1 is_error + 1 obs_log + 2 token_logs
+    # + 1 latency_log + 1 cost_norm + len(CONDITION_VOCAB) condition one-hot
+    return 1 + len(STEP_TOOL_VOCAB) + 1 + 1 + 2 + 1 + 1 + len(CONDITION_VOCAB)
+
+
+def featurize_step(rec: StepRecord, max_steps: int = 15,
+                   max_cost: float = 0.50) -> np.ndarray:
+    feat = np.zeros(_step_feature_dim(), dtype=np.float32)
+    i = 0
+    feat[i] = min(rec.step / max(max_steps, 1), 1.0); i += 1
+    if rec.tool in STEP_TOOL_VOCAB:
+        feat[i + STEP_TOOL_VOCAB.index(rec.tool)] = 1.0
+    i += len(STEP_TOOL_VOCAB)
+    feat[i] = 1.0 if rec.is_error else 0.0; i += 1
+    feat[i] = math.log1p(max(rec.obs_len, 0)) / 10.0; i += 1
+    feat[i] = math.log1p(max(rec.input_tokens, 0)) / 10.0; i += 1
+    feat[i] = math.log1p(max(rec.output_tokens, 0)) / 10.0; i += 1
+    feat[i] = math.log1p(max(rec.latency_ms, 0)) / 10.0; i += 1
+    feat[i] = min(rec.cost / max(max_cost, 1e-9), 1.0); i += 1
+    if rec.condition in CONDITION_VOCAB:
+        feat[i + CONDITION_VOCAB.index(rec.condition)] = 1.0
+    i += len(CONDITION_VOCAB)
+    return feat
+
+
+def _events_to_steps(cid: str, workspace: str, condition: str,
+                     events: list[dict]) -> list[StepRecord]:
+    """Reduce a chronologically sorted list of L0 events for one episode
+    into StepRecords. Each step starts with an OBSERVE event; the
+    OBSERVE → next-OBSERVE window defines one step's events."""
+    step_groups: list[dict] = []
+    current: dict | None = None
+    for e in events:
+        if e["kind"] == "observe":
+            if current is not None:
+                step_groups.append(current)
+            current = {"step": int(e["payload"].get("step", 0)), "events": []}
+        if current is not None:
+            current["events"].append(e)
+    if current is not None:
+        step_groups.append(current)
+
+    records: list[StepRecord] = []
+    cumulative_cost = 0.0
+    for sg in step_groups:
+        evs = sg["events"]
+        reasoner = next((e for e in evs if e["kind"] == "reasoner_call"), None)
+        decide = next((e for e in evs if e["kind"] == "decide"), None)
+        step_out = next((e for e in evs if e["kind"] == "step"), None)
+        lyap = next((e for e in evs if e["kind"] == "lyapunov"), None)
+
+        latency_ms = float(reasoner["payload"].get("latency_ms", 0.0)
+                            if reasoner else 0.0)
+        if reasoner:
+            cumulative_cost = float(reasoner["payload"].get("cost",
+                                                              cumulative_cost))
+        input_tokens = int(reasoner["payload"].get("input_tokens", 0)
+                            if reasoner else 0)
+        output_tokens = int(reasoner["payload"].get("output_tokens", 0)
+                             if reasoner else 0)
+        tool = str(decide["payload"].get("tool", "<no-decide>")
+                    if decide else "<no-decide>")
+        is_error = bool(step_out["payload"].get("is_error", False)
+                         if step_out else False)
+        obs_len = int(step_out["payload"].get("obs_len", 0)
+                       if step_out else 0)
+        score = lyap["payload"].get("score") if lyap else None
+        records.append(StepRecord(
+            cid=cid, workspace=workspace, condition=condition,
+            step=int(sg["step"]), tool=tool, is_error=is_error,
+            obs_len=obs_len, input_tokens=input_tokens,
+            output_tokens=output_tokens, latency_ms=latency_ms,
+            cost=cumulative_cost,
+            score=float(score) if score is not None else None,
+        ))
+    return records
+
+
+def parse_workspace_events(workspace_dir: Path
+                           ) -> dict[str, list[StepRecord]]:
+    """Read events.jsonl from a persistent-workspace directory, group L0
+    events by correlation_id (episode cid), reduce to StepRecords.
+
+    Path convention: `<workspace_dir>/.rcs/events.jsonl`. The workspace
+    directory's name encodes the condition (`flat`, `plus_meta`, `full`).
+    """
+    events_path = workspace_dir / ".rcs" / "events.jsonl"
+    if not events_path.exists():
+        return {}
+    cond_raw = workspace_dir.name
+    condition = cond_raw.replace("plus_", "+")
+
+    events_by_cid: dict[str, list[dict]] = {}
+    for line in events_path.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            d = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        cid = d.get("correlation_id", "")
+        # Only L0 episode events. L1/L2/L3 events have non-"ep_" cids.
+        if cid.startswith("ep_") and d.get("level") == 0:
+            events_by_cid.setdefault(cid, []).append(d)
+
+    result: dict[str, list[StepRecord]] = {}
+    for cid, evs in events_by_cid.items():
+        evs.sort(key=lambda e: e["timestamp"])
+        steps = _events_to_steps(cid, str(workspace_dir), condition, evs)
+        if steps:
+            result[cid] = steps
+    return result
+
+
+def build_step_trajectories(steps_by_cid: dict[str, list[StepRecord]]
+                             ) -> list[StepTrajectory]:
+    """One StepTrajectory per cid (episode). Drops episodes with < 2 steps
+    (need at least one (z_t, z_{t+1}) pair)."""
+    trajectories: list[StepTrajectory] = []
+    for cid, recs in steps_by_cid.items():
+        if len(recs) < 2:
+            continue
+        recs_sorted = sorted(recs, key=lambda r: r.step)
+        cond = recs_sorted[0].condition
+        feats = np.stack([featurize_step(r) for r in recs_sorted], axis=0)
+        trajectories.append(StepTrajectory(
+            key=(cond, cid), steps=recs_sorted, features=feats,
+        ))
+    return trajectories
+
+
+def collect_step_trajectories(workspace_root: Path) -> list[StepTrajectory]:
+    """Walk every immediate subdirectory of `workspace_root`, treat each as
+    one workspace, and return all step trajectories aggregated."""
+    aggregate: dict[str, list[StepRecord]] = {}
+    for ws_dir in sorted(p for p in workspace_root.iterdir() if p.is_dir()):
+        for cid, recs in parse_workspace_events(ws_dir).items():
+            # Workspace name is the unique discriminator: cids COULD collide
+            # across workspaces if random uuids alias; namespace by ws name.
+            namespaced_cid = f"{ws_dir.name}:{cid}"
+            aggregate[namespaced_cid] = recs
+    return build_step_trajectories(aggregate)
+
+
+# === 10. Per-step JEPA training (reuses model from §4-§6) ===================
+def train_step_jepa(trajectories: list[StepTrajectory],
+                    cfg: TrainConfig,
+                    device: str = "cpu",
+                    verbose: bool = True) -> tuple[JEPA, list[dict]]:
+    """Same model architecture as `train_jepa`; only the trajectory type
+    differs. We materialize (X_t, X_next) pairs from precomputed features."""
+    parts_t: list[np.ndarray] = []
+    parts_next: list[np.ndarray] = []
+    for traj in trajectories:
+        f = traj.features
+        if f.shape[0] < 2:
+            continue
+        parts_t.append(f[:-1])
+        parts_next.append(f[1:])
+    if not parts_t:
+        raise ValueError("No usable step trajectories (all length < 2)")
+    X_t = np.concatenate(parts_t, axis=0)
+    X_next = np.concatenate(parts_next, axis=0)
+    in_dim = X_t.shape[1]
+    n = X_t.shape[0]
+    if verbose:
+        print(f"[jepa-a-step] training on {n} step-pairs, dim={in_dim}, "
+              f"latent={cfg.latent_dim}, epochs={cfg.epochs}")
+
+    torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    model = JEPA(in_dim, latent_dim=cfg.latent_dim, hidden=cfg.hidden,
+                 ema_momentum=cfg.ema_momentum).to(device)
+    opt = Adam(list(model.encoder.parameters()) +
+                list(model.predictor.parameters()),
+                lr=cfg.learning_rate)
+    X_t_t = torch.from_numpy(X_t).to(device)
+    X_next_t = torch.from_numpy(X_next).to(device)
+
+    history: list[dict] = []
+    for epoch in range(cfg.epochs):
+        perm = torch.randperm(n, device=device)
+        epoch_loss = epoch_pred = epoch_var = 0.0
+        n_batches = 0
+        for i in range(0, n, cfg.batch_size):
+            idx = perm[i:i + cfg.batch_size]
+            x_t = X_t_t[idx]
+            x_next = X_next_t[idx]
+            z_t, z_pred, z_target = model(x_t, x_next)
+            pred_loss = ((z_pred - z_target) ** 2).sum(dim=-1).mean()
+            reg_loss, reg_info = vicreg_loss(
+                z_t, var_weight=cfg.vicreg_var_weight,
+                cov_weight=cfg.vicreg_cov_weight,
+            )
+            loss = pred_loss + reg_loss
+            opt.zero_grad(); loss.backward(); opt.step()
+            model.update_target()
+            epoch_loss += float(loss.detach())
+            epoch_pred += float(pred_loss.detach())
+            epoch_var += reg_info["std_mean"]
+            n_batches += 1
+        history.append({
+            "epoch": epoch,
+            "loss": epoch_loss / max(n_batches, 1),
+            "pred_loss": epoch_pred / max(n_batches, 1),
+            "std_mean": epoch_var / max(n_batches, 1),
+        })
+        if verbose and (epoch == 0 or (epoch + 1) % 10 == 0
+                        or epoch == cfg.epochs - 1):
+            h = history[-1]
+            print(f"[jepa-a-step] epoch {epoch:>3} loss={h['loss']:.4f} "
+                  f"pred={h['pred_loss']:.4f} std={h['std_mean']:.3f}")
+    return model, history
+
+
+def lambda_hat_step(model: JEPA,
+                    trajectories: list[StepTrajectory],
+                    device: str = "cpu") -> dict[tuple, float | None]:
+    """Per-trajectory λ̂ from JEPA energy along each episode's step sequence.
+
+    Returns None when the trajectory has fewer than 3 positive energy
+    samples — `_ols_slope` requires ≥3 to fit a meaningful line.
+    """
+    out: dict[tuple, float | None] = {}
+    model.eval()
+    for traj in trajectories:
+        feats = traj.features
+        if feats.shape[0] < 2:
+            out[traj.key] = None
+            continue
+        x_t = torch.from_numpy(feats[:-1]).to(device)
+        x_next = torch.from_numpy(feats[1:]).to(device)
+        e = model.energy(x_t, x_next).cpu().numpy().tolist()
+        out[traj.key] = _ols_slope(e)
+    return out
+
+
+def lambda_hat_step_cohort(model: JEPA,
+                            trajectories: list[StepTrajectory],
+                            device: str = "cpu"
+                            ) -> dict[str, dict]:
+    """Cohort-aggregate λ̂ per condition.
+
+    For each condition, pool every (step_idx, energy) pair across all
+    trajectories and OLS-fit `log E` vs `step_idx` once. This sidesteps
+    the per-trajectory short-episode constraint: even when individual
+    trajectories don't have ≥3 step pairs, the cohort might. The trade-off
+    is that survival bias (only longer trajectories reach high step_idx)
+    can skew the slope; we report `n_pairs` per condition so callers can
+    judge.
+
+    Returns: `{condition: {"lambda_hat": float|None, "n_pairs": int,
+    "intercept": float|None}}`.
+    """
+    pooled: dict[str, list[tuple[int, float]]] = {}
+    model.eval()
+    for traj in trajectories:
+        feats = traj.features
+        if feats.shape[0] < 2:
+            continue
+        x_t = torch.from_numpy(feats[:-1]).to(device)
+        x_next = torch.from_numpy(feats[1:]).to(device)
+        energies = model.energy(x_t, x_next).cpu().numpy().tolist()
+        cond = traj.key[0]
+        # step index of the *source* state in each pair (0, 1, ..., T-2)
+        for s_idx, e in enumerate(energies):
+            pooled.setdefault(cond, []).append((s_idx, float(e)))
+
+    out: dict[str, dict] = {}
+    for cond, pairs in pooled.items():
+        positives = [(s, e) for s, e in pairs if e > 0]
+        if len(positives) < 3:
+            out[cond] = {"lambda_hat": None, "n_pairs": len(pairs),
+                         "intercept": None}
+            continue
+        xs = np.array([p[0] for p in positives], dtype=np.float64)
+        ys = np.log(np.array([p[1] for p in positives], dtype=np.float64))
+        # Degenerate cases: all xs identical (every trajectory contributes
+        # a single pair at the same step_idx) or all ys identical
+        # (constant log-energy across pairs) — both make OLS undefined.
+        if np.allclose(xs.std(), 0) or np.allclose(ys.std(), 0):
+            out[cond] = {"lambda_hat": None, "n_pairs": len(pairs),
+                         "intercept": None,
+                         "n_unique_steps": int(np.unique(xs).size)}
+            continue
+        slope, intercept = np.polyfit(xs, ys, 1)
+        out[cond] = {"lambda_hat": float(-slope), "n_pairs": len(pairs),
+                     "intercept": float(intercept),
+                     "n_unique_steps": int(np.unique(xs).size)}
+    return out
+
+
+def render_perstep_markdown(
+    trajectories: list[StepTrajectory],
+    lambdas: dict[tuple, float | None],
+    train_history: list[dict],
+    cohort_lambdas: dict[str, dict] | None = None,
+) -> str:
+    # Group by condition.
+    by_condition: dict[str, list[float]] = {}
+    score_for_lambda: dict[str, list[tuple[float, float]]] = {}
+    for traj in trajectories:
+        cond = traj.key[0]
+        lam = lambdas.get(traj.key)
+        if lam is None or not math.isfinite(lam):
+            continue
+        by_condition.setdefault(cond, []).append(lam)
+        # Episode score is the score on the terminal step (LYAPUNOV-bearing).
+        terminal = traj.steps[-1]
+        if terminal.score is not None:
+            score_for_lambda.setdefault(cond, []).append(
+                (lam, float(terminal.score))
+            )
+
+    out = ["# JEPA Experiment A — Per-Step Results",
+           "",
+           f"**Date**: {time.strftime('%Y-%m-%d')}",
+           f"**Step trajectories** (≥2 steps): {len(trajectories)}",
+           f"**Step pairs trained on**: "
+           f"{sum(max(t.features.shape[0] - 1, 0) for t in trajectories)}",
+           f"**Final pred_loss**: "
+           f"{train_history[-1]['pred_loss']:.4f}" if train_history else "n/a",
+           f"**Final std_mean**: "
+           f"{train_history[-1]['std_mean']:.3f}" if train_history else "n/a",
+           "",
+           "## λ̂ distribution per condition",
+           "",
+           "| condition | n | mean λ̂ | std | min | max |",
+           "|---|---|---|---|---|---|"]
+    for cond in sorted(by_condition):
+        vals = by_condition[cond]
+        if not vals:
+            continue
+        out.append(f"| {cond} | {len(vals)} | "
+                    f"{float(np.mean(vals)):+.4f} | "
+                    f"{float(np.std(vals, ddof=1)) if len(vals) > 1 else 0:.4f} | "
+                    f"{min(vals):+.4f} | {max(vals):+.4f} |")
+
+    if cohort_lambdas:
+        out += [
+            "",
+            "## Cohort-aggregate λ̂ per condition",
+            "",
+            "(Pools every (step_idx, energy) pair across trajectories per "
+            "condition; one OLS fit per condition. Sidesteps short-trajectory "
+            "limit of per-trajectory λ̂.)",
+            "",
+            "| condition | n_pairs | λ̂ (cohort) | intercept |",
+            "|---|---|---|---|"]
+        for cond in sorted(cohort_lambdas):
+            entry = cohort_lambdas[cond]
+            lh = entry.get("lambda_hat")
+            ic = entry.get("intercept")
+            out.append(f"| {cond} | {entry.get('n_pairs', 0)} | "
+                        f"{lh:+.4f}" + " | " + (f"{ic:+.4f}" if ic is not None
+                                                  else "—") + " |"
+                        if lh is not None else
+                        f"| {cond} | {entry.get('n_pairs', 0)} | n/a | n/a |")
+
+    out += [
+        "",
+        "## λ̂ vs final episode score (correlation)",
+        "",
+        "| condition | n | Pearson r |",
+        "|---|---|---|"]
+    for cond, pairs in sorted(score_for_lambda.items()):
+        if len(pairs) < 3:
+            out.append(f"| {cond} | {len(pairs)} | n/a (n<3) |")
+            continue
+        xs = np.array([p[0] for p in pairs])
+        ys = np.array([p[1] for p in pairs])
+        if xs.std() == 0 or ys.std() == 0:
+            out.append(f"| {cond} | {len(pairs)} | n/a (zero variance) |")
+        else:
+            r = float(np.corrcoef(xs, ys)[0, 1])
+            out.append(f"| {cond} | {len(pairs)} | {r:+.3f} |")
+
+    out += [
+        "",
+        "## Training curve (final 5 epochs)",
+        "",
+        "| epoch | loss | pred_loss | std_mean |",
+        "|---|---|---|---|"]
+    for h in train_history[-5:]:
+        out.append(f"| {h['epoch']} | {h['loss']:.4f} | "
+                    f"{h['pred_loss']:.4f} | {h['std_mean']:.3f} |")
+    out.append("")
+    return "\n".join(out)
+
+
+# === 11. CLI ================================================================
+def _cmd_episode_level(args: argparse.Namespace) -> int:
     reports_dir = Path(args.reports)
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -559,7 +971,8 @@ def main() -> int:
 
     trajectories = build_trajectories(records)
     print(f"[jepa-a] built {len(trajectories)} trajectories "
-          f"(median len={int(np.median([len(t.episodes) for t in trajectories]))})")
+          f"(median len="
+          f"{int(np.median([len(t.episodes) for t in trajectories]))})")
 
     cfg = TrainConfig(
         epochs=args.epochs, batch_size=args.batch_size,
@@ -576,7 +989,6 @@ def main() -> int:
     comparison = compare_estimators(jepa_lambdas, heur_lambdas)
     md = render_markdown(comparison, history, len(trajectories), n_pairs)
 
-    # Persist artifacts
     (out_dir / "results.md").write_text(md)
     (out_dir / "comparison.json").write_text(json.dumps(comparison,
                                                         indent=2, default=str))
@@ -594,6 +1006,122 @@ def main() -> int:
     print(f"[jepa-a] JEPA wins {comparison['n_jepa_lower_variance']} / "
           f"{comparison['n_finite_ratios']} cells")
     return 0
+
+
+def _cmd_per_step(args: argparse.Namespace) -> int:
+    workspaces_root = Path(args.workspaces)
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if not workspaces_root.exists():
+        print(f"[jepa-a-step] ERROR: workspaces root does not exist: "
+              f"{workspaces_root}", file=sys.stderr)
+        return 1
+
+    print(f"[jepa-a-step] parsing workspaces under {workspaces_root}")
+    trajectories = collect_step_trajectories(workspaces_root)
+    if not trajectories:
+        print("[jepa-a-step] ERROR: no step trajectories with ≥2 steps",
+              file=sys.stderr)
+        return 1
+    n_pairs = sum(max(t.features.shape[0] - 1, 0) for t in trajectories)
+    print(f"[jepa-a-step] {len(trajectories)} trajectories, "
+          f"{n_pairs} step-pairs, "
+          f"conditions={sorted({t.key[0] for t in trajectories})}")
+
+    cfg = TrainConfig(
+        epochs=args.epochs, batch_size=args.batch_size,
+        learning_rate=args.lr, latent_dim=args.latent_dim,
+        hidden=args.hidden, ema_momentum=args.ema, seed=args.seed,
+    )
+    model, history = train_step_jepa(trajectories, cfg, device=args.device,
+                                       verbose=True)
+    lambdas = lambda_hat_step(model, trajectories, device=args.device)
+    cohort = lambda_hat_step_cohort(model, trajectories, device=args.device)
+    md = render_perstep_markdown(trajectories, lambdas, history,
+                                  cohort_lambdas=cohort)
+
+    (out_dir / "results.md").write_text(md)
+    (out_dir / "training_history.json").write_text(json.dumps(history, indent=2))
+    (out_dir / "lambdas.json").write_text(json.dumps(
+        {f"{k[0]}|{k[1]}": v for k, v in lambdas.items()},
+        indent=2, default=str,
+    ))
+    (out_dir / "cohort_lambdas.json").write_text(json.dumps(cohort, indent=2))
+    torch.save(model.state_dict(), out_dir / "jepa_a_step.pt")
+
+    finite = [v for v in lambdas.values() if v is not None and math.isfinite(v)]
+    print()
+    print(f"[jepa-a-step] wrote {out_dir}/results.md")
+    if finite:
+        print(f"[jepa-a-step] per-trajectory λ̂: n={len(finite)}, "
+              f"mean={float(np.mean(finite)):+.4f} "
+              f"std={float(np.std(finite, ddof=1)) if len(finite) > 1 else 0:.4f}")
+    else:
+        print(f"[jepa-a-step] no finite per-trajectory λ̂ "
+              f"(trajectories too short)")
+    for cond in sorted(cohort):
+        entry = cohort[cond]
+        lh = entry.get("lambda_hat")
+        if lh is not None:
+            print(f"[jepa-a-step] cohort λ̂[{cond}] = {lh:+.4f} "
+                  f"(n_pairs={entry['n_pairs']})")
+        else:
+            print(f"[jepa-a-step] cohort λ̂[{cond}] = n/a "
+                  f"(n_pairs={entry['n_pairs']})")
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    sub = ap.add_subparsers(dest="cmd")
+
+    # episode-level (default for backward compatibility — no subcommand also OK)
+    ep = sub.add_parser("episode-level",
+                         help="Train JEPA on per-episode bench aggregates "
+                              "(v1 default).")
+    ep.add_argument("--reports", default="reports",
+                     help="Directory containing bro945-*/bench-*/0019*/metrics.json")
+    ep.add_argument("--out", default="reports/jepa-a",
+                     help="Output directory for trained model + report")
+    ep.add_argument("--epochs", type=int, default=50)
+    ep.add_argument("--batch-size", type=int, default=64)
+    ep.add_argument("--latent-dim", type=int, default=32)
+    ep.add_argument("--hidden", type=int, default=64)
+    ep.add_argument("--lr", type=float, default=1e-3)
+    ep.add_argument("--ema", type=float, default=0.99)
+    ep.add_argument("--seed", type=int, default=42)
+    ep.add_argument("--device", default="cpu")
+    ep.set_defaults(func=_cmd_episode_level)
+
+    # per-step (v2 — fresh-bench events.jsonl)
+    ps = sub.add_parser("per-step",
+                         help="Train JEPA on per-step trajectories from a "
+                              "persistent-workspace events.jsonl bench (v2).")
+    ps.add_argument("--workspaces", required=True,
+                     help="Directory whose subdirs are persistent workspaces "
+                          "with .rcs/events.jsonl streams.")
+    ps.add_argument("--out", default="reports/jepa-a-perstep",
+                     help="Output directory for trained model + report")
+    ps.add_argument("--epochs", type=int, default=100)
+    ps.add_argument("--batch-size", type=int, default=64)
+    ps.add_argument("--latent-dim", type=int, default=32)
+    ps.add_argument("--hidden", type=int, default=64)
+    ps.add_argument("--lr", type=float, default=1e-3)
+    ps.add_argument("--ema", type=float, default=0.99)
+    ps.add_argument("--seed", type=int, default=42)
+    ps.add_argument("--device", default="cpu")
+    ps.set_defaults(func=_cmd_per_step)
+
+    # Backward-compat: bare `python -m scripts.jepa_a --reports ...` (no
+    # subcommand) maps to episode-level. argparse can't directly express
+    # this with sub.required=False + default values, so we handle it
+    # manually below.
+    args = ap.parse_args(argv)
+    if not getattr(args, "cmd", None):
+        # Re-parse with episode-level defaults so old invocations keep working.
+        return _cmd_episode_level(ap.parse_args(["episode-level"] + (argv or sys.argv[1:])))
+    return args.func(args)
 
 
 if __name__ == "__main__":
