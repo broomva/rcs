@@ -2,7 +2,7 @@
 # RCS — Build & Test
 # =============================================================================
 
-.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test test-microrcs swe-smoke swe-smoke-dry swe-pilot swe-clean params params-check clean
+.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test test-microrcs swe-smoke swe-smoke-dry swe-pilot swe-clean swarm-smoke params params-check clean
 
 # --- Parameters ---
 # data/parameters.toml is the single source of truth for all stability
@@ -105,6 +105,18 @@ swe-pilot:
 # Wipe the SWE smoke + pilot cache (canonical clones + venvs + workspaces).
 swe-clean:
 	rm -rf ~/.cache/microrcs-swe
+
+# --- Swarm-RCS-L0 smoke (BRO-944 follow-up) ---
+# Skeleton smoke: --dry-run by default (mocked Reasoner, no API). Exercises
+# the SwarmL0Plant + voting + substrate wiring without spend. Live runs
+# (lift --dry-run) are deferred to a follow-up PR per spec
+# docs/superpowers/specs/2026-05-05-swarm-rcs-l0-design.md.
+swarm-smoke:
+	cd microrcs && python3 -m scripts.swarm_run --dry-run \
+	    --condition swarm_full --suite reference \
+	    --n-peers 3 --k-quorum 2 \
+	    --max-steps 5 --max-cost-usd 0.10 \
+	    --workspace-root /tmp/microrcs-swarm
 
 # --- Clean ---
 
