@@ -156,6 +156,199 @@ def test_ols_slope_handles_degenerate_inputs():
     assert out is not None and out > 0  # decay → positive λ
 
 
+# =====================================================================
+# Per-step pipeline (Experiment A v2 — events.jsonl → step trajectories)
+# =====================================================================
+def _write_synthetic_workspace(out_dir: Path, n_episodes: int = 3,
+                                steps_per_episode: int = 4,
+                                condition: str = "flat") -> Path:
+    """Write a minimal events.jsonl mimicking microrcs' L0 event stream.
+
+    Layout: <out_dir>/<condition>/.rcs/events.jsonl
+    Each episode has steps_per_episode OBSERVE/REASONER/DECIDE/STEP cycles,
+    plus a terminal LYAPUNOV emitting a synthetic score.
+    """
+    ws = out_dir / condition
+    rcs_dir = ws / ".rcs"
+    rcs_dir.mkdir(parents=True, exist_ok=True)
+    events_path = rcs_dir / "events.jsonl"
+    ts = [1_000_000.0]
+
+    def emit(level, kind, cid, payload, parent=None):
+        ts[0] += 0.001
+        return {
+            "event_id": f"ev-{ts[0]:.3f}",
+            "parent_id": parent,
+            "timestamp": ts[0],
+            "level": level,
+            "kind": kind,
+            "correlation_id": cid,
+            "payload": payload,
+        }
+
+    lines: list[dict] = []
+    for ep_idx in range(n_episodes):
+        cid = f"ep_{ep_idx:04d}"
+        cumulative_cost = 0.0
+        for s in range(steps_per_episode):
+            obs = emit(0, "observe", cid,
+                        {"step": s, "n_messages": s + 1})
+            cumulative_cost += 0.001
+            lines.append(obs)
+            lines.append(emit(0, "reasoner_call", cid, {
+                "latency_ms": 100.0, "cost": cumulative_cost,
+                "stop_reason": "tool_use",
+                "input_tokens": 10 * (s + 1), "output_tokens": 5 * (s + 1),
+            }, parent=obs["event_id"]))
+            decide = emit(0, "decide", cid,
+                            {"tool": "bash", "arguments": {"command": "ls"}},
+                            parent=obs["event_id"])
+            lines.append(decide)
+            lines.append(emit(0, "shield", cid,
+                                {"action_type": "BashAction", "reason": ""},
+                                parent=decide["event_id"]))
+            lines.append(emit(0, "step", cid,
+                                {"action_type": "BashAction",
+                                 "is_error": (s % 2 == 1),
+                                 "obs_len": 50 + s * 10},
+                                parent=decide["event_id"]))
+        score = 1.0 if (ep_idx % 2 == 0) else 0.0
+        lines.append(emit(0, "lyapunov", cid, {
+            "V": 0.5, "score": score,
+            "cost": cumulative_cost, "step": steps_per_episode,
+        }))
+    events_path.write_text("\n".join(json.dumps(d) for d in lines) + "\n")
+    return ws
+
+
+def test_parse_workspace_events_round_trip(tmp_path):
+    ja.TASK_VOCAB.clear()
+    ws = _write_synthetic_workspace(tmp_path, n_episodes=3,
+                                      steps_per_episode=4)
+    by_cid = ja.parse_workspace_events(ws)
+    assert len(by_cid) == 3
+    for _cid, recs in by_cid.items():
+        assert len(recs) == 4
+        assert [r.step for r in recs] == [0, 1, 2, 3]
+        costs = [r.cost for r in recs]
+        assert all(b >= a - 1e-9 for a, b in zip(costs, costs[1:]))
+        assert recs[-1].score is not None
+        assert all(r.score is None for r in recs[:-1])
+
+
+def test_featurize_step_dim_and_dtype(tmp_path):
+    ws = _write_synthetic_workspace(tmp_path, n_episodes=1)
+    by_cid = ja.parse_workspace_events(ws)
+    rec = next(iter(by_cid.values()))[0]
+    feat = ja.featurize_step(rec)
+    assert feat.shape == (ja._step_feature_dim(),)
+    assert feat.dtype == np.float32
+
+
+def test_collect_step_trajectories_aggregates_workspaces(tmp_path):
+    """Each subdir is one workspace; trajectories aggregate across conditions
+    with namespaced cids so cid collisions across workspaces can't merge."""
+    _write_synthetic_workspace(tmp_path, n_episodes=2, condition="flat")
+    _write_synthetic_workspace(tmp_path, n_episodes=2, condition="full")
+    trajectories = ja.collect_step_trajectories(tmp_path)
+    assert len(trajectories) == 4  # 2 episodes × 2 conditions
+    conds = sorted({t.key[0] for t in trajectories})
+    assert conds == ["flat", "full"]
+
+
+def test_build_step_trajectories_drops_too_short(tmp_path):
+    """Episodes with < 2 steps must be filtered out (no z_t→z_{t+1})."""
+    ja.TASK_VOCAB.clear()
+    ws = _write_synthetic_workspace(tmp_path, n_episodes=2,
+                                      steps_per_episode=1)
+    by_cid = ja.parse_workspace_events(ws)
+    trajectories = ja.build_step_trajectories(by_cid)
+    assert trajectories == []
+
+
+def test_train_step_jepa_smoke_runs_without_collapse(tmp_path):
+    _write_synthetic_workspace(tmp_path, n_episodes=4, steps_per_episode=5,
+                                condition="flat")
+    _write_synthetic_workspace(tmp_path, n_episodes=4, steps_per_episode=5,
+                                condition="full")
+    trajectories = ja.collect_step_trajectories(tmp_path)
+    assert len(trajectories) >= 4
+    cfg = ja.TrainConfig(epochs=2, batch_size=4, latent_dim=8, hidden=16,
+                          seed=0)
+    model, history = ja.train_step_jepa(trajectories, cfg, device="cpu",
+                                          verbose=False)
+    assert len(history) == 2
+    assert all(np.isfinite(h["loss"]) for h in history)
+    assert history[-1]["std_mean"] > 1e-3
+
+
+def test_lambda_hat_step_returns_value_per_trajectory(tmp_path):
+    _write_synthetic_workspace(tmp_path, n_episodes=4, steps_per_episode=5,
+                                condition="flat")
+    trajectories = ja.collect_step_trajectories(tmp_path)
+    cfg = ja.TrainConfig(epochs=2, batch_size=4, latent_dim=8, hidden=16,
+                          seed=0)
+    model, _ = ja.train_step_jepa(trajectories, cfg, device="cpu",
+                                    verbose=False)
+    out = ja.lambda_hat_step(model, trajectories, device="cpu")
+    assert set(out.keys()) == {t.key for t in trajectories}
+
+
+def test_lambda_hat_step_cohort_handles_single_step_trajectories(tmp_path):
+    """Cohort fit must gracefully degrade when every trajectory contributes
+    only one step pair (all xs collapsed to step_idx=0 → undefined slope)."""
+    _write_synthetic_workspace(tmp_path, n_episodes=6, steps_per_episode=2,
+                                condition="flat")
+    trajectories = ja.collect_step_trajectories(tmp_path)
+    cfg = ja.TrainConfig(epochs=2, batch_size=4, latent_dim=8, hidden=16,
+                          seed=0)
+    model, _ = ja.train_step_jepa(trajectories, cfg, device="cpu",
+                                    verbose=False)
+    cohort = ja.lambda_hat_step_cohort(model, trajectories, device="cpu")
+    assert "flat" in cohort
+    # All 2-step trajectories → all pairs at step_idx=0 → no slope possible
+    assert cohort["flat"]["lambda_hat"] is None
+    assert cohort["flat"]["n_unique_steps"] == 1
+    assert cohort["flat"]["n_pairs"] == 6
+
+
+def test_lambda_hat_step_cohort_fits_when_steps_vary(tmp_path):
+    """When trajectories span multiple step indices, cohort fit succeeds."""
+    _write_synthetic_workspace(tmp_path, n_episodes=4, steps_per_episode=5,
+                                condition="full")
+    trajectories = ja.collect_step_trajectories(tmp_path)
+    cfg = ja.TrainConfig(epochs=2, batch_size=4, latent_dim=8, hidden=16,
+                          seed=0)
+    model, _ = ja.train_step_jepa(trajectories, cfg, device="cpu",
+                                    verbose=False)
+    cohort = ja.lambda_hat_step_cohort(model, trajectories, device="cpu")
+    assert "full" in cohort
+    assert cohort["full"]["n_unique_steps"] >= 2
+    # Slope may be either sign on synthetic data — just check it's finite.
+    lh = cohort["full"]["lambda_hat"]
+    assert lh is None or np.isfinite(lh)
+
+
+def test_perstep_cli_subcommand_dispatch(tmp_path):
+    """Smoke: per-step subcommand wires up parsing → training → reporting."""
+    _write_synthetic_workspace(tmp_path / "raw", n_episodes=4,
+                                 steps_per_episode=5, condition="flat")
+    _write_synthetic_workspace(tmp_path / "raw", n_episodes=4,
+                                 steps_per_episode=5, condition="full")
+    rc = ja.main([
+        "per-step",
+        "--workspaces", str(tmp_path / "raw"),
+        "--out", str(tmp_path / "out"),
+        "--epochs", "2",
+        "--latent-dim", "8",
+        "--hidden", "16",
+    ])
+    assert rc == 0
+    assert (tmp_path / "out" / "results.md").exists()
+    assert (tmp_path / "out" / "lambdas.json").exists()
+    assert (tmp_path / "out" / "jepa_a_step.pt").exists()
+
+
 def test_vicreg_loss_penalizes_collapse():
     """When all latents are identical, var_loss should be high."""
     # Disable cov term: identical points have NO off-diagonal covariance,

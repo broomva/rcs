@@ -1,0 +1,1 @@
+Solve Tower of Hanoi for 4 disks moving from peg A to peg C using peg B as auxiliary. Output one move per line as 'A->B' or 'B->C' etc. Submit only the moves, one per line, no other text.
