@@ -233,6 +233,54 @@ observed costs before kicking off, or start with a tighter pilot (5
 instances × 4 conditions × 1 seed at Haiku ≈ $30) to confirm the recursion
 ablation produces a directional signal before the full N=3 seeds run.
 
+## JEPA Experiment A — null on existing capacity-sweep traces (PR #44+)
+
+PR #44 shipped the design note `docs/research-notes/2026-05-05-jepa-as-rcs-frame.md` proposing JEPA's predictor energy `E_θ = ‖P_φ(z) − z'‖²` as an alternative Lyapunov substrate to the current `V_0 = 0.3·cost + 0.3·steps + 0.4·(1−score)` heuristic. Experiment A — train a small MLP-JEPA on existing per-episode capacity-sweep traces and check whether `Var[λ̂_0]_JEPA < Var[λ̂_0]_heuristic` — has now been run.
+
+### Setup
+
+- **Code**: `microrcs/scripts/jepa_a.py` (~430 LOC, 9 unit tests passing)
+- **Data**: 2,160 per-episode records from `reports/bro945-{sonnet,opus}/` (2 capacities × 3 seeds × 4 conditions × 90 episodes)
+- **Trajectories**: 24 ordered per-(model, seed, condition) sequences
+- **Model**: encoder R²⁰ → R³² (5K params), residual predictor, EMA target encoder, VICReg-lite collapse prevention
+- **Training**: 50 epochs, ~2s wall-clock CPU, no collapse (final std=1.01, pred_loss=0.41)
+
+### Result — heuristic wins
+
+**Median `Var[λ̂_0]_JEPA / Var[λ̂_0]_heuristic = 1.67`** across 8 (capacity × condition) cells. JEPA achieves lower variance in 3/8 cells, heuristic in 5/8. The two estimators **disagree on the sign of `λ̂_0` in 4/8 cells** — they measure different dynamic properties of the trajectory, not noisier vs less noisy versions of the same property.
+
+| capacity | condition | JEPA λ̂ | heur λ̂ | Var ratio J/H |
+|---|---|---|---|---|
+| opus   | flat | −0.0030 | −0.0027 | **0.72** ✓ |
+| opus   | full | +0.0016 | −0.0037 | **0.52** ✓ |
+| sonnet | +autonomic | −0.0117 | −0.0030 | **0.49** ✓ |
+| (5 other cells) | | | | 1.4× to 21.3× |
+
+(✓ = JEPA wins. Full table at `docs/research-notes/2026-05-05-jepa-experiment-a-results.md`.)
+
+### Why this is interpretable, not refutational
+
+1. **Episode-level granularity ≠ design-spec step-level.** The note's Experiment A specified per-step `(z_t, z_{t+1})` pairs from `events.jsonl` streams. Those streams are wiped from `/tmp` workspaces; this run substituted per-episode aggregates from existing reports — fewer pairs, coarser dynamics.
+2. **Pass-rate ceiling on Opus compresses both estimators** symmetrically into the e-3/e-4 band, where ratios are dominated by sampling noise (the 21× outlier on `sonnet flat` is one near-zero seed cell pinching).
+3. **n=3 seeds per cell is below statistical power** for second-order statistics like Var[λ̂].
+
+### Implications
+
+- **Experiment A null does NOT refute the design-note thesis.** It refutes the path "use existing capacity-sweep aggregates → JEPA graduates immediately." The thesis test (Experiment B: two-level H-JEPA U-shape recovery) remains scoped at the original priority.
+- **Productive next data run is per-step.** Run a small fresh bench with `--persistent-workspace` on gemma4 (free), retain `events.jsonl`, parse to `(z_t, z_{t+1})` pairs at >100K resolution. At step level, ceiling effects on episode score don't matter — within-episode dynamics are richer than the score boolean.
+- **JEPA frame stays alive but downgraded** from "ship Tier-1 immediately" to "needs step-level data first."
+
+### Reproduction
+
+```bash
+cd microrcs
+python3 -m scripts.jepa_a --reports ../reports --out ../reports/jepa-a \
+    --epochs 50 --seed 42
+# wall-clock: ~2 s on Apple M4 Pro CPU
+```
+
+Full results note: `docs/research-notes/2026-05-05-jepa-experiment-a-results.md`.
+
 ## Swarm-RCS-L0 first live run — quorum aggregation matters more than expected
 
 PR #40 shipped the SwarmL0Plant scaffold (3 architectural decisions: strict-majority answer-hash voting, union-of-peer-streams L1, helpers+memory+rules shared). PR #43 ran the first live invocation against gemma4 to test "does horizontal recursion (peer swarm + stigmergic substrate) help at the weakest tier?"
