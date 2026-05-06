@@ -1,0 +1,77 @@
+# Q1 Pre-Registration — JEPA-as-Substrate Research Program
+#
+# Locks all gate thresholds, instance set, seeds, and budget caps BEFORE
+# any data collection. Same discipline as PR #25 noise-floor protocol that
+# buried PR #24's optimistic single-seed signal.
+#
+# Spec ref: docs/superpowers/specs/2026-05-05-jepa-as-substrate-design.md
+#           Section 5.5 (pre-registration); 6.9 (pre-registration commits)
+# Plan ref: docs/superpowers/plans/2026-05-05-jepa-q1-implementation.md
+#           Task 0 (this file); Tasks 2, 7, 8 (consume this file)
+
+schema_version = 1
+phase = "Q1"
+
+[q1.instances]
+# 10 SWE-bench-Lite instance IDs deterministically chosen.
+# 4 are from existing pilot data (psf__requests-3362, pallets__flask-4992,
+# pylint-dev__pylint-7080, sphinx-doc__sphinx-8721); 6 are added for
+# diversity across project size.
+ids = [
+  "pallets__flask-4992",
+  "pylint-dev__pylint-7080",
+  "sphinx-doc__sphinx-8721",
+  "psf__requests-3362",
+  "astropy__astropy-12907",
+  "django__django-11848",
+  "matplotlib__matplotlib-23299",
+  "scikit-learn__scikit-learn-13497",
+  "pytest-dev__pytest-7373",
+  "sympy__sympy-13971",
+]
+
+[q1.seeds]
+# Three coprime seeds for cross-seed variance estimation.
+values = [1, 1009, 2018]
+
+[q1.conditions]
+# Standard 4-tier microRCS conditions.
+values = ["flat", "+autonomic", "+meta", "full"]
+
+[q1.model]
+# Haiku for cost-efficiency; signal-sufficient at this tier.
+provider = "anthropic:claude-haiku-4-5"
+
+[q1.gate.math]
+# G1: median Var ratio < 1.0 across >= 3 conditions
+g1_var_ratio_threshold = 1.0
+g1_min_conditions_with_data = 3
+
+# G2: Pearson r(λ̂, episode_score) <= -0.2
+g2_pearson_threshold = -0.2
+
+# G3: training health
+g3_min_std_mean_at_epoch_100 = 0.5
+g3_max_loss_increase_consecutive_epochs = 3
+g3_no_nan_required = true
+
+[q1.gate.production]
+# P1: Spearman ρ(λ̂, pass-bool) <= -0.15 with p < 0.05
+p1_spearman_threshold = -0.15
+p1_significance_level = 0.05
+
+[q1.training]
+# Substrate hyperparameters. Locked.
+latent_dim = 64
+hidden_dim = 64
+epochs = 200
+batch_size = 64
+learning_rate = 1e-3
+ema_momentum = 0.99
+vicreg_var_weight = 25.0
+vicreg_cov_weight = 1.0
+
+[q1.budget]
+# Cost cap per Q1 (auto-abort if exceeded).
+max_usd = 10.0
+max_wall_clock_hours = 24
