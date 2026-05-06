@@ -374,6 +374,21 @@ Three concurrency invariants:
 
 ### 4.4 Theorem statement: Online JEPA Composite Stability
 
+> **Implementation status (2026-05-06).** The Paper 5 scaffold has landed at
+> [`papers/p5-online-jepa-stability/`](../../../papers/p5-online-jepa-stability/) (PR #57, commit `2bf54fc`,
+> sub-epic BRO-955 In Progress). The locked theorem statement, the six
+> assumptions H8a–e + H9, the five-step proof skeleton, and the
+> empirical-constants estimation protocol are in
+> [`papers/p5-online-jepa-stability/PROTOCOL.md`](../../../papers/p5-online-jepa-stability/PROTOCOL.md)
+> — that file is the **canonical theorem source** going forward; this spec
+> section remains the design context. Mathematical drift between the two
+> documents will surface in CodeRabbit review on any T1–T5 leaf PR. The
+> scaffold also tightened the reduction-to-P0 condition: the new terms
+> vanish in the regime $(\Delta\to\infty,\ \kappa_k = 0)$, not "$\Delta\to\infty$ and $L_H \le 1$" as this
+> spec originally phrased it (`L_H \le 1` only bounds the head cost by
+> $\kappa_k$; full vanishing requires $\kappa_k = 0$, i.e., no L0 head
+> engaged at level k).
+
 **Theorem (Online JEPA Composite Stability — Generalized).** Let Σ be an RCS instantiated with:
 - L0 head H ∈ {LLM, world-model, SSC, hybrid, BC};
 - L1 controller π₁ = `L1ForwardRollout(s_θ, P_φ, z_target)`;
