@@ -308,6 +308,12 @@ def train_jepa(trajectories: list[Trajectory],
                cfg: TrainConfig,
                device: str = "cpu",
                verbose: bool = True) -> tuple[JEPA, list[dict]]:
+    if cfg.vicreg_var_weight <= 0.0:
+        raise ValueError(
+            "VICReg variance weight is non-optional (Q1-T6 invariant; "
+            "spec Section 4.1 invariant 3). Anti-collapse (H8) requires "
+            "var_weight > 0."
+        )
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     X_t, X_next = _build_pairs(trajectories)
@@ -714,7 +720,16 @@ def train_step_jepa(trajectories: list[StepTrajectory],
                     device: str = "cpu",
                     verbose: bool = True) -> tuple[JEPA, list[dict]]:
     """Same model architecture as `train_jepa`; only the trajectory type
-    differs. We materialize (X_t, X_next) pairs from precomputed features."""
+    differs. We materialize (X_t, X_next) pairs from precomputed features.
+
+    Q1-T6 invariant: vicreg_var_weight > 0 required (anti-collapse).
+    """
+    if cfg.vicreg_var_weight <= 0.0:
+        raise ValueError(
+            "VICReg variance weight is non-optional (Q1-T6 invariant; "
+            "spec Section 4.1 invariant 3). Anti-collapse (H8) requires "
+            "var_weight > 0."
+        )
     parts_t: list[np.ndarray] = []
     parts_next: list[np.ndarray] = []
     for traj in trajectories:

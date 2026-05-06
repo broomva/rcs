@@ -85,6 +85,22 @@ def test_build_trajectories_groups_by_size_seed_condition(tmp_path):
                     ("test", "0019deadbeef-test", "full")}
 
 
+def test_jepa_a_vicreg_non_optional_in_train_jepa(tmp_path):
+    """train_jepa() with var_weight=0 raises ValueError (Q1-T6 invariant).
+
+    Anti-collapse (H8) requires var_weight > 0. The API must never permit
+    a degenerate configuration that ships an unstable substrate.
+    """
+    _write_synthetic_metrics(tmp_path)
+    ja.TASK_VOCAB.clear()
+    records = ja.load_episodes(tmp_path)
+    trajectories = ja.build_trajectories(records)
+    cfg = ja.TrainConfig(epochs=1, batch_size=4, latent_dim=8, hidden=16,
+                          seed=0, vicreg_var_weight=0.0)
+    with pytest.raises(ValueError, match="VICReg.*non-optional"):
+        ja.train_jepa(trajectories, cfg, device="cpu", verbose=False)
+
+
 def test_train_jepa_smoke_runs_without_collapse(tmp_path):
     """A 2-epoch training pass on the synthetic fixture must:
     1) terminate without error,
@@ -264,6 +280,21 @@ def test_build_step_trajectories_drops_too_short(tmp_path):
     by_cid = ja.parse_workspace_events(ws)
     trajectories = ja.build_step_trajectories(by_cid)
     assert trajectories == []
+
+
+def test_jepa_a_vicreg_non_optional_in_train_step_jepa(tmp_path):
+    """train_step_jepa() with var_weight=0 raises ValueError.
+
+    Same Q1-T6 invariant as train_jepa, applied to the per-step training
+    entry point. Anti-collapse (H8) requires var_weight > 0.
+    """
+    _write_synthetic_workspace(tmp_path, n_episodes=4, steps_per_episode=5,
+                                 condition="flat")
+    trajectories = ja.collect_step_trajectories(tmp_path)
+    cfg = ja.TrainConfig(epochs=1, batch_size=4, latent_dim=8, hidden=16,
+                          seed=0, vicreg_var_weight=0.0)
+    with pytest.raises(ValueError, match="VICReg.*non-optional"):
+        ja.train_step_jepa(trajectories, cfg, device="cpu", verbose=False)
 
 
 def test_train_step_jepa_smoke_runs_without_collapse(tmp_path):
