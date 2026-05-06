@@ -840,6 +840,8 @@ Q3     docs(microrcs): pre-register Q3 thresholds    Constants ranges,
 
 These pre-registration PRs are committed BEFORE any data run. Downstream analysis scripts cite the specific commit hash.
 
+**Q1 pre-registration commit**: `data/q1_pre_registration.toml` — locks 10 SWE-bench-Lite instances, 3 seeds, 4 conditions, Haiku as L0 model, all gate thresholds (G1 Var ratio < 1.0; G2 r ≤ −0.2; G3 std_mean ≥ 0.5; P1 Spearman ρ ≤ −0.15 p<0.05), training hyperparameters, budget caps ($10, 24h). Frozen at PR (Q1-T0).
+
 ## 7. Risk Analysis + Open Questions + Migration Path (Section E)
 
 ### 7.1 Theoretical risks
