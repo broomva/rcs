@@ -26,8 +26,20 @@ REPORTS_DIR="${3:?missing reports_dir}"
 STATE_FILE="${STATE_DIR}/state.jsonl"
 POLL_INTERVAL="${POLL_INTERVAL:-60}"   # seconds between polls
 MIN_EPISODES="${MIN_EPISODES:-100}"    # 120 expected; allow 100 for partial-success classification
-MAX_USD="${MAX_USD:-10.0}"             # pre-reg budget cap (data/q1_pre_registration.toml)
-MAX_HOURS="${MAX_HOURS:-24}"           # pre-reg wall-clock cap
+
+# MAX_USD default MUST match data/q1_pre_registration.toml's [q1.budget]
+# max_usd value; otherwise an unset MAX_USD launches the watcher with a
+# stale ceiling that kills the long-running job ~12x sooner than pre-reg
+# permits (the exact class of drift this watcher exists to prevent).
+# Prefer reading from the TOML at launch site so the two stay coupled by
+# construction:
+#   MAX_USD=$(python3 -c 'import tomllib; from pathlib import Path; \
+#     cfg = tomllib.loads(Path("data/q1_pre_registration.toml").read_text()); \
+#     print(cfg["q1"]["budget"]["max_usd"])')
+# Default kept at 120.0 only as a fail-soft floor matching the current
+# pre-reg value; bump in lockstep when the TOML changes.
+MAX_USD="${MAX_USD:-120.0}"            # default mirrors pre-reg q1.budget.max_usd
+MAX_HOURS="${MAX_HOURS:-24}"           # pre-reg q1.budget.max_wall_clock_hours
 MAX_SECONDS=$(( MAX_HOURS * 3600 ))
 
 emit_event() {
@@ -78,12 +90,15 @@ count_episodes_completed() {
     # This is more accurate than events.jsonl file count because some instances
     # that hit per-instance --max-cost still log a result line but may not have
     # a finalized events.jsonl. Same bug-fix lineage as estimate_cost_usd().
+    # Trailing `|| echo "0"` mirrors estimate_cost_usd's robustness so an
+    # early-poll where no log files exist (or shopt -s inherit_errexit is
+    # enabled) still returns a clean integer rather than aborting the watcher.
     if [ ! -d "$REPORTS_DIR" ]; then
         echo "0"
         return
     fi
-    grep -h "score=" "$REPORTS_DIR"/seed-*.log 2>/dev/null | \
-        grep -v "done: pass" | wc -l | tr -d ' '
+    { grep -h "score=" "$REPORTS_DIR"/seed-*.log 2>/dev/null | \
+        grep -v "done: pass" | wc -l | tr -d ' '; } 2>/dev/null || echo "0"
 }
 
 START_TS=$(date +%s)
