@@ -1,0 +1,202 @@
+% =============================================================================
+% RCS Paper 5 --- Online JEPA Composite Stability (Article Format)
+% Skeleton scaffold (body to be drafted across T1--T5; see PROTOCOL.md).
+% =============================================================================
+\documentclass[11pt,a4paper]{article}
+
+% --- Encoding and fonts ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% --- Language ---
+\usepackage[english]{babel}
+
+% --- Page geometry ---
+\usepackage[margin=2.5cm]{geometry}
+
+% --- Colors (must load before hyperref for color mixing) ---
+\usepackage{xcolor}
+
+% --- Hyperlinks ---
+\usepackage[colorlinks=true,linkcolor=blue!70!black,citecolor=blue!70!black,urlcolor=blue!70!black]{hyperref}
+
+% --- Tables ---
+\usepackage{booktabs}
+\usepackage{array}
+
+% --- Paragraph spacing ---
+\usepackage{parskip}
+
+% --- Micro-typography ---
+\usepackage{microtype}
+
+% --- Shared RCS preamble (math, theorems, macros) ---
+% \SHAREDLATEX points at the shared LaTeX assets dir. Each paper in
+% papers/pN-.../ resolves it relative to its own location; preamble.tex
+% uses the macro to reference its own includes (parameters.tex, etc.).
+\def\SHAREDLATEX{../../latex}
+\input{\SHAREDLATEX/preamble}
+
+% --- Bibliography ---
+\usepackage[numbers,sort&compress]{natbib}
+
+% --- Paper-5 local macros (substrate / online JEPA) ---
+% These are used only in this paper. If a macro becomes load-bearing across
+% multiple papers it should be promoted to \SHAREDLATEX/preamble.tex.
+\newcommand{\encoder}{s_\theta}                 % JEPA encoder
+\newcommand{\predictor}{P_\varphi}              % JEPA predictor
+\newcommand{\emaencoder}{s'_\theta}             % EMA target encoder
+\newcommand{\head}[1]{\varphi_{H_{#1}}}         % L0 head emission map
+\newcommand{\headlip}{L_H}                      % Head Lipschitz constant
+\newcommand{\encoderlip}{L_\theta}              % Encoder Lipschitz constant
+\newcommand{\predictorlip}{L_P}                 % Predictor Lipschitz constant
+\newcommand{\onlineenc}{L_{o\theta}}            % Online encoder cost L_oθ(Δ,μ)
+\newcommand{\deplag}{\Delta}                    % Deployment lag (steps)
+\newcommand{\klcoef}{\mu}                       % KL regularizer coefficient
+\newcommand{\headvar}{\kappa}                   % Per-level head-payload variance proxy
+\newcommand{\composite}{\stab^{\mathrm{comp}}}  % Composite per-level margin
+
+% =============================================================================
+\title{Online JEPA Composite Stability\\
+A Two-Time-Scale Extension of Borkar (2008)\\
+for Recursive Controlled Systems with Learned Substrates}
+\author{Carlos D.\ Escobar-Valbuena}
+\date{May 2026 --- Scaffold Draft}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\emph{Scaffold placeholder.} Paper~0 of the Recursive Controlled Systems
+series proves a per-level stability budget
+$\stab_k = \decay_k - \adapt_k - \design_k - \delay_k - \switch_k$ under
+hand-set Lyapunov functions and hand-set constants. This paper generalises
+the budget to the setting in which the substrate $V_k$ itself is
+\emph{learned online} by a Joint-Embedding Predictive Architecture (JEPA),
+yielding two new cost terms: an \emph{online encoder cost}
+$\onlineenc(\deplag, \klcoef)$ derived by extending Borkar's Ch.~6
+two-time-scale stochastic approximation to discrete deployment events, and
+a \emph{head cost} $\headlip\,\headvar_k$ that bounds substrate
+sensitivity to head-specific payload variations. The new bound reduces to
+Paper~0's Theorem~VI exactly in the Paper~0 regime
+$(\deplag\to\infty,\;\headvar_k = 0)$ --- the encoder cost vanishes
+asymptotically and the head cost is identically zero when no L0 head is
+engaged at level~$k$. Under an engaged head with $\headlip \le 1$ the
+head cost is bounded by $\headvar_k$ but does not vanish; the bound is
+then strictly tighter than P0 and gates a CI-enforced production rollout
+via the empirical-constants protocol of Section~\ref{sec:constants}. The
+final abstract will be written in T5 once the constants table from Q3
+substrate measurements is in hand. See \texttt{PROTOCOL.md} for the locked
+theorem statement and proof skeleton.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+% =============================================================================
+\section{Introduction}
+\label{sec:introduction}
+% =============================================================================
+% TODO(T4): motivate moving from hand-set V_k to learned-substrate V_k;
+% state the contribution (first stability bound for online JEPA substrates
+% with provably-bounded deployment-lag drift); position relative to Paper~0's
+% Theorem~VI and to the broader JEPA-as-substrate research program.
+
+% =============================================================================
+\section{Related Work}
+\label{sec:related}
+% =============================================================================
+% TODO(T4): three threads:
+%   1. Two-time-scale stochastic approximation: Borkar (2008), Tsitsiklis
+%      \& Van Roy (1997), Konda \& Tsitsiklis (2003).
+%   2. JEPA / self-supervised learning: LeCun (2022) (\citep{lecun2022path}),
+%      Bardes-Ponce-LeCun (2022) VICReg, Assran et al. (2023) I-JEPA.
+%   3. Stability of switched / hybrid / learned-Lyapunov systems:
+%      Hespanha \& Morse (1999) (already cited in P0), Liberzon (2003),
+%      Khalil (2002) -- forward to P0.
+
+% =============================================================================
+\section{RCS Recap}
+\label{sec:recap}
+% =============================================================================
+% Short, cites Paper~0: restate the 7-tuple
+% $\rcs = (\X, \Y, \U, \dyn, \obs, \shield, \ctrl)$, Paper~0's Theorem~VI
+% (composite stability $\omega_N = \min_i \stab_i > 0$ under H1--H7), and
+% the four hand-set constants ($\encoderlip\rho_k$, $L_d\eta_k$,
+% $\beta_k\bar\tau_k$, $\ln\nu_k/\tau_a$) that Paper~5 will replace with
+% \emph{learned} analogues. No new proofs here; forward all details to
+% Paper~0.
+
+% =============================================================================
+\section{Theorem Statement}
+\label{sec:theorem}
+% =============================================================================
+% TODO(T4): state the theorem verbatim from PROTOCOL.md \S1. Six assumptions
+% H8a (encoder Lipschitz), H8b (predictor Lipschitz), H8c (deployment lag),
+% H8d (KL-bounded drift), H8e (stability monitor), H9 (head Lipschitz emission).
+% Conclusion: seven-term composite bound $\composite_k > 0$.
+% Corollary: reduction to Paper~0 Theorem~VI when $\deplag\to\infty$ and
+% $\headlip \le 1$.
+
+% =============================================================================
+\section{Proof}
+\label{sec:proof}
+% =============================================================================
+% TODO(T4): five-step argument from PROTOCOL.md \S2. Lemmas land as:
+%   \S\ref{sec:proof}.1 Lyapunov decomposition (T4)
+%   \S\ref{sec:proof}.2 Discrete-deployment Borkar lemma (T1) ---
+%                       \emph{the load-bearing technical contribution.}
+%   \S\ref{sec:proof}.3 Predictor-residual bound via Lipschitz composition (T4)
+%   \S\ref{sec:proof}.4 Head-Lipschitz cross-generalisation (T3)
+%   \S\ref{sec:proof}.5 Sum bounds and reduction-to-P0 (T4)
+% Each lemma is stated as a \texttt{lemma} environment from preamble.tex.
+
+% =============================================================================
+\section{Empirical-Constants Estimation Protocol}
+\label{sec:constants}
+% =============================================================================
+% TODO(T5): the seven-row constants table from PROTOCOL.md \S4. CI-gated
+% deployment criterion: $\hat\composite_k^{\mathrm{lower}} > 0$.
+% Per-head expected $\headlip$ table (LLM, world-model, state-space, hybrid,
+% behavior-cloning) from spec Section 4.4.
+% The Q3 measurement script (BRO-983) populates this table with empirical
+% values from at least 1000 sample pairs per Lipschitz constant.
+
+% =============================================================================
+\section{Discussion}
+\label{sec:discussion}
+% =============================================================================
+% TODO(T4--T5): regimes where the new terms dominate; sensitivity to
+% $\deplag$ and $\klcoef$ (with empirical curves from Q3); relationship to
+% the JEPA-as-substrate research program (Q1--Q5); explicitly: how the
+% theorem applies even when the empirical research program fails its joint
+% phase gate (\S5.2 of the spec) --- the theorem's bound diagnoses the
+% failure rather than being invalidated by it.
+
+% =============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =============================================================================
+% TODO(T5): limitations (hand-written proof; no Lean/Coq mechanization;
+% empirical figures depend on Q3 substrate landing); open questions
+% (multi-head $\headlip$ amplification; non-i.i.d.\ deployment events;
+% extension to L2/L3 estimators); threads to a future mechanized proof and
+% to the dormant categorical-foundations Paper~5 sibling.
+
+% =============================================================================
+% Bibliography
+% =============================================================================
+% Scaffold: anchor the load-bearing references for Paper~5 so the
+% bibliography is non-empty until T1--T5 populate the body with real
+% \cite commands. Borkar 2008 is the load-bearing reference for the
+% discrete-deployment two-time-scale extension (T1); Tsitsiklis \& Van
+% Roy 1997 is the closest TD-learning precedent; Bishop 2006 grounds the
+% KL-bound lemma (T2).
+\nocite{borkar2008stochastic}
+\nocite{tsitsiklis1997td}
+\nocite{bishop2006prml}
+\bibliographystyle{plainnat}
+\bibliography{\SHAREDLATEX/references}
+
+\end{document}
