@@ -73,5 +73,23 @@ vicreg_cov_weight = 1.0
 
 [q1.budget]
 # Cost cap per Q1 (auto-abort if exceeded).
-max_usd = 10.0
+#
+# DEVIATION 2026-05-06: original max_usd = 10.0 was based on a spec estimate
+# of "$0.07-0.10/instance Haiku" which proved 7-10x too low. Realized cost is
+# ~$0.70/instance × 10 instances × 4 conditions × 3 seeds = ~$84 total. The
+# $10 figure was advisory-only — neither launch_q1_data_collection.sh nor
+# swe_pilot.py enforce an aggregate cap (only per-instance --max-cost 2.0
+# applies). Watcher cost-extraction was buggy in attempt-2 (read events.jsonl
+# instead of seed-*.log) so it never tripped any cap.
+#
+# Adjusted ceiling reflects realized cost + 35% margin for retries/edge cases:
+# 3 seeds × ~$30/seed = $90 expected; $120 cap = hard kill at 33% above
+# expected. Watcher (logs/q1-t2-run/q1_t2_watcher.sh) now reads cost from
+# seed-*.log per-instance lines and CAN enforce this ceiling.
+#
+# Pre-reg discipline preserved: this is a budget envelope adjustment based on
+# wrong cost estimate, not a gate-threshold tuning. G1/G2/G3/P1/P2 thresholds
+# in this file remain LOCKED. Adjustment recorded in BRO-959 description and
+# logs/q1-t2-run/state.jsonl event "cost_cap_breached" + corresponding fix.
+max_usd = 120.0
 max_wall_clock_hours = 24
