@@ -76,16 +76,28 @@ Two new terms vs Paper 0:
   drift between canary deployments. Closed form derived by extending Borkar
   (2008) Ch. 6 (two-time-scale stochastic approximation) to the
   deployment-lag setting. Decreasing in $\Delta$; increasing in $1/\mu$.
-  **Vanishes when $\Delta \to \infty$** (frozen substrate; Q1+Q2 case).
+  **Vanishes ($\to 0$) as $\Delta \to \infty$** (frozen substrate; Q1+Q2
+  case).
 - $L_H\,\kappa_k$ — **head cost**. Captures substrate sensitivity to
-  head-specific payload variations. **Vanishes when $L_H \le 1$**
-  (head non-amplifying). Penalizes heads whose payloads vary wildly
-  (e.g., poorly-prompted LLM at temperature 1.0).
+  head-specific payload variations. With $L_H \le 1$ (head non-amplifying),
+  the head cost is **bounded by $\kappa_k$** ($L_H \kappa_k \le \kappa_k$),
+  meaning the head does not amplify per-level payload variance; with
+  $L_H > 1$ the head amplifies it. The term **vanishes only when no L0
+  head is engaged at level $k$** (i.e., $\kappa_k = 0$, the Paper 0
+  setting). Penalizes heads whose payloads vary wildly (e.g.,
+  poorly-prompted LLM at temperature 1.0).
 
-The theorem **reduces to Paper 0's Theorem VI** when $\Delta \to \infty$ and
-$L_H \le 1$. This is the formal sense in which Paper 5 is *additive* to
-Paper 0: the new terms vanish in the regime Paper 0 covers, and the bound is
-strictly tighter than Paper 0 in any regime where they do not vanish.
+The theorem **reduces to Paper 0's Theorem VI** in the Paper 0 regime
+$(\Delta \to \infty,\;\kappa_k = 0)$: the encoder cost vanishes
+asymptotically, the head cost is identically zero (no head engaged at
+level $k$ in P0's formalism), and the residual bound is exactly P0's
+Theorem VI. This is the formal sense in which Paper 5 is *additive* to
+Paper 0: the new terms are zero in the regime Paper 0 covers, and the
+bound is strictly tighter than Paper 0 in any regime where they are not.
+Under an engaged head with $L_H \le 1$, Paper 5's bound is non-trivial
+(strictly tighter than P0) but the head cost is at worst $\kappa_k$ —
+the level-$k$ head-payload variance proxy is exposed as the load-bearing
+quantity to bound empirically.
 
 ---
 
@@ -169,7 +181,11 @@ $$
 
 where $c$ is a level-$k$-dependent constant absorbing P0's standing
 hypotheses (H1)–(H7). Note $L_{o\theta} \to 0$ as $\Delta \to \infty$
-because $\varepsilon$ does, recovering P0 exactly.
+because $\varepsilon$ does. The reduction to P0 exactly requires
+additionally that no L0 head is engaged at level $k$
+($\kappa_k = 0$), making the head cost $L_H \kappa_k = 0$ identically;
+under those two conditions the seven-term bound collapses to P0's
+five-term bound.
 
 > **Status: TBC-T4** (BRO-992). Two weeks. The full proof is the
 > integrated writeup; T1–T3 supply the load-bearing lemmas.
@@ -250,8 +266,11 @@ Internal consistency of the hand-written proof is checked by:
    $\Delta$, $\mu$, $L_{o\theta}$, $L_H$, $\kappa_k$) appears in
    §1, §2, §4, and the LaTeX body, with identical names.
 2. **Reduction-to-P0 sanity check.** Setting $\Delta \to \infty$ and
-   $L_H \to 1$ in the final bound must reduce to Paper 0's
-   Theorem VI exactly. This is asserted at the end of T4.
+   $\kappa_k = 0$ (no head engaged at level $k$) in the final bound must
+   reduce to Paper 0's Theorem VI exactly. The first condition makes
+   $L_{o\theta} \to 0$ asymptotically; the second makes $L_H \kappa_k = 0$
+   identically. This is asserted at the end of T4 with both substitutions
+   shown explicitly.
 3. **Empirical bound check.** The Q3 constants-measurement protocol
    produces a numeric lower bound $\hat\lambda_{\text{composite}}$ that
    must agree with the theorem's prediction (within a confidence

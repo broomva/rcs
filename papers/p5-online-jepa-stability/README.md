@@ -60,14 +60,21 @@ Two new terms vs Paper 0:
 - $L_{o\theta}(\Delta, \mu)$ — **online encoder cost**, bounding the
   contribution of latent-state drift between canary deployments. Closed form
   derived by extending Borkar (2008) Ch. 6 to discrete deployment events.
+  Vanishes ($\to 0$) as $\Delta \to \infty$ (frozen substrate).
 - $L_H \kappa_k$ — **head cost**, bounding the contribution of head-specific
   payload variations to the encoder's effective Lipschitz constant.
+  With $L_H \le 1$ (non-amplifying head) the head cost is bounded by
+  $\kappa_k$; it vanishes only when no L0 head is engaged at level $k$
+  ($\kappa_k = 0$).
 
-When $\Delta \to \infty$ (frozen substrate) and $L_H \le 1$ (non-amplifying
-head), the new terms vanish and the bound reduces exactly to Paper 0
-Theorem VI. Paper 5 is therefore **strictly additive** to Paper 0: it
-covers every regime Paper 0 covers and extends to the new online + head-aware
-regime that Paper 0 does not address.
+The bound reduces exactly to Paper 0 Theorem VI in the Paper 0 regime
+$(\Delta \to \infty,\;\kappa_k = 0)$ — the encoder cost vanishes
+asymptotically and the head cost is identically zero (no head engaged).
+Paper 5 is therefore **strictly additive** to Paper 0: it covers every
+regime Paper 0 covers ($\kappa_k = 0$, frozen-substrate baseline) and
+extends to the engaged-head + online-substrate regime that Paper 0 does
+not address. Under an engaged head with $L_H \le 1$, Paper 5's bound is
+strictly tighter than P0 with the head cost bounded by $\kappa_k$.
 
 **Not a measurement paper.** Paper 1 is the empirical paper for frozen-substrate
 runtime measurements. Paper 5 is a theory paper: theorem statement, proof,
@@ -144,7 +151,7 @@ specified at `docs/superpowers/specs/2026-05-05-jepa-as-substrate-design.md`.
 The program has six phases (Q1, Q2.0, Q2.1, Q3, Q4, Q5) and a parallel
 theorem track:
 
-```
+```text
                       Q1 (substrate + AC-Trajectory-JEPA)
                            │
                            │ joint phase gate (G1/G2/G3 + P1/P2)

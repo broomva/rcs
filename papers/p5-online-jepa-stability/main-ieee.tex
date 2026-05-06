@@ -77,11 +77,14 @@ $\onlineenc(\deplag, \klcoef)$ derived by extending Borkar's Ch.~6
 two-time-scale stochastic approximation to discrete deployment events, and
 a \emph{head cost} $\headlip\,\headvar_k$ that bounds substrate
 sensitivity to head-specific payload variations. The new bound reduces to
-Paper~0's Theorem~VI exactly when $\deplag\to\infty$ (frozen substrate)
-and $\headlip \le 1$ (non-amplifying head); otherwise it is strictly
-tighter and gates a CI-enforced production rollout via the
-empirical-constants protocol of Section~\ref{sec:constants}. The final
-abstract will be written in T5 once the constants table from Q3
+Paper~0's Theorem~VI exactly in the Paper~0 regime
+$(\deplag\to\infty,\;\headvar_k = 0)$ --- the encoder cost vanishes
+asymptotically and the head cost is identically zero when no L0 head is
+engaged at level~$k$. Under an engaged head with $\headlip \le 1$ the
+head cost is bounded by $\headvar_k$ but does not vanish; the bound is
+then strictly tighter than P0 and gates a CI-enforced production rollout
+via the empirical-constants protocol of Section~\ref{sec:constants}. The
+final abstract will be written in T5 once the constants table from Q3
 substrate measurements is in hand.
 \end{abstract}
 
