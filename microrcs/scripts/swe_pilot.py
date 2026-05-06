@@ -322,7 +322,52 @@ def _run_condition(
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def _split_log_to_workspaces(
+    consolidated_log_path: Path,
+    output_root: Path,
+    condition: str,
+) -> int:
+    """Split a consolidated events.jsonl into per-(condition, episode_cid)
+    workspace structure consumable by `jepa_a.collect_step_trajectories`.
+
+    Each unique correlation_id starting with `ep_` becomes its own workspace
+    at:
+        <output_root>/<condition>/<cid>/.rcs/events.jsonl
+
+    Non-episode events (correlation_id not starting with `ep_`, e.g.
+    `control`, `epoch_5`, `gov_e3`) are skipped — they don't represent L0
+    agent steps and would confuse downstream substrate training.
+
+    Returns the count of episodes split out (0 if input log doesn't exist
+    or is empty).
+    """
+    if not consolidated_log_path.exists():
+        return 0
+
+    events_by_cid: dict[str, list[str]] = {}
+    for raw_line in consolidated_log_path.read_text().splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            d = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        cid = d.get("correlation_id", "")
+        if not isinstance(cid, str) or not cid.startswith("ep_"):
+            continue
+        events_by_cid.setdefault(cid, []).append(line)
+
+    for cid, lines in events_by_cid.items():
+        ws_dir = output_root / condition / cid / ".rcs"
+        ws_dir.mkdir(parents=True, exist_ok=True)
+        (ws_dir / "events.jsonl").write_text("\n".join(lines) + "\n")
+
+    return len(events_by_cid)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the swe_pilot CLI parser. Exposed for testing (Q1-T1)."""
     p = argparse.ArgumentParser(prog="swe_pilot", description=__doc__)
     p.add_argument(
         "--cache-root", type=Path,
@@ -348,6 +393,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--instance", action="append", default=None,
                    help="Override instance IDs. Repeatable.")
     p.add_argument("--quiet", action="store_true")
+    p.add_argument(
+        "--save-events", action="store_true",
+        help=("Mirror per-condition consolidated events.jsonl into per-"
+              "(cond, episode) workspace structure consumable by "
+              "jepa_a.collect_step_trajectories. Required for Q1-T2 "
+              "substrate training-data collection."),
+    )
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = build_parser()
     args = p.parse_args(argv)
 
     if "ANTHROPIC_API_KEY" not in os.environ:
@@ -410,6 +467,22 @@ def main(argv: list[str] | None = None) -> int:
     }
     summary_path = args.out / f"{pilot_run_id}-summary.json"
     summary_path.write_text(json.dumps(summary, indent=2))
+
+    # Q1-T1: when --save-events, mirror per-condition consolidated logs
+    # into per-(cond, episode) workspace structure for substrate training.
+    if args.save_events:
+        per_ws_root = args.out / "workspaces"
+        for cond in conditions:
+            cond_safe = cond.replace("+", "plus_")
+            consolidated = args.out / f"{pilot_run_id}-{cond}-events.jsonl"
+            n_split = _split_log_to_workspaces(
+                consolidated, per_ws_root, cond_safe
+            )
+            print(
+                f"[pilot] save-events: {cond:>14} → {n_split} episodes "
+                f"mirrored to {per_ws_root}/{cond_safe}/",
+                flush=True,
+            )
 
     print(f"\n[pilot] === HEADLINE ===", flush=True)
     print(f"{'cond':>14}  {'pass^1':>7}  {'cost':>7}", flush=True)
