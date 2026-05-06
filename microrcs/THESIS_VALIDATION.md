@@ -334,6 +334,65 @@ python3 -m scripts.jepa_a per-step \
     --epochs 100 --seed 42
 ```
 
+## JEPA-as-substrate research-program spec (PR #48)
+
+PR #48 ships the 1,105-line spec at `docs/superpowers/specs/2026-05-05-jepa-as-substrate-design.md` scoping a phased research program (Q1-Q5 + Paper 5) that turns JEPA from a sensor signal into the **substrate** for the RCS controller hierarchy. Synthesizes v1 + v2 null/limit results into a coherent next-step program.
+
+### Architecture commitment
+
+Three-trait family (mirrors Spec D AnimaCustody pattern):
+
+- `L0Head` — agent loop abstraction (LLM/world-model/SSC/hybrid/BC)
+- `JepaSubstrate` — encoder + predictor + EMA target + stability monitor
+- `L1Controller` — existing L1Autonomic + new L1ForwardRollout
+
+L0Head abstraction enables Q4 multi-head A/B and Q5 embodied extension. Substrate intrinsic control rate ~10 kHz; LLM is the binding constraint.
+
+### Theoretical contribution
+
+**Online JEPA Composite Stability Theorem** with 6 assumptions (H8a-e Lipschitz/deployment-lag/KL-drift/monitor + H9 head-Lipschitz):
+
+```
+λ_composite = γ_k − L_θρ_k − L_dη_k − β_kτ̄_k − L_oθ(Δ,μ) − L_Hκ_k
+              − ln(ν_k)/τ_a > 0
+```
+
+Two new terms vs P0: online encoder cost L_oθ(Δ,μ) and head cost L_H κ_k. Closed form derived by extending Borkar 2008 two-time-scale stochastic approximation to discrete-deployment setting. Full proof scoped to Paper 5; CI-gated empirical lower bound > 0 before any production rollout.
+
+### Validation surface
+
+SWE-bench-Lite paired A/B as primary validation surface — real GitHub bugs, pytest verification, paired McNemar test. Joint phase gate: math (G1 Var ratio + G2 Pearson r + G3 training health, 2-of-3) + production (P1 Spearman ρ ≤ -0.15, P2 z-L1 pass^1 ≥ hand-L1 pass^1, both-of-2). Kill criteria K1/K2 force clean stop on persistent failure.
+
+### Phase decomposition
+
+7 sub-epics under parent JEPA Substrate Research Program:
+- Q1 (8 tickets, ~2 weeks): substrate + AC-Trajectory-JEPA + Q1 SWE data
+- Q2.0 (3 tickets, mechanical): L0Head protocol introduction
+- Q2.1 (8 tickets, ~2 weeks): L1ForwardRollout + SWE A/B benchmark
+- Q3 (8 tickets, ~4 weeks): OnlineJepaSubstrate + canary + circuit breaker
+- Q4 (3 tickets, post-Q3): WorldModelL0Head + HybridL0Head + 3-way A/B
+- Q5 (1 sketched ticket): StateSpaceL0Head + sensor encoder
+- Paper 5 (5 tickets, parallel weeks 1-3 + 8-12): theorem track
+
+Critical path 11-12 weeks. Cost ~$386 ($4 Q1 Haiku + $132 Q2 Sonnet + $200 Q3 demo + $50 buffer). 3-month focused engineering.
+
+### Locked decisions
+
+7 decisions from brainstorm explicitly locked:
+1. Spec scope full Q1+Q2 with phased decommit
+2. Theory depth = full theorem (proofs in Paper 5)
+3. Q2 empirical scope L1 only; L0/L2/L3 architecturally scoped
+4. microRCS as proving ground; Life Rust deferred
+5. Phase gate = math 2-of-3 + production both-of-2 + kill criteria
+6. SWE-bench-Lite as primary validation surface
+7. Q3 encoder cadence = online (replay + canary + circuit breaker)
+
+### Status
+
+Design complete. Next: implementation plan via writing-plans skill (separate PR), then Q1 implementation begins.
+
+Full spec: `docs/superpowers/specs/2026-05-05-jepa-as-substrate-design.md`.
+
 ## Swarm-RCS-L0 first live run — quorum aggregation matters more than expected
 
 PR #40 shipped the SwarmL0Plant scaffold (3 architectural decisions: strict-majority answer-hash voting, union-of-peer-streams L1, helpers+memory+rules shared). PR #43 ran the first live invocation against gemma4 to test "does horizontal recursion (peer swarm + stigmergic substrate) help at the weakest tier?"
