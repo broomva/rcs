@@ -2,7 +2,7 @@
 # RCS — Build & Test
 # =============================================================================
 
-.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee epub epub-p0 epub-p1 test test-microrcs swe-smoke swe-smoke-dry swe-pilot swe-clean swarm-smoke params params-check clean
+.PHONY: all build build-p0 build-p0-article build-p0-ieee build-p1 build-p1-article build-p1-ieee build-p5-jepa build-p5-jepa-article build-p5-jepa-ieee epub epub-p0 epub-p1 test test-microrcs swe-smoke swe-smoke-dry swe-pilot swe-clean swarm-smoke params params-check clean
 
 # --- Parameters ---
 # data/parameters.toml is the single source of truth for all stability
@@ -21,7 +21,7 @@ params-check:
 
 all: build test
 
-build: build-p0 build-p1
+build: build-p0 build-p1 build-p5-jepa
 
 build-p0: build-p0-article build-p0-ieee
 
@@ -38,6 +38,18 @@ build-p1-article: params
 
 build-p1-ieee: params
 	cd papers/p1-stability && tectonic main-ieee.tex
+
+# Paper 5: Online JEPA Composite Stability (sub-epic BRO-955).
+# Sibling of dormant papers/p5-categorical-foundations/; see
+# papers/p5-online-jepa-stability/PROTOCOL.md \S8 for the naming
+# reconciliation note.
+build-p5-jepa: build-p5-jepa-article build-p5-jepa-ieee
+
+build-p5-jepa-article: params
+	cd papers/p5-online-jepa-stability && tectonic main.tex
+
+build-p5-jepa-ieee: params
+	cd papers/p5-online-jepa-stability && tectonic main-ieee.tex
 
 # --- EPUB (iOS Books / reflowable readers) ---
 # pandoc 3.x required; see scripts/tex2epub.sh for pipeline details.
