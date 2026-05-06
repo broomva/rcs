@@ -58,3 +58,11 @@ reports/swe-smoke/
 # microRCS SWE-bench pilot artifacts (machine-specific paths)
 reports/swe-pilot/
 microrcs/reports/
+
+# Q1-T2 substrate run artifacts (machine-specific paths)
+reports/q1-substrate/seed-*/
+reports/q1-substrate/raw/
+
+# Q1-T2 watcher runtime state (keep the script, ignore the per-run artifacts)
+logs/q1-t2-run/state.jsonl
+logs/q1-t2-run/*.pid
