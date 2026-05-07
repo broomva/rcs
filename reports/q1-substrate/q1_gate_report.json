@@ -1,0 +1,71 @@
+{
+  "commit_hash": "b195b2d9",
+  "q_phase": "Q1",
+  "gates": {
+    "g1": {
+      "pass": false,
+      "median_ratio": 342.6302814405415,
+      "n_conditions": 4,
+      "all_ratios": [
+        249.7156326645152,
+        423.79405687245344,
+        415.0871866629078,
+        270.17337621817524
+      ]
+    },
+    "g2": {
+      "pass": false,
+      "pearson_r": 0.07881717999937357,
+      "n": 78
+    },
+    "g3": {
+      "pass": false,
+      "reason": "non_monotone (max consec increases 12)",
+      "max_consecutive_increases": 12
+    },
+    "p1": {
+      "pass": false,
+      "spearman_rho": 0.07254484215651459,
+      "p_value": 0.52791824473158,
+      "n": 78
+    }
+  },
+  "decision": "FAIL",
+  "timestamp": "2026-05-06T22:41:05",
+  "metadata": {
+    "n_trajectories_total": 78,
+    "n_trajectories_per_condition": {
+      "flat": 19,
+      "full": 21,
+      "+autonomic": 21,
+      "+meta": 17
+    },
+    "n_pass_total": 3,
+    "jepa_var_per_condition": {
+      "flat": 0.00028286371557575117,
+      "full": 0.00036004747236561386,
+      "+autonomic": 0.00047302433396299035,
+      "+meta": 0.00030124728988011176
+    },
+    "heuristic_var_per_condition": {
+      "flat": 1.1327433231053234e-06,
+      "full": 8.495812211778491e-07,
+      "+autonomic": 1.1395782600900502e-06,
+      "+meta": 1.1150147142435056e-06
+    },
+    "training_history_epochs": 200,
+    "substrate_dir": "../reports/q1-substrate/jepa-substrate-q1",
+    "joint_gate_decision": {
+      "overall": "FAIL",
+      "math_gate_passes": 0,
+      "math_gate_threshold": 2,
+      "p1_pass": false,
+      "failed_gates": [
+        "g1",
+        "g2",
+        "g3",
+        "p1"
+      ]
+    }
+  }
+}
