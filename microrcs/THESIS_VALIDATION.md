@@ -393,6 +393,74 @@ Design complete. Next: implementation plan via writing-plans skill (separate PR)
 
 Full spec: `docs/superpowers/specs/2026-05-05-jepa-as-substrate-design.md`.
 
+## Q1-T8 — Q1 joint phase gate FAIL (2026-05-06, attempt-2 data)
+
+Q1 SWE-bench-Lite data collection finished after one operational restart (attempt-1 used `sk-ant-oat-` admin key → 401; attempt-2 used `sk-ant-api-` key → completed all 3 seeds in ~3h45m, 84 episodes, $79.53 — within revised $120 cap). MLP-JEPA per-step substrate trained for 200 epochs (24.8s wall) on 78 of 84 trajectories with ≥2 steps. Joint gate evaluated against pre-registered TOML thresholds.
+
+**Verdict: FAIL on all 4 gates.** No instrumentation issue (validator wired all 4 gates correctly; n=78 trajectories distributed across 4 conditions × 3 seeds). The failure modes are diagnostic-actionable rather than thesis-killing — full read below.
+
+### Headline numbers
+
+| Gate | Result | Threshold | Pre-reg key |
+|---|---|---|---|
+| **G1** Var ratio | median = **342.6** across 4 conditions (range 250–424) | < 1.0 | `g1_var_ratio_threshold` |
+| **G2** Pearson r(λ̂, score) | **+0.079** (n=78) | ≤ −0.2 | `g2_pearson_threshold` |
+| **G3** training health | non-monotone, 12 consecutive loss-increase epochs | ≤ 3 | `g3_max_loss_increase_consecutive_epochs` |
+| **P1** Spearman ρ(λ̂, pass-bool) | **+0.073**, p = 0.528 (n=78) | ≤ −0.15 ∧ p<0.05 | `p1_spearman_threshold`, `p1_significance_level` |
+
+Joint-gate decision: math_passes=0/3 ∧ p1_pass=False → **FAIL**. Full report: `reports/q1-substrate/q1_gate_report.{json,md}`.
+
+### Underlying empirical signal
+
+Pre-registered Q1 conditions × seeds (pass^1 per cell):
+
+```
+condition       seed-1   seed-1009   seed-2018   aggregate (n=30/cond)
+─────────────────────────────────────────────────────────────────────
+flat            0.00     0.00        0.00        0.000
++autonomic      0.10     0.00        0.00        0.033
++meta           0.10     0.00        0.00        0.033
+full            0.00     0.00        0.10        0.033
+```
+
+3 wins across 90 augmented-condition trials (3.3%) vs 0 wins across 30 flat trials. Directional signal favours augmented conditions but the absolute base rate is too low — pre-reg power analysis assumed n_pairs ≥ 60 with effect size Cohen's h=0.3 (which presumes pass-rates near 0.5), not 0.04.
+
+### Diagnosis (per spec §5.2 fail-branch)
+
+Each gate's failure has a distinct, structural cause:
+
+1. **G1 — heuristic baseline is degenerate**: Var[λ̂_heuristic] is ~10⁻⁶ per condition because `V_step = 0.3·cost_frac + 0.3·step_frac + 0.4·(1−score)` saturates at the per-instance cost cap ($2) and step cap (100); episodes that exhaust either look near-identical in V_step trajectory, so OLS slopes cluster tightly. JEPA's variance is real (~10⁻⁴), so the *ratio* is ~300×. **G1 in this regime measures heuristic degeneracy, not JEPA failure.**
+
+2. **G2 — class imbalance**: r=+0.079 with 3 positives out of 78 cannot be statistically negative. Score is ≈0 for 75/78 episodes, so any λ̂ distribution will produce r near 0. **G2 is unpowered, not falsified.**
+
+3. **G3 — VICReg + EMA target dynamics**: variance regularizer and predictor loss interact non-monotonically in early training; 12 consecutive small loss increases is well within normal VICReg behavior. The threshold of 3 was inherited from a simpler one-loss training assumption. **G3 threshold was mis-calibrated for VICReg, not training failure.**
+
+4. **P1 — same root cause as G2**: ρ=+0.073, p=0.528. Cannot detect a rank-correlation when 96% of pass-bool values are 0. Same n + class-imbalance issue.
+
+### Why this is not K1 yet
+
+`K1` requires Q1 to **fail twice on real data** — pre-reg specifies math gate fail on a *re-run*, not first attempt. This was a single attempt. Furthermore, three of the four gate failures are **instrumentation/power issues**, not substrate-as-Lyapunov falsifications:
+
+- G1's failure proves the heuristic baseline is a poor comparator at this regime — does not prove JEPA's λ̂ is uninformative.
+- G3's threshold is too aggressive for VICReg and unrelated to substrate quality.
+- G2 + P1 are unpowered with 3 positives out of 78.
+
+A second Q1 attempt that addresses these would be informative; firing K1 on this data would confuse instrumentation failure with thesis falsification.
+
+### Decision options surfaced (no auto-fire)
+
+| Option | Action | Cost / time | Discipline note |
+|---|---|---|---|
+| **A. K1 (downgrade JEPA → P0 instantiation row)** | Mark thesis falsified at this attempt; preserve spec as research-only | $0 | Honest stop but conflates instrumentation failure with substrate failure |
+| **B. Re-run Q1 on Sonnet** | Higher pass^1 (Sonnet ~3-4× Haiku on SWE-bench-Lite) → lift base rate above class-imbalance floor | ~$50–80 | Stays within pre-reg discipline (Sonnet is the planned Q2 model anyway); changes model, not gates |
+| **C. Adjust gate thresholds + re-run** | Re-derive G1 with a non-degenerate heuristic; loosen G3 max_consec_increases for VICReg; re-run | ~$80 | Risky for pre-reg discipline (gate-tuning post-hoc is the exact bias the pre-reg discipline forbids) |
+| **D. Adjust + Sonnet (B+C)** | Both fixes simultaneously | ~$80 | Combines fixes |
+| **E. Refine substrate architecture** | Replace per-step JEPA with episode-level JEPA (was v1) on per-step data; or add stronger feature engineering | ~$0 (re-train only) + $0–80 if re-collect | Architectural change, defer to Q2 design refresh |
+
+My read: **Option B (re-run on Sonnet)** is the cleanest discipline-preserving path. Sonnet is the planned Q2 model anyway; Q1 was on Haiku purely as a cost-save. The Haiku cost-save proved false economy here (no signal to evaluate). Sonnet's higher solve rate fixes the class-imbalance directly, which fixes G2 + P1 mechanically. G1 + G3 may also resolve if higher-quality trajectories give the heuristic + JEPA both real variance.
+
+**K1 not fired pending your decision on options.** PR ships the validator wiring + this gate report; subsequent action follows from your call.
+
 ## Swarm-RCS-L0 first live run — quorum aggregation matters more than expected
 
 PR #40 shipped the SwarmL0Plant scaffold (3 architectural decisions: strict-majority answer-hash voting, union-of-peer-streams L1, helpers+memory+rules shared). PR #43 ran the first live invocation against gemma4 to test "does horizontal recursion (peer swarm + stigmergic substrate) help at the weakest tier?"

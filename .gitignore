@@ -66,3 +66,9 @@ reports/q1-substrate/raw/
 # Q1-T2 watcher runtime state (keep the script, ignore the per-run artifacts)
 logs/q1-t2-run/state.jsonl
 logs/q1-t2-run/*.pid
+
+# Q1-T8 trained substrate + flat aggregator symlinks (regenerable via
+# `python -m scripts.jepa_a per-step ...`). The gate report itself
+# (q1_gate_report.{json,md}) IS committed as an authoritative artifact.
+reports/q1-substrate/jepa-substrate-q1/
+reports/q1-substrate/all-episodes/
