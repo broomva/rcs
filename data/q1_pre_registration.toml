@@ -39,8 +39,34 @@ values = [1, 1009, 2018]
 values = ["flat", "+autonomic", "+meta", "full"]
 
 [q1.model]
-# Haiku for cost-efficiency; signal-sufficient at this tier.
-provider = "anthropic:claude-haiku-4-5"
+# DEVIATION 2026-05-06 (attempt-3): Haiku 4-5 was the original choice
+# "for cost-efficiency; signal-sufficient at this tier". Q1-T8 attempt-2
+# verdict (PR #60, commit 438e0bc) showed it was NOT signal-sufficient:
+# Haiku's 3.8% pass^1 on SWE-bench-Lite produced 3 positives out of 78
+# trajectories — the joint phase gate's G2 (Pearson r) and P1 (Spearman ρ)
+# cannot statistically support a -0.2 / -0.15 threshold under that class
+# imbalance regardless of substrate quality. Pre-reg power analysis
+# (data/q1_pre_registration.toml + spec §5.5) assumed Cohen's h=0.3 around
+# 0.5 base rate — the Haiku regime falls outside that assumption.
+#
+# Sonnet 4-5 was always the planned Q2 model (spec §5.3); using it for Q1
+# data collection too is a discipline-preserving fix because:
+#   1. Gates (G1/G2/G3/P1/P2) are NOT being tuned — they remain LOCKED.
+#   2. The change is to the data-collection configuration upstream of
+#      the gate evaluation, not to the gate evaluation itself.
+#   3. Sonnet's expected SWE-bench-Lite pass^1 (~15-20%, per existing
+#      microRCS pilot data and SWE-bench leaderboard) gives n_positives
+#      sufficient for the pre-registered statistical thresholds to discriminate.
+#   4. K1 was NOT fired on attempt-2 because three of four gate failures
+#      were diagnosed as instrumentation/power, not substrate falsification.
+#      A Sonnet re-run resolves the instrumentation/power issue mechanically;
+#      the substrate's real signal-or-no-signal verdict is what attempt-3 measures.
+#
+# This is the only change to [q1.model] across attempts; no further model
+# adjustments will be made within Q1. If attempt-3 also FAILs on real signal
+# (G1+G2+G3+P1 with adequate base rate), THAT is the second failure that
+# triggers K1 per spec §5.5.
+provider = "anthropic:claude-sonnet-4-5"
 
 [q1.gate.math]
 # G1: median Var ratio < 1.0 across >= 3 conditions
@@ -87,9 +113,19 @@ vicreg_cov_weight = 1.0
 # expected. Watcher (logs/q1-t2-run/q1_t2_watcher.sh) now reads cost from
 # seed-*.log per-instance lines and CAN enforce this ceiling.
 #
-# Pre-reg discipline preserved: this is a budget envelope adjustment based on
-# wrong cost estimate, not a gate-threshold tuning. G1/G2/G3/P1/P2 thresholds
-# in this file remain LOCKED. Adjustment recorded in BRO-959 description and
-# logs/q1-t2-run/state.jsonl event "cost_cap_breached" + corresponding fix.
-max_usd = 120.0
+# DEVIATION 2026-05-06 (attempt-3): Sonnet 4-5 input/output token cost is
+# ~5x Haiku 4-5 ($3/$15 vs $0.80/$4 per MTok), and Sonnet typically uses
+# more tokens per agent step (longer reasoning). Realized Haiku attempt-2
+# cost was $79.53 across 84 episodes / 3 seeds. Project Sonnet at
+# 4x-5x Haiku throughput-adjusted cost = ~$80/seed × 3 = ~$240; $300 cap
+# = hard kill at 25% above expected. Per-instance --max-cost 2.0 stays
+# unchanged (still bounds individual runaway).
+#
+# Pre-reg discipline preserved (both deviations): both adjustments are
+# operational — wrong cost estimate (PR #59) and wrong model tier for the
+# regime (this attempt). G1/G2/G3/P1/P2 thresholds in this file remain
+# LOCKED across all three attempts. Adjustments recorded in BRO-959
+# description, logs/q1-t2-run/state.jsonl, and the per-attempt commit
+# messages.
+max_usd = 300.0
 max_wall_clock_hours = 24
