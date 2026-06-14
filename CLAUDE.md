@@ -234,8 +234,9 @@ Never edit the mirror by hand. If CI in life reports canonical-parameter test fa
 
 ## Forthcoming
 
-- **Integration test end-to-end strengthening** (life-repo follow-up): replace the current reconstruction-style test in `rcs_validation.rs` with one that observes the actual autonomic daemon's `HomeostaticState` and asserts `lambda_1 > 0` against real runtime state. Work in progress.
-- **L0 and L2 estimators** (life-repo): `MarginEstimator::for_l0` (hooking `aios_runtime` tick stats) and `MarginEstimator::for_l2` (bridging `autoany-core::loop_engine`). Not yet implemented — scope of the F2 PR was L1 only (the only level with direct `HomeostaticState` observability).
+- **L0 and L2 estimators** (life-repo): `MarginEstimator::for_l0` (hooking `aios_runtime` tick stats) and `MarginEstimator::for_l2` (bridging `autoany-core::loop_engine`). Not yet implemented — scope of the F2 PR was L1 only (the only level with direct `HomeostaticState` observability). So L1's margin is *measured from real runtime state*; L0, L2, L3 remain *calibrated estimates*.
+
+> **Done (was forthcoming — corrected 2026-06-14, BRO-1517):** the L1 end-to-end real-trace test landed (life#804). `crates/arcan/arcand/tests/rcs_validation.rs` *replaced* the reconstruction-style test and asserts `lambda_1 > 0` against the daemon's **actual** `HomeostaticState` (no parallel state). Confirmed green this date: `rcs_l1_margin_is_positive_from_real_daemon_state`, `rcs_l1_observer_survives_multiple_cycles`, `rcs_handle_exposes_live_observer_through_registry`, `rcs_canonical_parameters_reproduce_paper_lambdas` — 4/4. The earlier "Work in progress" bullet here contradicted the `life#804` row in the Landed-infrastructure table above; this resolves the drift.
 
 ## Key References
 
