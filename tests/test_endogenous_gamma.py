@@ -32,6 +32,14 @@ TWO thresholds, three regimes:
                 certificate flips negative before the singularity (control lost).
 
 This file is the runnable witness: pure stdlib (math only) so it runs in CI.
+
+NOTE (asymptotic caveat — see docs/endogenous-gamma-derivation.md §7): control-loss
+is asymptotic in gamma — gamma_crit -> inf as alpha -> (2-p)+, so very close to the
+threshold the flip occurs only at astronomically large capability (beyond this test's
+gamma cap). The tests deliberately sample alpha at astar +/- {0.4, 0.5, 1.5}, i.e.
+*outside* that near-threshold band, where the flip is reached within the integrated
+trajectory. The certificate sign (gamma_eff) is necessary, not yet sufficient, for
+full closed-loop stability under non-stationary gamma (the open Tikhonov theorem).
 """
 
 import math

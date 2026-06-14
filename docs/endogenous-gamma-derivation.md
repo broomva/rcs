@@ -49,6 +49,16 @@ the **largest exponent**, `max(α−2, α+p−2) = α+p−2` (since p ≥ 0). He
 > α > α*: `γ_eff` flips negative at `γ_crit = (…)^{1/(α+p−2)}` (finite) — **control lost**.
 > α < α*: `γ_eff → γ` — **homeostatic control maintained even as capability → ∞**.
 
+**What "iff" means here (necessary-asymptotic, not full closed-loop).** The result is a
+statement about the *contraction certificate* `γ_eff`, which is **necessary** for
+closed-loop homeostatic stability under growing γ. It is not yet the full closed-loop
+theorem — that needs the singular-perturbation argument re-derived for non-stationary γ
+(§7, OPEN). So the bold "control maintained / lost" below should be read as "the
+certificate holds / fails," which is the asymptotic boundary, not a proof of full
+stability. **Marginal line** α = 2−p exactly (measure-zero): there the adaptation term
+→ the constant `B_a·p`, so positivity hinges on `B_a·p < 1`; the strict inequality
+α < 2−p is what the theorem asserts.
+
 Two endpoints:
 - **p = 0** (capability free to wield) → **α\* = 2** — recovers the switching-only budget (the result before adaptation cost is added).
 - **p = 1** (verification cost scales with capability) → **α\* = 1**.
