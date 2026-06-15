@@ -31,7 +31,8 @@ TWO thresholds, three regimes:
                 (homeostasis survives, ceiling is thermodynamic); above it the
                 certificate flips negative before the singularity (control lost).
 
-This file is the runnable witness: pure stdlib (math only) so it runs in CI.
+This file is the runnable witness: pure stdlib (math + tomllib). It is wired into
+the Makefile `test` target and the ci.yml `test-proofs` job, so it runs in CI.
 
 NOTE (asymptotic caveat — see docs/endogenous-gamma-derivation.md §7): control-loss
 is asymptotic in gamma — gamma_crit -> inf as alpha -> (2-p)+, so very close to the
@@ -44,6 +45,10 @@ full closed-loop stability under non-stationary gamma (the open Tikhonov theorem
 
 import math
 import sys
+import tomllib
+from pathlib import Path
+
+PARAMETERS_TOML = Path(__file__).resolve().parents[1] / "data" / "parameters.toml"
 
 KAPPA, ETA = 0.10, 0.20
 LN_NU, C, L_TH = math.log(1.2), 10.0, 5.0
@@ -153,6 +158,50 @@ def test_certificate_monotone_in_alpha():
     print("  PASS  gamma_eff decreasing in alpha at fixed capability")
 
 
+def test_canonical_lambda_cache_consistent():
+    """Drift guard tying this file's p=0 endpoint to the canonical budget.
+
+    This file's switching-cost coefficient B_s = ln(nu)*c*kappa*eta GENERALISES
+    the canonical per-level switching cost ln(nu)/tau_a (Eq. 15). The p=0 endpoint
+    (alpha* = 2, test_p0_recovers_switching_only_threshold) *is* the switching-only
+    stability budget. So this file participates in the repo's drift net exactly as
+    tests/test_stability_budget.py::test_recursive_all_levels_stable does: recompute
+    lambda_i from data/parameters.toml and assert they match the cached
+    [derived.lambda] / [derived.omega]. If the canonical params drift, the
+    'recovers the switching-only budget' grounding of the p=0 claim silently rots —
+    this catches it (and keeps the alpha* = 2-p endpoints anchored to the paper)."""
+    with PARAMETERS_TOML.open("rb") as f:
+        cfg = tomllib.load(f)
+    assert cfg["schema_version"] == 1, (
+        f"unsupported schema_version {cfg['schema_version']}: written for v1"
+    )
+
+    def lam(l: dict) -> float:
+        # lambda_i = gamma - L_theta*rho - L_d*eta - beta*tau_bar - ln(nu)/tau_a
+        return (l["gamma"] - l["L_theta"] * l["rho"] - l["L_d"] * l["eta"]
+                - l["beta"] * l["tau_bar"] - math.log(l["nu"]) / l["tau_a"])
+
+    cached = cfg["derived"]["lambda"]
+    recomputed = {l["id"]: lam(l) for l in cfg["levels"]}
+    assert set(recomputed) == {"L0", "L1", "L2", "L3"}, sorted(recomputed)
+    for lid, val in recomputed.items():
+        assert abs(val - cached[lid]) < 1e-6, (
+            f"drift: [derived.lambda].{lid} = {cached[lid]} in TOML but recomputed "
+            f"{val:.9f}. Run scripts/gen_parameters_tex.py."
+        )
+    omega = min(recomputed.values())
+    omega_level = min(recomputed, key=lambda k: recomputed[k])
+    cached_omega = cfg["derived"]["omega"]
+    assert abs(omega - cached_omega["value"]) < 1e-6, (
+        f"drift: [derived.omega].value = {cached_omega['value']} but recomputed {omega:.9f}"
+    )
+    assert omega_level == cached_omega["level"], (
+        f"drift: [derived.omega].level = {cached_omega['level']!r} but argmin is {omega_level!r}"
+    )
+    print(f"  PASS  canonical [derived.lambda] cache consistent "
+          f"(omega = {omega:.6f} at {omega_level}; p=0 endpoint grounded)")
+
+
 if __name__ == "__main__":
     tests = [
         test_control_loss_threshold_is_2_minus_p,
@@ -161,6 +210,7 @@ if __name__ == "__main__":
         test_blowup_time_matches_analytic,
         test_subcritical_no_finite_time_blowup,
         test_certificate_monotone_in_alpha,
+        test_canonical_lambda_cache_consistent,
     ]
     print("=" * 64)
     print("Endogenous-gamma: controllability of recursive capability growth")

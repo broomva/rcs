@@ -1,8 +1,20 @@
+---
+title: "Endogenous-γ: controllability of recursive capability growth"
+type: derivation
+ticket: BRO-1518
+status: conjecture
+tags: [rcs, rsi, intelligence-explosion, stability, endogenous-gamma, controllability]
+related:
+  - "[[tests/test_endogenous_gamma.py]]"
+  - "[[data/parameters.toml]]"
+created: 2026-06-14
+---
+
 # Endogenous-γ: controllability of recursive capability growth (BRO-1518)
 
 The formal model of recursive self-improvement / "intelligence explosion" *within*
 the RCS stability budget. Companion to the runnable witness
-`tests/test_endogenous_gamma.py`. Graduation target: a P2-EGRI section or a short
+[[tests/test_endogenous_gamma.py]]. Graduation target: a P2-EGRI section or a short
 standalone paper, *Controllability of Recursive Capability Growth*.
 
 ## 1. The coupled system
@@ -11,7 +23,7 @@ In P0, `γ` (the nominal decay rate, Assumption `ass:decay`) is a **constant** �
 substrate's contraction capability. To model self-improvement, promote it to a state
 variable that grows by self-modification (spending design effort `η`):
 
-```
+```text
 dγ/dt = κ · η · γ^α          (RSI kernel; α = returns-to-self-improvement exponent)
 ```
 
@@ -30,7 +42,7 @@ cost channels scale with capability:
 Closed-loop, the homeostatic Lyapunov function `V_p` therefore obeys
 `dV_p/dt ≤ −γ_eff(γ) V_p` with the **effective decay**
 
-```
+```text
 γ_eff(γ) = γ − B_s γ^{α−1} − B_a p γ^{α+p−1}.
 ```
 
@@ -43,7 +55,7 @@ the **largest exponent**, `max(α−2, α+p−2) = α+p−2` (since p ≥ 0). He
 
 > **Controllability threshold.** The contraction certificate `γ_eff` stays positive
 > for all large γ iff
-> ```
+> ```text
 >     α  <  α*  =  2 − p .
 > ```
 > α > α*: `γ_eff` flips negative at `γ_crit = (…)^{1/(α+p−2)}` (finite) — **control lost**.
