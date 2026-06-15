@@ -61,6 +61,9 @@ jobs:
       - name: Test Lyapunov simulation
         run: python3 tests/test_lyapunov_simulation.py
 
+      - name: Test endogenous-gamma (controllability)
+        run: python3 tests/test_endogenous_gamma.py
+
   test-microrcs:
     name: microRCS Tests
     needs: params-drift-check
