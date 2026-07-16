@@ -67,6 +67,9 @@ jobs:
       - name: Test agency-necessity (persistence needs lambda>0)
         run: python3 tests/test_agency_necessity.py
 
+      - name: Test non-stationary objective (internalized verifier decouples goal)
+        run: python3 tests/test_nonstationary_objective.py
+
   test-microrcs:
     name: microRCS Tests
     needs: params-drift-check
