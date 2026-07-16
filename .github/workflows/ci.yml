@@ -70,6 +70,9 @@ jobs:
       - name: Test non-stationary objective (internalized verifier decouples goal)
         run: python3 tests/test_nonstationary_objective.py
 
+      - name: Test persistent-excitation dither (identifiability restores coupling)
+        run: python3 tests/test_pe_dither_identifiability.py
+
   test-microrcs:
     name: microRCS Tests
     needs: params-drift-check
