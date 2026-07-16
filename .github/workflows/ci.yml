@@ -64,6 +64,9 @@ jobs:
       - name: Test endogenous-gamma (controllability)
         run: python3 tests/test_endogenous_gamma.py
 
+      - name: Test agency-necessity (persistence needs lambda>0)
+        run: python3 tests/test_agency_necessity.py
+
   test-microrcs:
     name: microRCS Tests
     needs: params-drift-check
