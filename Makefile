@@ -92,6 +92,7 @@ test: params-check test-microrcs
 	python3 tests/test_stability_budget.py
 	python3 tests/test_lyapunov_simulation.py
 	python3 tests/test_endogenous_gamma.py
+	python3 tests/test_agency_necessity.py
 
 # microrcs/ — single-file LLM-controller RCS baseline (P0/P1 empirical witness)
 test-microrcs:
