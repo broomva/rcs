@@ -33,8 +33,11 @@ and re-inject it, and *that* restores **separable** control of the world-target
 (`∂x*/∂ν → 0` under PE; see §4 — without PE the corrector still moves `x` but drags
 the internal nuisance in with it). So the dither is:
 
-- **necessary** — without a persistently-exciting probe, the corrector is blind
-  (`r₀` is unobservable from the internalized loop), and
+- **necessary** — without a persistently-exciting probe the corrector cannot
+  steer the world-target *separably*: with no probe at all `r₀` is unobservable
+  (`α=0`), and with a merely *collinear* probe the estimate collapses to the blend
+  `r̂₀=½(r₀+ν)`, so steering "toward `r₀`" drags the nuisance `ν` in with equal
+  weight (§4) — a nonzero-but-inseparable handle, not a blind one, and
 - **insufficient** — you also need the corrector that uses the identified `r₀`.
 
 This is exactly why the verifiable pause requires *both* exogenous members: the
@@ -56,6 +59,13 @@ estimator **variance** scaling like `1/α` (so error *magnitude* `∝ 1/√α`).
 rank-deficient (non-PE) probe leaves the parameters unidentifiable. We *apply* this
 theorem; we do not reprove it.
 
+*What the witness measures.* §2 states the **windowed** bound `∫_t^{t+T} φφᵀ ≥ αI`;
+the runnable witness (§3) instead computes the **full-run averaged** Gram
+`(1/n)Σφφᵀ`. For the stationary, periodic probes used here the two agree up to
+constants — over an integer number of periods the time-average equals the windowed
+integral divided by the window length — so the reported `α` is the windowed PE
+bound up to that normalization, not a different quantity.
+
 ## 3. The identification model
 
 Two hidden parameters `θ* = [r₀, ν]` (a world-target and a nuisance), so PE **of
@@ -68,13 +78,16 @@ y(t) = φ(t)·θ* = w₁(t)·r₀ + w₂(t)·ν,     θ̂ = (Σ φφᵀ)⁻¹ (�
 | Probe | `w₁, w₂` | `Σφφᵀ` | Result |
 |---|---|---|---|
 | **PE** | `sin t`, `sin 2t` (distinct freqs) | full rank, `α>0` | `θ̂ = θ*` exactly — `r₀` recovered |
-| non-PE (constant) | `1`, `1` | rank 1, `α≈0` | `r₀` not separable from `ν` |
-| non-PE (single freq) | `sin t`, `sin t` | rank 1, `α≈0` | collinear channels (linearly dependent) |
+| collinear (constant) | `1`, `1` | rank 1, `α≈0` | `r₀` not separable from `ν` |
+| collinear (shared sinusoid) | `sin t`, `sin t` | rank 1, `α≈0` | identical channels (linearly dependent) |
 | no probe | `0`, `0` | zero | `r₀` fully hidden (the BRO-1924 baseline) |
 
-Not *any* dither works — only one whose regressor channels are linearly
-independent (persistently exciting to the order of the unknowns). (Witnessed:
-`α = 0.47 > 0` for the PE probe; `α = 0` for constant, collinear, and no probe.)
+Not *any* dither works — but the failure mode is regressor-channel **collinearity**
+(`w₁=w₂`), not spectral poverty per se: a single sinusoid sampled into two *distinct*
+lagged regressors is already persistently exciting of order 2 (Åström–Wittenmark).
+What the two failing rows share is `w₁=w₂` (identical channels ⟹ rank-1 Gram), which
+is exactly why they cannot separate two unknowns. (Witnessed: `α = 0.47 > 0` for the
+PE probe; `α = 0` for both collinear probes and the no-probe baseline.)
 
 ## 4. Restored coupling — *separability* is the switch
 
@@ -100,8 +113,18 @@ world-target can be steered *without contaminating it* with the internal nuisanc
 `ν`. Under PE, `∂x*/∂ν = 0` — the corrector moves the goal along the world axis
 alone. Without PE, `∂x*/∂ν = ∂x*/∂r₀` — "correcting toward the world" drags the
 nuisance in with equal weight. That is the `endogenous-reference-contamination`
-failure made precise: **inseparability, not decoupling**. (Witnessed: `∂x*/∂ν =
-0.000` under PE vs `0.292` without.)
+failure made precise: **inseparability, not decoupling**.
+
+Witnessed against an **integrated** corrector, not the closed form:
+`test_integrated_corrector_pins_correction_fraction` RK-integrates
+`ẋ = −k(x−g(x)) − k_c(x−r̂₀)` to its fixed point, confirms it equals the closed form
+`(kb+k_c r̂₀)/(k(1−a)+k_c)`, checks `∂x*/∂r̂₀ = 0.583 = correction_fraction()` by
+finite difference *through* that integration, and then finite-differences the
+end-to-end world sensitivities through the REAL least-squares estimator composed
+with the integrated fixed point: `∂x*/∂r₀ = 0.583` (PE) vs `0.292` (non-PE), and
+`∂x*/∂ν = 0.000` (PE) vs `0.292` (non-PE). Every `0.583`/`0.292` in this table is
+*reproduced* by integrating the ODE and running the estimator, then checked against
+these values — not obtained by evaluating the closed-form gain alone.
 
 ## 5. The excitation threshold
 
@@ -137,6 +160,11 @@ rate rather than a switch.)
   dither is absorbed before it identifies (`h* → 0` as `ρ → ∞`); above it coupling
   is sustained.
 
+The threshold is **well-posed only for `0 < h_min < h_max` and `β, ρ > 0`**. Since
+`h* = βσ²h_max/(ρ+βσ²) < h_max` for every finite `σ²`, a target `h_min ≥ h_max` is
+unreachable at *any* excitation and the formula divides by a non-positive
+`(h_max − h_min)` — undefined. (`excitation_threshold` enforces this precondition.)
+
 ## 6. Where it sits in the RSI account
 
 This closes the four-corner picture. BRO-1924 said internalizing the verifier
@@ -152,14 +180,18 @@ Alignment is engineerable, and this is its cost function.
 
 ## 7. Status — validated vs classical vs open
 
-- **Validated** (`tests/test_pe_dither_identifiability.py`, 8/8 green in CI): PE
+- **Validated** (`tests/test_pe_dither_identifiability.py`, 9/9 green in CI): PE
   probe identifies `[r₀, ν]` exactly (`α>0`); constant / collinear / no probe all
   fail (`α≈0` — rank-deficient, `r₀` inseparable from `ν`); the PE bound `α` governs
-  estimation error (magnitude `∝ 1/√α ∝ 1/amp`, genuinely nonzero — exponent pinned,
-  not merely monotone); restored steering is **separable** (`∂x*/∂ν≈0`) iff PE while
-  non-PE contaminates (`∂x*/∂ν = ∂x*/∂r₀`, both `0.292` — finite-differenced from the
-  real estimator, not hardcoded); the threshold `σ*² = ρ h_min/(β(h_max−h_min))`
-  (`σ²=0` recovers BRO-1924, analytic == integrated); dither absorbed as `ρ→∞`.
+  estimation error (a deterministic projection *bias* of magnitude `∝ 1/√α ∝ 1/amp`,
+  genuinely nonzero — exponent pinned, not merely monotone); restored steering is
+  **separable** (`∂x*/∂ν≈0`) iff PE while non-PE contaminates (`∂x*/∂ν = ∂x*/∂r₀`,
+  both `0.292`); the `0.583`/`0.292` sensitivities and `correction_fraction()=0.583`
+  are finite-differenced **through the RK-integrated corrector fixed point**
+  `ẋ=−k(x−g(x))−k_c(x−r̂₀)` (`test_integrated_corrector_pins_correction_fraction`) —
+  witnessed against the ODE, not hardcoded or asserted; the threshold
+  `σ*² = ρ h_min/(β(h_max−h_min))` (well-posed for `0<h_min<h_max`; `σ²=0` recovers
+  BRO-1924, analytic == integrated); dither absorbed as `ρ→∞`.
 - **Classical** (cited, not re-proved): PE ⟺ identifiability and the estimator
   variance bound `∝ 1/α` (⟹ error magnitude `∝ 1/√α`) (Åström–Wittenmark). This
   derivation *applies* it to the alignment framing.

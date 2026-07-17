@@ -24,7 +24,7 @@ to, not identical with, the trajectory-conserved independence h⟂U) is
 
 Consequences at μ = 1 (verifier fully internalized):
   1. EXISTENCE DICHOTOMY — g(x)=x+c (a=1, c≠0) has NO fixed point ⟹ ẋ = kc,
-     unbounded drift (incoherent-drift sub-case); or |a|<1 ⟹ unique x*=b/(1−a).
+     unbounded drift (incoherent-drift sub-case); or a<1 ⟹ unique x*=b/(1−a).
   2. DECOUPLING — at any fixed point ∂x*/∂r₀ = 0: the terminal objective is
      causally independent of the exogenous task (the reward-hack / wirehead
      fixed point). h_coupling collapses 1 → 0.
@@ -40,7 +40,7 @@ instrumental convergence). It yields either (a) drift with no stable terminal
 goal, or (b) convergence to a fixed point of its own evaluation map, decoupled
 from the world. "Monomaniacal coherent optimizer" is neither.
 
-Cross-link to the agency lemma (BRO-1923): at μ=1, |a|<1 the closed loop is
+Cross-link to the agency lemma (BRO-1923): at μ=1, a<1 the closed loop is
 still CONTRACTING — effective rate λ = k(1−a) > 0 clears the agency-necessity
 bar — yet its goal is world-decoupled. λ>0 buys CONVERGENCE, not CORRECTNESS.
 
@@ -48,6 +48,7 @@ Pure stdlib (math only). Wired into the Makefile `test` target and the ci.yml
 `test-proofs` job, so it runs in CI.
 """
 
+import math
 import sys
 
 K = 1.0   # controller gain (a valid contraction rate; agency-necessity, BRO-1923)
@@ -113,7 +114,7 @@ def test_exogenous_objective_stationary_and_world_coupled():
 
 
 def test_endogenous_contraction_map_converges():
-    """μ=1, |a|<1: internalized verifier with a contraction map has a unique
+    """μ=1, a<1: internalized verifier with a contraction map has a unique
     fixed point x*=b/(1−a)."""
     a, b = 0.5, 3.0
     x_star = steady_state(1.0, a, b, r0=99.0)     # r0 arbitrary — should not matter
@@ -122,7 +123,7 @@ def test_endogenous_contraction_map_converges():
 
 
 def test_endogenous_objective_decoupled_from_world():
-    """μ=1, |a|<1: the terminal objective is causally independent of the
+    """μ=1, a<1: the terminal objective is causally independent of the
     exogenous task — ∂x*/∂r₀ = 0. The reward-hack / wirehead fixed point."""
     a, b = 0.5, 3.0
     # x* is identical across wildly different "world tasks" r₀
@@ -147,24 +148,39 @@ def test_endogenous_no_fixed_point_drifts():
 
 def test_endogenous_unstable_fixed_point_diverges():
     """μ=1, a>1: a fixed point x*=b/(1−a) exists FORMALLY but is a repeller
-    (effective gain −k(1−a) > 0). The state diverges away from it."""
+    (effective gain −k(1−a) > 0). The deviation grows as init·e^{k(a−1)t}; we
+    assert the exponential RATE k(a−1), not merely ">100× growth" (BRO-1937). A
+    half-exponent model e^{½k(a−1)t} still clears 100× at t=20 (e^5≈148), so the
+    magnitude-only check does NOT pin the rate that §7 lists as validated."""
     a, b = 1.5, 3.0
+    k_rate = K * (a - 1.0)                              # analytic exponent = 0.5
     x_fp = b / (1 - a)   # = -6.0, exists analytically
     init_dev = 0.01
+    t_end = 20.0
     # start just off the fixed point → run AWAY from it (repeller), not toward
-    _ts, xs = integrate(dynamics(1.0, a, b, r0=0.0), x_fp + init_dev, 20.0)
+    ts, xs = integrate(dynamics(1.0, a, b, r0=0.0), x_fp + init_dev, t_end)
     final_dev = abs(xs[-1] - x_fp)
-    # deviation grows ≥100× the perturbation ⟹ repelled (analytic: init·e^{k(a−1)t})
-    assert final_dev > 100 * init_dev, (final_dev, init_dev)
-    assert (1 - 1.0 * a) < 0                            # unstable condition 1−μa<0
-    print(f"  PASS  μ=1, a={a}: formal fixed point {x_fp:.1f} is a repeller → "
-          f"deviation grew {final_dev/init_dev:.0f}× → diverges")
+    assert final_dev > 100 * init_dev, (final_dev, init_dev)     # repelled at all
+    assert (1 - 1.0 * a) < 0                                     # unstable condition 1−μa<0
+    # (1) endpoint magnitude matches init·e^{k(a−1)·t_end} within 1%
+    expected = init_dev * math.exp(k_rate * t_end)
+    assert abs(final_dev / expected - 1.0) < 1e-2, (final_dev, expected)
+    # (2) INTERIOR rate fitted from the trajectory itself between t=10 and t=20 —
+    #     a genuine per-t exponent, not just the endpoint; excludes e^{½k(a−1)t}
+    i_mid = len(ts) // 2                               # t≈10 (dt=1e-3 ⟹ exact)
+    dev_mid = abs(xs[i_mid] - x_fp)
+    rate_fit = math.log(final_dev / dev_mid) / (ts[-1] - ts[i_mid])
+    assert abs(rate_fit - k_rate) < 1e-2, (rate_fit, k_rate)
+    print(f"  PASS  μ=1, a={a}: repeller — deviation grew {final_dev/init_dev:.0f}× "
+          f"(fitted rate {rate_fit:.4f} ≈ k(a−1)={k_rate:.3f}; e^{{½·}} model excluded)")
 
 
 def test_transient_target_is_nonstationary():
-    """μ=1, |a|<1: the tracked target g(x(t))=a·x(t)+b is TIME-VARYING while the
-    state moves (d/dt[g(x)]=a·ẋ≠0). The reference co-moves with the tracked
-    variable — the defining non-stationarity."""
+    """μ=1, a≠0 (0<|a|<1 here): the tracked target g(x(t))=a·x(t)+b is TIME-VARYING
+    while the state moves (d/dt[g(x)]=a·ẋ≠0). The reference co-moves with the
+    tracked variable — the defining non-stationarity. a≠0 is REQUIRED: at a=0 the
+    map g(x)=b is constant, so the target is stationary (and decoupled) — the
+    non-stationarity is an a≠0 phenomenon (BRO-1937)."""
     a, b = 0.5, 3.0
     # effective rate λ=k(1−a)=0.5 → time constant 2s; run 30s (~15 τ) to settle
     _ts, xs = integrate(dynamics(1.0, a, b, r0=0.0), x0=0.0, t_end=30.0)
@@ -174,8 +190,21 @@ def test_transient_target_is_nonstationary():
     late_delta = abs(targets[-1] - targets[-200])        # near equilibrium
     assert early_delta > 1e-3, early_delta
     assert late_delta < 1e-4, late_delta
-    print(f"  PASS  μ=1: target g(x(t)) non-stationary off-equilibrium "
-          f"(Δearly={early_delta:.3f}, Δlate={late_delta:.1e})")
+    # a=0 BOUNDARY witness: g(x)=a·x+b with a=0 is constant (=b), so the target is
+    # STATIONARY even though the STATE sweeps a large range. The state-movement
+    # assertion is the non-vacuous anchor (it fails if the integrator is broken or
+    # the state is stuck — without it the `0.0·x` would make the target check pass
+    # for any trajectory); the target then being pinned at b witnesses
+    # d/dt[g(x)]=a·ẋ=0 at a=0 — decoupled AND stationary (BRO-1937 part-3 boundary).
+    a0 = 0.0
+    _ts0, xs0 = integrate(dynamics(1.0, a0, b, r0=0.0), x0=0.0, t_end=30.0)
+    state_range0 = max(xs0) - min(xs0)
+    assert state_range0 > 1.0, state_range0                  # state genuinely moves (0→b=3)
+    targets0 = [a0 * x + b for x in xs0]
+    assert max(targets0) - min(targets0) < 1e-12, targets0   # yet target constant (a0=0)
+    print(f"  PASS  μ=1: target g(x(t)) non-stationary off-equilibrium for a={a}≠0 "
+          f"(Δearly={early_delta:.3f}, Δlate={late_delta:.1e}); a=0 target constant "
+          f"while state swept {state_range0:.2f}")
 
 
 def test_independence_quantity_collapse():
@@ -219,12 +248,26 @@ def test_a_gt_1_sweep_is_not_a_smooth_collapse():
     # endpoints still 1 and 0 despite the discontinuous interior
     assert abs(h_coupling_analytic(0.0, a) - 1.0) < 1e-12
     assert abs(h_coupling_analytic(1.0, a) - 0.0) < 1e-12
+    # DYNAMICAL witness (BRO-1937): the pole/sign-flip above are pure formula
+    # self-consistency (h_coupling_analytic checked against itself). Pin the
+    # pre-pole RISE to actual RK integration on the STABLE side μ<1/a (1−μa>0, so
+    # the fixed point is a real attractor): the integrated ∂x*/∂r₀ must match the
+    # large analytic value, and the blended fixed point must match integration.
+    mu_stable = 0.6                        # < 1/a=0.667 ⟹ 1−μa=0.1>0 (stable)
+    h_an_stable = h_coupling_analytic(mu_stable, a)    # = (1−0.6)/0.1 = 4.0
+    h_nu_stable = h_coupling_numeric(mu_stable, a, b=3.0)
+    assert abs(h_an_stable - 4.0) < 1e-9, h_an_stable
+    assert abs(h_an_stable - h_nu_stable) < 1e-3, (h_an_stable, h_nu_stable)
+    for r0 in (-2.0, 5.0):
+        assert abs(fixed_point_analytic(mu_stable, a, 3.0, r0)
+                   - steady_state(mu_stable, a, 3.0, r0)) < 1e-6, (r0,)
     print(f"  PASS  a={a}>1: h(μ) poles at μ=1/a={mu_pole:.3f} "
-          f"(below={h_below:.1f}, above={h_above:.1f}) — collapse NOT smooth")
+          f"(below={h_below:.1f}, above={h_above:.1f}) — collapse NOT smooth; "
+          f"pre-pole rise pinned to integration (h(0.6)={h_nu_stable:.3f}≈4.0)")
 
 
 def test_stable_but_decoupled_lambda_buys_convergence_not_correctness():
-    """Cross-link to the agency lemma (BRO-1923): at μ=1, |a|<1 the closed loop
+    """Cross-link to the agency lemma (BRO-1923): at μ=1, a<1 the closed loop
     is CONTRACTING — effective rate λ = k(1−a) > 0 clears the agency-necessity
     bar (BRO-1923) — YET the goal it converges to is world-decoupled
     (∂x*/∂r₀=0). Stability buys CONVERGENCE, not CORRECTNESS: an uncontrolled
