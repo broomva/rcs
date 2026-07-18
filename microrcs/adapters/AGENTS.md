@@ -51,20 +51,51 @@ the host filesystem. The threat model is "agent gets confused" not
 bench against untrusted patches), add a new `SandboxBackend` impl —
 candidates: `sandbox-exec` (macOS-native), Lima VM, Daytona.
 
-## Instance curation
+## Environment fidelity (BRO-1948)
 
-`curated_pilot_instances()` returns 2 hard-coded SWE-bench-Lite IDs proven
-to install + test cleanly in venv-without-Docker. To re-curate:
+`swe_specs.py` adapts the canonical **`swebench`** package (`pip install
+swebench`). The venv backend uses `MAP_REPO_VERSION_TO_SPECS` for the exact
+per-instance environment — the pinned Python + dependency versions (so
+flask@2.3 keeps `Werkzeug==2.3.7` and `url_quote` survives instead of rotting
+to Werkzeug 3.x), `pre_install` source edits, and the spec install — and
+`MAP_REPO_TO_PARSER` + the spec `test_cmd` + test directives for scoring (so
+sympy's `bin/test` bare-name IDs parse correctly, not just pytest node IDs).
 
-1. Browse https://huggingface.co/datasets/princeton-nlp/SWE-bench_Lite
-2. Pick instances satisfying:
-   - Pure Python (no C extensions, no system libs)
-   - `pip install -e .` works without flags or system deps
-   - Test suite total runtime < 60s
-   - FAIL_TO_PASS = 1–3 tests
-   - Repo clone < 200 MB
-3. Verify by running `make swe-smoke-dry` against the candidate
-4. Replace the IDs in `curated_pilot_instances()`
+Two invariants the verifier now upholds (both had oracle-verified regressions):
+- **editable repoint** (`UvVenvBackend.repoint_editable`) re-aims the shared
+  venv's editable install at the workspace about to run tests, so SOURCE edits
+  are actually exercised. Without it every episode silently scores 0.
+- **pristine base** (`_materialize_workspace` resets `--hard base` + `clean
+  -fdx` after COW) so a dirty canonical clone can't make empty-diff falsely
+  pass.
+
+`swebench` is optional at import (guarded); when absent the backend falls back
+to the legacy floating install and the verifier to per-node-ID counting.
+Live curation / the experiment require it installed.
+
+## Instance curation — the $0 oracle gate
+
+`scripts/curate_instances.py` proves a candidate is gradeable by running it
+through the real verifier TWICE (no LLM, subscription-free):
+- **empty diff** → FAIL_TO_PASS must fail at base, PASS_TO_PASS must all pass;
+- **gold patch** → the ground-truth fix must make FAIL_TO_PASS pass.
+
+Passing both certifies the env resolves today AND that source edits are
+exercised (the fidelity property). Run:
+
+```bash
+cd microrcs && python3 -m scripts.curate_instances \
+    --candidates experiments/<run>/candidates.json \
+    --out        experiments/<run>/validated_instances.json --need 12
+```
+
+Pick candidates that are pure-Python + pytest/`bin/test`-runnable (sympy,
+flask, pytest, requests, pylint). Excluded automatically: conda
+`environment.yml` repos (matplotlib/scikit-learn/xarray) and tox-driven repos
+(sphinx — deferred). Note: a few instances fail the gate on macOS because a
+handful of PASS_TO_PASS tests are Linux-specific (pytest/requests near-misses);
+sympy's deterministic math tests are the most reliable reservoir. The legacy
+`curated_pilot_instances()` list in `swe_bench.py` predates this gate.
 
 ## Adding a new sandbox backend
 

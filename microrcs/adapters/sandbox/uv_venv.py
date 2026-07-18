@@ -22,6 +22,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from .. import swe_specs
 from ..swe_types import SweInstance
 from .backend import SetupError
 
@@ -59,15 +60,29 @@ class UvVenvBackend:
     def repo_dir(self, instance: SweInstance) -> Path:
         return self.cache_root / "repos" / f"{instance.repo_slug}--{instance.base_commit}"
 
+    def _resolve_python(self, instance: SweInstance) -> str:
+        """Python toolchain for this instance: the canonical swebench spec's
+        `python` when available (per-instance fidelity — flask@2.3 wants 3.11,
+        most 2022-vintage repos want 3.9), else the backend default."""
+        spec = swe_specs.spec_for(instance)
+        if spec and spec.get("python"):
+            return str(spec["python"])
+        return self.python_version
+
     def venv_dir(self, instance: SweInstance) -> Path:
         # CodeRabbit catch: key venv cache by python_version too — otherwise
         # changing the default Python (e.g., 3.12 → 3.11) silently reuses an
-        # incompatible cached venv from a prior config.
-        py = self.python_version.replace(".", "")
+        # incompatible cached venv from a prior config. BRO-1948: the version
+        # is now per-instance (from the swebench spec), so the key reflects it,
+        # AND a `-sb` recipe tag when a swebench spec drives the build — so a
+        # spec-pinned venv never collides with a stale floating-install venv
+        # from before the fidelity fix (the exact flask stale-cache miss).
+        py = self._resolve_python(instance).replace(".", "")
+        tag = "-sb" if (swe_specs.HAS_SWEBENCH and swe_specs.spec_for(instance)) else ""
         return (
             self.cache_root
             / "venvs"
-            / f"{instance.repo_slug}--{instance.base_commit}--py{py}"
+            / f"{instance.repo_slug}--{instance.base_commit}--py{py}{tag}"
         )
 
     def workspace_dir(
@@ -120,6 +135,48 @@ class UvVenvBackend:
             check=False,
         )
 
+    def _venv_env(self, workspace_path: Path) -> dict:
+        venv_bin = self._venv_bin_from_workspace(workspace_path)
+        env = os.environ.copy()
+        env["VIRTUAL_ENV"] = str(venv_bin.parent)
+        env["PATH"] = f"{venv_bin}{os.pathsep}{env.get('PATH', '')}"
+        env.pop("PYTHONHOME", None)
+        return env
+
+    def repoint_editable(
+        self, workspace_path: Path, timeout_s: float = 300.0
+    ) -> None:
+        """Redirect the venv's editable install to point at THIS workspace
+        (BRO-1948). The venv is shared across the agent + verify workspaces, so
+        its single editable pointer must be re-aimed at whichever workspace is
+        about to run tests — otherwise source edits (agent fix / gold patch)
+        are invisible and every episode silently scores 0 regardless of the
+        harness. `--no-deps` keeps it fast (runtime deps already in the venv;
+        build deps come from uv's isolated build env)."""
+        env = self._venv_env(workspace_path)
+        r = subprocess.run(
+            [self.uv_path, "pip", "install", "-e", ".", "--no-deps"],
+            cwd=str(workspace_path), env=env,
+            capture_output=True, text=True, timeout=timeout_s,
+        )
+        if r.returncode != 0:
+            raise SetupError(
+                f"repoint_editable failed in {workspace_path}: "
+                f"{(r.stderr or r.stdout)[-500:]}"
+            )
+
+    def run_test_command(
+        self, workspace_path: Path, command: str, timeout_s: float
+    ) -> subprocess.CompletedProcess[str]:
+        """Run a test command STRING inside the workspace with the venv
+        activated. The command may carry env prefixes + a custom runner
+        (e.g. sympy's `PYTHONWARNINGS='...' bin/test -C --verbose`), so it runs
+        through the shell. Does not raise on test failures."""
+        return subprocess.run(
+            command, cwd=str(workspace_path), env=self._venv_env(workspace_path),
+            shell=True, capture_output=True, text=True, timeout=timeout_s,
+        )
+
     # ---- internals --------------------------------------------------------
 
     def _ensure_canonical_clone(self, instance: SweInstance) -> None:
@@ -169,39 +226,118 @@ class UvVenvBackend:
                 return
             shutil.rmtree(venv_dir, ignore_errors=True)
         venv_dir.parent.mkdir(parents=True, exist_ok=True)
-        # Create venv with the configured Python toolchain. uv will download
-        # the toolchain if not installed. Default 3.11 maximizes compat with
-        # 2022-vintage SWE-bench-Lite repos (see python_version docstring).
+        # Per-instance Python from the swebench spec (BRO-1948) — env fidelity.
+        # `--seed` provisions pip/setuptools/wheel so the spec's install command
+        # (`python -m pip install -e .`) runs verbatim (a bare uv venv has no
+        # pip → "No module named pip").
+        py = self._resolve_python(instance)
         subprocess.run(
-            [self.uv_path, "venv", "--python", self.python_version, str(venv_dir)],
+            [self.uv_path, "venv", "--seed", "--python", py, str(venv_dir)],
             check=True,
             capture_output=True,
             text=True,
         )
-        # Install the repo + test deps. The repo's setup.py / pyproject is
-        # what determines deps. `uv pip install -e .[test]` is the typical
-        # incantation; we fall back to plain `-e .` if `[test]` extras don't
-        # exist.
         repo_dir = self.repo_dir(instance)
         env = os.environ.copy()
         env["VIRTUAL_ENV"] = str(venv_dir)
-        for spec in (".[test]", ".[testing]", ".[tests]", ".[dev]", "."):
+        env["PATH"] = f"{venv_dir / 'bin'}{os.pathsep}{env.get('PATH', '')}"
+        env.pop("PYTHONHOME", None)
+        spec = swe_specs.spec_for(instance) if swe_specs.HAS_SWEBENCH else None
+        if spec:
+            self._install_from_spec(instance, spec, repo_dir, venv_dir, env)
+        else:
+            self._install_floating(instance, repo_dir, env)
+
+    def _install_from_spec(
+        self,
+        instance: SweInstance,
+        spec: dict,
+        repo_dir: Path,
+        venv_dir: Path,
+        env: dict,
+    ) -> None:
+        """Canonical swebench install: pinned deps + pre_install + spec install.
+
+        Reproduces the environment the SWE-bench Docker harness builds, in a
+        venv: exact dependency versions (so flask@2.3 keeps Werkzeug==2.3.7 and
+        `url_quote` survives), any `pre_install` source edits, then the spec's
+        install command. The target package's editable pointer is redirected to
+        each per-episode workspace by `repoint_editable`; here it seeds the
+        venv with the package + its test dependencies.
+        """
+        # 1. base packages: a requirements.txt (fetched + cleaned by swebench)
+        #    or a space-separated conda/pip list. Test runner belt-and-braces
+        #    for every repo EXCEPT pytest itself (which IS the package).
+        pkgs = spec.get("packages", "")
+        extra = [] if instance.repo == "pytest-dev/pytest" else ["pytest"]
+        if pkgs == "requirements.txt":
+            reqs = swe_specs.requirements_text(instance)
+            reqs_file = venv_dir.parent / f"{instance.instance_id}-reqs.txt"
+            reqs_file.write_text(reqs)
+            try:
+                self._uv_pip(["install", "-r", str(reqs_file), *extra], repo_dir, env)
+            finally:
+                reqs_file.unlink(missing_ok=True)
+        elif pkgs and pkgs != "environment.yml":
+            self._uv_pip(["install", *pkgs.split(), *extra], repo_dir, env)
+        elif extra:
+            self._uv_pip(["install", *extra], repo_dir, env)
+        # 2. pinned pip_packages (the version lock that prevents rot).
+        if spec.get("pip_packages"):
+            self._uv_pip(["install", *spec["pip_packages"]], repo_dir, env)
+        # 3. pre_install source edits (sed on setup.py etc.). Deferred repos
+        #    (tox-based, e.g. sphinx) are excluded upstream by venv_support.
+        for pre in spec.get("pre_install") or []:
+            subprocess.run(
+                pre, cwd=repo_dir, env=env, shell=True,
+                check=True, capture_output=True, text=True,
+            )
+        # 4. spec install — seeds the venv with the package + its test extras.
+        #    Run faithfully (it may be `-e .`, `-e .[test]`, or plain `.`);
+        #    repoint_editable makes the workspace authoritative per episode.
+        install_cmd = spec.get("install", "python -m pip install -e .")
+        r = subprocess.run(
+            install_cmd, cwd=repo_dir, env=env, shell=True,
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            raise SetupError(
+                f"spec install failed for {instance.instance_id} "
+                f"({install_cmd!r}): {(r.stderr or r.stdout)[-500:]}"
+            )
+
+    def _install_floating(
+        self, instance: SweInstance, repo_dir: Path, env: dict
+    ) -> None:
+        """Legacy fallback (no swebench spec): floating `-e .[extras]` install.
+
+        Kept for repos without a swebench spec and for offline unit tests. This
+        is the rot-prone path BRO-1948 replaces wherever a spec exists.
+        """
+        for extras in (".[test]", ".[testing]", ".[tests]", ".[dev]", "."):
             try:
                 subprocess.run(
-                    [self.uv_path, "pip", "install", "-e", spec, "pytest"],
-                    cwd=repo_dir,
-                    env=env,
-                    check=True,
-                    capture_output=True,
-                    text=True,
+                    [self.uv_path, "pip", "install", "-e", extras, "pytest"],
+                    cwd=repo_dir, env=env, check=True,
+                    capture_output=True, text=True,
                 )
                 return
             except subprocess.CalledProcessError:
                 continue
         raise SetupError(
-            f"could not install {instance.repo} into venv (tried [test], "
-            f"[testing], [tests], [dev], plain '.')"
+            f"could not install {instance.repo} into venv (no swebench spec; "
+            f"tried [test], [testing], [tests], [dev], plain '.')"
         )
+
+    def _uv_pip(self, args: list[str], cwd: Path, env: dict) -> None:
+        r = subprocess.run(
+            [self.uv_path, "pip", *args], cwd=cwd, env=env,
+            capture_output=True, text=True,
+        )
+        if r.returncode != 0:
+            raise SetupError(
+                f"`uv pip {' '.join(args)}` failed: {(r.stderr or r.stdout)[-500:]}"
+            )
 
     def _materialize_workspace(
         self, instance: SweInstance, run_id: str, suffix: str
@@ -230,6 +366,20 @@ class UvVenvBackend:
                 self.prefer_clonefile = False
         if not copied:
             shutil.copytree(repo_dir, ws, symlinks=True)
+        # BRO-1948: guarantee a pristine base tree regardless of any dirt in
+        # the shared canonical clone (stray egg-info/build artifacts from an
+        # editable install, or a patch left applied by a prior run — the flask
+        # cache-pollution class that made empty-diff falsely PASS). Reset
+        # tracked files to base_commit and remove untracked cruft so the
+        # workspace starts at EXACTLY base, before test_patch is applied.
+        for args in (
+            ["reset", "--hard", instance.base_commit],
+            ["clean", "-fdx"],
+        ):
+            subprocess.run(
+                [self.git_path, "-C", str(ws), *args],
+                check=True, capture_output=True, text=True,
+            )
         # Write the venv marker so run_in_workspace can locate the venv from
         # just a workspace path (the Protocol only exposes Path).
         (ws / ".microrcs_venv").write_text(str(self.venv_dir(instance)))
