@@ -71,10 +71,17 @@ def venv_support(instance) -> tuple[bool, str]:
     if spec.get("packages") == "environment.yml":
         return False, "conda environment.yml instance (needs conda, not venv)"
     test_cmd = spec.get("test_cmd", "")
+    # Some swebench 4.x specs (non-Lite, e.g. redis) carry a LIST test_cmd;
+    # `"tox" in test_cmd` and `test_cmd + directives` both assume a string.
+    if not isinstance(test_cmd, str) or not test_cmd:
+        return False, "spec has no string test_cmd (list-form / full-SWE-bench — unsupported)"
     if "tox" in test_cmd:
         return False, "tox-based test_cmd (deferred — needs tox + pre_install seds)"
-    if not test_cmd:
-        return False, "spec has no test_cmd"
+    # Parser-existence gate (P20): without a repo log parser the status map is
+    # empty and EVERY episode scores 0 — the exact silent-zero class this fix
+    # exists to kill. All 12 SWE-bench-Lite repos have one; guard anyway.
+    if instance.repo not in MAP_REPO_TO_PARSER:
+        return False, f"no swebench log parser for {instance.repo} (would score 0 every episode)"
     return True, "supported"
 
 

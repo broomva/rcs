@@ -152,7 +152,13 @@ class UvVenvBackend:
         about to run tests — otherwise source edits (agent fix / gold patch)
         are invisible and every episode silently scores 0 regardless of the
         harness. `--no-deps` keeps it fast (runtime deps already in the venv;
-        build deps come from uv's isolated build env)."""
+        build deps come from uv's isolated build env).
+
+        ASSUMES SERIAL EXECUTION: the venv (keyed by repo+commit+py) is shared,
+        and GenerationLoop runs episodes serially, so each consumer repoints
+        immediately before use. Parallelizing episodes of the SAME instance
+        (e.g. P5 multi-seed) would race on this single pointer — give each
+        parallel worker its own venv/workspace first."""
         env = self._venv_env(workspace_path)
         r = subprocess.run(
             [self.uv_path, "pip", "install", "-e", ".", "--no-deps"],

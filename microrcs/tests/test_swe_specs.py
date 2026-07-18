@@ -96,12 +96,36 @@ def test_venv_support_no_spec(monkeypatch):
     assert ok is False and "no swebench spec" in why
 
 
+def test_venv_support_list_test_cmd_excluded(monkeypatch):
+    # swebench 4.x non-Lite specs (e.g. redis) carry a list test_cmd.
+    monkeypatch.setattr(swe_specs, "HAS_SWEBENCH", True)
+    monkeypatch.setattr(
+        swe_specs, "MAP_REPO_VERSION_TO_SPECS",
+        {"r/r": {"1": {"test_cmd": ["make test", "cat out"]}}},
+    )
+    ok, why = swe_specs.venv_support(_stub(repo="r/r", version="1"))
+    assert ok is False and "string test_cmd" in why
+
+
+def test_venv_support_no_parser_excluded(monkeypatch):
+    # spec + string test_cmd but no log parser => would score 0 every episode.
+    monkeypatch.setattr(swe_specs, "HAS_SWEBENCH", True)
+    monkeypatch.setattr(
+        swe_specs, "MAP_REPO_VERSION_TO_SPECS",
+        {"a/b": {"1": {"packages": "pytest", "test_cmd": "pytest -rA"}}},
+    )
+    monkeypatch.setattr(swe_specs, "MAP_REPO_TO_PARSER", {})
+    ok, why = swe_specs.venv_support(_stub(repo="a/b", version="1"))
+    assert ok is False and "log parser" in why
+
+
 def test_venv_support_ok(monkeypatch):
     monkeypatch.setattr(swe_specs, "HAS_SWEBENCH", True)
     monkeypatch.setattr(
         swe_specs, "MAP_REPO_VERSION_TO_SPECS",
         {"a/b": {"1": {"packages": "pytest", "test_cmd": "pytest -rA"}}},
     )
+    monkeypatch.setattr(swe_specs, "MAP_REPO_TO_PARSER", {"a/b": lambda log, ts=None: {}})
     ok, why = swe_specs.venv_support(_stub(repo="a/b", version="1"))
     assert ok is True and why == "supported"
 
