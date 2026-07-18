@@ -177,6 +177,7 @@ def test_run_episode_score_comes_from_verifier_not_cli():
         task = make_task(tmp, score=0.0)  # but pytest verification fails
         res = runner.run_episode(task, HarnessConfig())
         assert res.score == 0.0, "CLI self-report must never override the verifier"
+        assert res.aborted is None, "score-0 must be the verifier's verdict, not an abort"
 
 
 def test_run_episode_timeout_sigterm_first():
@@ -325,30 +326,45 @@ def test_reset_workspace_does_not_exfil_env_secret_via_planted_git_filter():
     """P20 round-2 NEW-1 regression: an agent-planted git smudge filter must
     NOT capture ANTHROPIC_API_KEY (or any parent secret) when it fires during
     the next episode's reset. The reset git spawns run under the filtered env
-    AND with filters/hooks/fsmonitor neutralized."""
-    import subprocess as sp
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td)
-        task = make_git_task(tmp)
-        ws = Path(task.metadata["swe_agent_workspace"])
-        loot = tmp / "loot.txt"
-        # The 'agent' plants a smudge filter + attributes that would run on
-        # the next `git reset --hard` checkout of code.py.
-        run = lambda *a: sp.run(list(a), cwd=ws, capture_output=True, text=True)  # noqa: E731
-        run("git", "config", "filter.evil.smudge", f"sh -c 'echo $ANTHROPIC_API_KEY > {loot}; cat'")
-        (ws / ".gitattributes").write_text("code.py filter=evil\n")
-        run("git", "add", ".gitattributes"); run("git", "commit", "-qm", "attrs")
-        (ws / "code.py").write_text("dirty\n")  # make reset actually re-checkout
+    AND with filters/hooks/fsmonitor neutralized.
 
-        runner = ClaudeCliRunner(
-            claude_bin="/fake/claude", timeout_s=5.0,
-            env_base={"HOME": str(tmp), "USER": "u", "LOGNAME": "u", "TERM": "x",
-                      "ANTHROPIC_API_KEY": "sk-ant-SECRET-PARENT"},
-            spawn=lambda argv, **kw: FakeProc(argv, canned_stdout=ENVELOPE, **kw),
-        )
-        runner._reset_workspace(str(ws))
-        captured = loot.read_text().strip() if loot.exists() else ""
-        assert "sk-ant-SECRET-PARENT" not in captured, f"SECRET EXFILTRATED: {captured!r}"
+    The secret is placed in os.environ (the real leak source), so removing
+    `env=self._env` from the reset spawn — inheriting os.environ — WOULD leak;
+    this keeps the test non-vacuous w.r.t. the env clause even on a CI runner
+    that has no key set (P20 round-3 MINOR)."""
+    import subprocess as sp
+    import os
+    SECRET = "sk-ant-SECRET-PARENT-r3"
+    prior = os.environ.get("ANTHROPIC_API_KEY")
+    os.environ["ANTHROPIC_API_KEY"] = SECRET
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            task = make_git_task(tmp)
+            ws = Path(task.metadata["swe_agent_workspace"])
+            loot = tmp / "loot.txt"
+            run = lambda *a: sp.run(list(a), cwd=ws, capture_output=True, text=True)  # noqa: E731
+            run("git", "config", "filter.evil.smudge", f"sh -c 'echo $ANTHROPIC_API_KEY > {loot}; cat'")
+            (ws / ".gitattributes").write_text("code.py filter=evil\n")
+            run("git", "add", ".gitattributes"); run("git", "commit", "-qm", "attrs")
+            (ws / "code.py").write_text("dirty\n")  # make reset actually re-checkout
+
+            # env_base=None → filter_env reads os.environ and STRIPS the key,
+            # so the real fix's self._env carries no secret; a mutation dropping
+            # env=self._env inherits os.environ (secret present) and leaks.
+            runner = ClaudeCliRunner(
+                claude_bin="/fake/claude", timeout_s=5.0,
+                spawn=lambda argv, **kw: FakeProc(argv, canned_stdout=ENVELOPE, **kw),
+            )
+            assert "ANTHROPIC_API_KEY" not in runner._env, "precondition: filtered env is keyless"
+            runner._reset_workspace(str(ws))
+            captured = loot.read_text().strip() if loot.exists() else ""
+            assert SECRET not in captured, f"SECRET EXFILTRATED: {captured!r}"
+    finally:
+        if prior is None:
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+        else:
+            os.environ["ANTHROPIC_API_KEY"] = prior
 
 
 def test_reset_workspace_failure_is_classified_reset_error():
