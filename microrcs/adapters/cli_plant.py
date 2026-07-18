@@ -194,8 +194,7 @@ class ClaudeCliRunner:
                 pass  # fall back to bare PATH; verifier still scores git diff
         return env
 
-    @staticmethod
-    def _reset_workspace(workspace: str) -> None:
+    def _reset_workspace(self, workspace: str) -> None:
         """B1: restore the workspace to its post-setup git state so every
         episode is INDEPENDENT. Setup commits test_patch as HEAD, so
         `reset --hard HEAD` reverts the previous agent's edits and `clean -fd`
@@ -203,15 +202,33 @@ class ClaudeCliRunner:
         venv-locator marker (the venv itself lives in a separate cache dir).
         Without this, agent edits + `git diff HEAD` accumulate across
         generations and the private gate measures cumulative state, not the
-        candidate's marginal effect (the load-bearing correctness property)."""
-        subprocess.run(
-            ["git", "reset", "--hard", "HEAD"], cwd=workspace,
-            capture_output=True, text=True, timeout=60, check=False,
-        )
-        subprocess.run(
-            ["git", "clean", "-fd", "-e", ".microrcs_venv"], cwd=workspace,
-            capture_output=True, text=True, timeout=60, check=False,
-        )
+        candidate's marginal effect (the load-bearing correctness property).
+
+        SECURITY (P20 round-2 NEW-1, BRO-1912): these git runs execute inside a
+        workspace the agent fully controls, so they get the SAME deny-by-default
+        filtered env as the child (no ANTHROPIC_API_KEY / AWS / GH to exfil),
+        AND we neutralize the agent-plantable code-execution vectors a
+        `git reset`/`clean` can trigger — smudge/clean filters (`filter.*`),
+        `.gitattributes`-driven drivers, fsmonitor, and hooks. Without this, an
+        agent could plant a smudge filter that fires on the NEXT episode's reset
+        and reads on-disk/env secrets. Raises on non-zero return (NEW-2) so a
+        failed reset is classified, never silently proceeding on a dirty tree."""
+        hardening = [
+            "-c", "core.fsmonitor=", "-c", "core.hooksPath=/dev/null",
+            "-c", "filter.lfs.smudge=", "-c", "filter.lfs.clean=",
+            "-c", "filter.lfs.process=",
+        ]
+        for args in (["reset", "--hard", "HEAD"],
+                     ["clean", "-fdx", "-e", ".microrcs_venv"]):
+            r = subprocess.run(
+                ["git", *hardening, *args], cwd=workspace, env=self._env,
+                capture_output=True, text=True, timeout=60, check=False,
+            )
+            if r.returncode != 0:
+                raise RuntimeError(
+                    f"git {args[0]} failed (rc={r.returncode}) in {workspace}: "
+                    f"{r.stderr.strip()[:200]}"
+                )
 
     def run_episode(self, task: m.Task, config: HarnessConfig) -> EpisodeResult:
         workspace = task.metadata.get("swe_agent_workspace")
@@ -225,7 +242,7 @@ class ClaudeCliRunner:
         # Independence gate: reset before the agent touches the workspace.
         try:
             self._reset_workspace(workspace)
-        except (OSError, subprocess.SubprocessError) as exc:
+        except (OSError, subprocess.SubprocessError, RuntimeError) as exc:
             return EpisodeResult(
                 instance_id=task.id, score=0.0, is_error=True, duration_s=0.0,
                 num_turns=None, cost_usd_reported=None,

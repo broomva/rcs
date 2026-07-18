@@ -63,9 +63,24 @@ class FakeProc:
         self.killed = True
 
 
+def _git_init(ws: Path) -> None:
+    """Minimal committed git repo so `_reset_workspace` (which now hard-fails
+    on a non-git tree, P20 NEW-2) has a valid HEAD to reset to. Idempotent —
+    overlap tests reuse the same task-id (same dir)."""
+    import subprocess as sp
+    if (ws / ".git").exists():
+        return
+    run = lambda *a: sp.run(list(a), cwd=ws, capture_output=True, text=True, check=True)  # noqa: E731
+    run("git", "init", "-q")
+    run("git", "config", "user.email", "t@t"); run("git", "config", "user.name", "t")
+    (ws / ".seed").write_text("seed\n")
+    run("git", "add", "-A"); run("git", "commit", "-qm", "seed")
+
+
 def make_task(tmp: Path, task_id="fake-instance", score=1.0) -> m.Task:
     ws = tmp / task_id
     ws.mkdir(parents=True, exist_ok=True)
+    _git_init(ws)
     return m.Task(
         id=task_id, domain="swe-bench-lite", prompt="fix the bug",
         verify=lambda _answer: score,
@@ -306,6 +321,55 @@ def test_run_episode_resets_workspace_between_episodes():
         assert r2.score > 0, "verifier should see the single fresh edit"
 
 
+def test_reset_workspace_does_not_exfil_env_secret_via_planted_git_filter():
+    """P20 round-2 NEW-1 regression: an agent-planted git smudge filter must
+    NOT capture ANTHROPIC_API_KEY (or any parent secret) when it fires during
+    the next episode's reset. The reset git spawns run under the filtered env
+    AND with filters/hooks/fsmonitor neutralized."""
+    import subprocess as sp
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        task = make_git_task(tmp)
+        ws = Path(task.metadata["swe_agent_workspace"])
+        loot = tmp / "loot.txt"
+        # The 'agent' plants a smudge filter + attributes that would run on
+        # the next `git reset --hard` checkout of code.py.
+        run = lambda *a: sp.run(list(a), cwd=ws, capture_output=True, text=True)  # noqa: E731
+        run("git", "config", "filter.evil.smudge", f"sh -c 'echo $ANTHROPIC_API_KEY > {loot}; cat'")
+        (ws / ".gitattributes").write_text("code.py filter=evil\n")
+        run("git", "add", ".gitattributes"); run("git", "commit", "-qm", "attrs")
+        (ws / "code.py").write_text("dirty\n")  # make reset actually re-checkout
+
+        runner = ClaudeCliRunner(
+            claude_bin="/fake/claude", timeout_s=5.0,
+            env_base={"HOME": str(tmp), "USER": "u", "LOGNAME": "u", "TERM": "x",
+                      "ANTHROPIC_API_KEY": "sk-ant-SECRET-PARENT"},
+            spawn=lambda argv, **kw: FakeProc(argv, canned_stdout=ENVELOPE, **kw),
+        )
+        runner._reset_workspace(str(ws))
+        captured = loot.read_text().strip() if loot.exists() else ""
+        assert "sk-ant-SECRET-PARENT" not in captured, f"SECRET EXFILTRATED: {captured!r}"
+
+
+def test_reset_workspace_failure_is_classified_reset_error():
+    """NEW-2: a non-git (or otherwise failing) workspace must classify as
+    reset_error, never silently proceed on an unreset tree."""
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        ws = tmp / "not-a-git-repo"; ws.mkdir()
+        (ws / ".microrcs_venv").write_text(str(tmp / "vc"))
+        (tmp / "vc" / "bin").mkdir(parents=True)
+        task = m.Task(id="nogit", domain="swe-bench-lite", prompt="x",
+                      verify=lambda _a: 1.0, metadata={"swe_agent_workspace": str(ws)})
+        runner = ClaudeCliRunner(
+            claude_bin="/fake/claude", timeout_s=5.0,
+            env_base={"HOME": str(tmp), "USER": "u", "LOGNAME": "u", "TERM": "x"},
+            spawn=lambda argv, **kw: FakeProc(argv, canned_stdout=ENVELOPE, **kw),
+        )
+        res = runner.run_episode(task, HarnessConfig())
+        assert res.aborted == "reset_error" and res.is_error and res.score == 0.0
+
+
 def test_run_episode_prepends_venv_to_child_path():
     """M1: the instance venv bin must be on the child PATH (the SWE prompt
     promises pytest/python there)."""
@@ -367,6 +431,7 @@ def test_run_episode_verify_exception_is_classified_not_raised():
         tmp = Path(td)
         runner, _ = make_runner(tmp)
         ws = tmp / "boom"; ws.mkdir()
+        _git_init(ws)  # reach the verify path (reset must succeed first)
         def boom(_a): raise RuntimeError("pytest exploded")
         task = m.Task(id="boom", domain="swe-bench-lite", prompt="x",
                       verify=boom, metadata={"swe_agent_workspace": str(ws)})
@@ -485,6 +550,8 @@ if __name__ == "__main__":
         test_generation_loop_history_never_leaks_holdout,
         test_generation_loop_rejects_train_holdout_overlap,
         test_run_episode_resets_workspace_between_episodes,
+        test_reset_workspace_does_not_exfil_env_secret_via_planted_git_filter,
+        test_reset_workspace_failure_is_classified_reset_error,
         test_run_episode_prepends_venv_to_child_path,
         test_run_episode_delivers_prompt_via_stdin,
         test_run_episode_sigkill_fallback_when_sigterm_ignored,
