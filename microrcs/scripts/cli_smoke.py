@@ -37,6 +37,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--max-turns", type=int, default=30)
     p.add_argument("--timeout-s", type=float, default=600.0)
     p.add_argument("--out", default="../reports/cli-smoke")
+    p.add_argument(
+        "--cache-root", type=Path,
+        default=Path("~/.cache/microrcs-swe").expanduser(),
+    )
     args = p.parse_args(argv)
 
     run_id = f"cli-smoke-{int(time.time())}"
@@ -44,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[cli_smoke] provisioning {args.instance} (run_id={run_id})...", flush=True)
-    backend = UvVenvBackend()
+    backend = UvVenvBackend(cache_root=args.cache_root)
     tasks = load_swe_bench_lite_subset([args.instance], backend, run_id)
     task = tasks[0]
     ws = task.metadata.get("swe_agent_workspace", "<none — setup failed>")
