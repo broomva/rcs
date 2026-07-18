@@ -230,6 +230,25 @@ class ClaudeCliRunner:
                     f"{r.stderr.strip()[:200]}"
                 )
 
+    def _repoint_editable(self, workspace: str) -> None:
+        """Re-aim the shared venv's editable install at `workspace` (BRO-1948).
+
+        Best-effort by design: runs under the deny-by-default filtered episode
+        env (no secret crosses into the install) and never raises — a failed
+        repoint only degrades the agent's own `pytest` feedback; the verifier
+        repoints independently, so scoring is unaffected."""
+        marker = Path(workspace) / ".microrcs_venv"
+        if not marker.exists():
+            return
+        try:
+            subprocess.run(
+                ["uv", "pip", "install", "-e", ".", "--no-deps"],
+                cwd=workspace, env=self._episode_env(workspace),
+                capture_output=True, text=True, timeout=300, check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            pass
+
     def run_episode(self, task: m.Task, config: HarnessConfig) -> EpisodeResult:
         workspace = task.metadata.get("swe_agent_workspace")
         if not workspace:
@@ -249,6 +268,14 @@ class ClaudeCliRunner:
                 result_text=f"workspace reset failed: {exc}",
                 config_id=config.config_id, aborted="reset_error",
             )
+        # BRO-1948: re-aim the shared venv's editable install at THIS workspace
+        # so the agent's own `pytest` reflects its edits (a prior verify
+        # repointed it at a since-torn-down verify workspace, and `reset` above
+        # stripped the workspace's editable metadata). Best-effort under the
+        # deny-by-default filtered env — the verifier repoints independently, so
+        # a failure here degrades the agent's self-check loop but NEVER corrupts
+        # scoring.
+        self._repoint_editable(workspace)
         argv = [
             self.claude_bin, "-p",
             "--model", config.model,
