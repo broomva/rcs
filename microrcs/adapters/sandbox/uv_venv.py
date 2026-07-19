@@ -26,6 +26,17 @@ from .. import swe_specs
 from ..swe_types import SweInstance
 from .backend import SetupError
 
+# Written at the venv root ONLY after a full install completes (spec step 4
+# or floating success). Presence => the venv is fully built and safe to reuse;
+# `bin/python` present but this absent => half-init, rebuild (BRO-1949).
+_SENTINEL_NAME = ".microrcs_spec_ok"
+
+# Written at the venv root by `repoint_editable`, recording which workspace the
+# shared venv's single editable pointer currently aims at. Lets the scoring
+# path detect a parallel same-instance repoint race and fail loudly instead of
+# scoring against cross-contaminated imports (BRO-1949).
+_EDITABLE_MARKER = ".microrcs_editable_at"
+
 
 @dataclass
 class UvVenvBackend:
@@ -158,7 +169,10 @@ class UvVenvBackend:
         and GenerationLoop runs episodes serially, so each consumer repoints
         immediately before use. Parallelizing episodes of the SAME instance
         (e.g. P5 multi-seed) would race on this single pointer — give each
-        parallel worker its own venv/workspace first."""
+        parallel worker its own venv/workspace first. As a backstop (BRO-1949)
+        the repoint records the target workspace in the venv and
+        `run_test_command` asserts the pointer is still ours before scoring, so
+        a race fails loudly instead of scoring against the wrong workspace."""
         env = self._venv_env(workspace_path)
         r = subprocess.run(
             [self.uv_path, "pip", "install", "-e", ".", "--no-deps"],
@@ -170,6 +184,9 @@ class UvVenvBackend:
                 f"repoint_editable failed in {workspace_path}: "
                 f"{(r.stderr or r.stdout)[-500:]}"
             )
+        # Record which workspace the shared venv's editable pointer now aims at
+        # (BRO-1949 parallel-repoint-race backstop).
+        self._editable_marker_path(workspace_path).write_text(str(workspace_path))
 
     def run_test_command(
         self, workspace_path: Path, command: str, timeout_s: float
@@ -177,11 +194,49 @@ class UvVenvBackend:
         """Run a test command STRING inside the workspace with the venv
         activated. The command may carry env prefixes + a custom runner
         (e.g. sympy's `PYTHONWARNINGS='...' bin/test -C --verbose`), so it runs
-        through the shell. Does not raise on test failures."""
+        through the shell. Does not raise on test failures.
+
+        Asserts the shared venv's editable pointer still aims at THIS workspace
+        before running (BRO-1949) — a parallel same-instance repoint would
+        otherwise silently score against the wrong source tree."""
+        self._assert_editable_pointer(workspace_path)
         return subprocess.run(
             command, cwd=str(workspace_path), env=self._venv_env(workspace_path),
             shell=True, capture_output=True, text=True, timeout=timeout_s,
         )
+
+    def _editable_marker_path(self, workspace_path: Path) -> Path:
+        """The shared venv's editable-pointer marker for this workspace's venv.
+
+        Resolved from the workspace's `.microrcs_venv` marker, so it names the
+        SAME venv the tests will import from."""
+        return self._venv_bin_from_workspace(workspace_path).parent / _EDITABLE_MARKER
+
+    def _assert_editable_pointer(self, workspace_path: Path) -> None:
+        """Fail loudly on a parallel same-instance repoint race (BRO-1949).
+
+        The venv (keyed by repo+commit+py) is shared across the agent + verify
+        workspaces and carries a SINGLE editable pointer, repointed immediately
+        before each test run. Serial execution (GenerationLoop) keeps that safe.
+        If a parallel worker for the same instance repoints between our repoint
+        and our test run, the pointer now aims at THEIR workspace and our scores
+        would be silently cross-contaminated. Convert that into a clear error.
+
+        An absent marker means no repoint happened through this backend (older
+        venv / a non-repoint code path); stay silent then, for backward
+        compatibility — the guard only trips on a definite mismatch."""
+        marker = self._editable_marker_path(workspace_path)
+        if not marker.exists():
+            return
+        pointed_at = marker.read_text().strip()
+        if pointed_at != str(workspace_path):
+            raise SetupError(
+                f"parallel repoint race: the shared venv editable pointer is "
+                f"aimed at {pointed_at!r}, not this workspace "
+                f"{str(workspace_path)!r}. Episodes of the same instance must "
+                f"not run in parallel on one venv — give each parallel worker "
+                f"its own venv/workspace."
+            )
 
     # ---- internals --------------------------------------------------------
 
@@ -218,17 +273,17 @@ class UvVenvBackend:
 
     def _ensure_venv(self, instance: SweInstance) -> None:
         venv_dir = self.venv_dir(instance)
-        # Half-init detection: `bin/python` exists but the package wasn't
-        # installed (no `.dist-info` directories). Nuke and rebuild rather
-        # than silently reuse the broken venv.
+        # Half-init detection (BRO-1949): reuse only a venv carrying the
+        # completion sentinel, written at the very end of construction. The
+        # prior `any *.dist-info` heuristic false-passed on a venv where
+        # `_install_from_spec` installed deps (steps 1-2, which carry
+        # dist-info) but then FAILED at step 4 (the target package) — leaving
+        # a persistent score-0 for a genuinely un-installable instance until
+        # the cache was cleared by hand. The sentinel is precise: present =>
+        # fully built, reuse; `bin/python` present but sentinel absent =>
+        # half-init (or a venv built before this fix), so nuke and rebuild.
         if (venv_dir / "bin" / "python").exists():
-            site_packages = list(
-                (venv_dir / "lib").glob("python*/site-packages")
-            )
-            has_install = any(
-                any(sp.glob("*.dist-info")) for sp in site_packages
-            )
-            if has_install:
+            if (venv_dir / _SENTINEL_NAME).exists():
                 return
             shutil.rmtree(venv_dir, ignore_errors=True)
         venv_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -253,6 +308,11 @@ class UvVenvBackend:
             self._install_from_spec(instance, spec, repo_dir, venv_dir, env)
         else:
             self._install_floating(instance, repo_dir, env)
+        # Completion sentinel (BRO-1949): reached ONLY if the install above did
+        # not raise. A half-init venv (install failed mid-way) never gets this
+        # marker, so the next setup() rebuilds it instead of reusing a partial
+        # env. Written last, so its presence proves construction finished.
+        (venv_dir / _SENTINEL_NAME).write_text("spec" if spec else "floating")
 
     def _install_from_spec(
         self,
