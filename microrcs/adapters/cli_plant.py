@@ -422,6 +422,10 @@ class GenerationLoop:
         self.out_dir = Path(out_dir)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self.best = genesis or HarnessConfig()
+        # Freeze the genesis config so final_report can compute the PAIRED
+        # generalization margin (evolved − genesis) the pre-registration locks
+        # on. `best` is replaced on acceptance; `genesis_config` is not.
+        self.genesis_config = self.best
         self.best_holdout: float | None = None  # lazily scored on first step
         self.max_generations = max_generations
         self.n_steps = 0
@@ -481,19 +485,30 @@ class GenerationLoop:
         return record
 
     def final_report(self) -> dict:
-        """Unbiased generalization estimate: score `best` on the final-test
-        split, which the gate NEVER touched (M2 mitigation for the accept-bit
-        adaptive-overfitting channel). Returns {} if no final split was given.
-        Call once, after the loop; never inside `step`."""
+        """Unbiased generalization estimate on the final-test split the gate
+        NEVER touched (M2 mitigation for the accept-bit adaptive-overfitting
+        channel). Scores BOTH the evolved `best` AND the frozen `genesis` on the
+        split so the pre-registered CONFIRM criterion — a PAIRED margin
+        (evolved − genesis > 0) — is mechanically computable here, with no
+        post-hoc analyst pass (the analyst-degree-of-freedom a pre-registration
+        exists to eliminate). Returns {} if no final split was given. Call once,
+        after the loop; never inside `step`. NOT idempotent — it re-scores on
+        every call, so the caller must guard against re-runs (aide2_run does)."""
         if not self.final_test_tasks:
             return {"final_test": None, "note": "no final_test_tasks — holdout is the only estimate (accept-bit overfitting uncorrected)"}
-        final_score = self._mean_score(self.best, self.final_test_tasks)
+        evolved_final = self._mean_score(self.best, self.final_test_tasks)
+        genesis_final = self._mean_score(self.genesis_config, self.final_test_tasks)
+        margin = evolved_final - genesis_final
         report = {
             "best_config": self.best.to_json(),
+            "genesis_config": self.genesis_config.to_json(),
             "generations": self.n_steps,
             "holdout_score": self.best_holdout,
-            "final_test_score": final_score,
-            "overfit_gap": (self.best_holdout - final_score) if self.best_holdout is not None else None,
+            "final_test_score": evolved_final,
+            "genesis_final_test_score": genesis_final,
+            "final_test_margin": margin,             # evolved − genesis (the locked criterion)
+            "confirmed": bool(margin > 0),           # CONFIRM iff strictly positive
+            "overfit_gap": (self.best_holdout - evolved_final) if self.best_holdout is not None else None,
         }
         (self.out_dir / "final_report.json").write_text(json.dumps(report, indent=2))
         return report

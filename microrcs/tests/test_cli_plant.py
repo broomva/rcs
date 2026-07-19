@@ -552,6 +552,48 @@ def test_generation_loop_rejects_final_overlap():
             raise AssertionError("final/holdout overlap must raise")
 
 
+def test_final_report_computes_paired_margin_and_confirm_bit():
+    """The pre-registered CONFIRM criterion (evolved − genesis > 0 on the
+    untouched split) must be MECHANICALLY computed by final_report — both the
+    evolved best AND the frozen genesis scored on final_test — not left to a
+    post-hoc analyst pass (BRO-1947 P20 BLOCKER fix)."""
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+
+        class CfgRunner:
+            # config-aware: genesis (generation 0) is worse than any evolved
+            # candidate (generation >= 1) on BOTH holdout (so it's accepted)
+            # and final_test (so the paired margin is positive).
+            def run_episode(self, task, config):
+                if task.id == "f":
+                    s = 0.3 if config.generation == 0 else 0.6
+                elif task.id == "h":
+                    s = 0.2 if config.generation == 0 else 0.9
+                else:
+                    s = 0.5
+                return EpisodeResult(task.id, s, False, 0.1, 1, None, "", config.config_id)
+
+        loop = GenerationLoop(
+            CfgRunner(), [make_task(tmp, "t")], [make_task(tmp, "h")],
+            propose_fn=lambda b, h: b, out_dir=tmp / "out",
+            final_test_tasks=[make_task(tmp, "f")],
+        )
+        loop.step()  # candidate gen=1, holdout 0.9 > genesis 0.2 => ACCEPTED
+        rep = loop.final_report()
+        assert rep["genesis_final_test_score"] == 0.3
+        assert rep["final_test_score"] == 0.6
+        assert abs(rep["final_test_margin"] - 0.3) < 1e-9
+        assert rep["confirmed"] is True
+        # null case: if best is still genesis, margin is 0 => not confirmed.
+        loop2 = GenerationLoop(
+            CfgRunner(), [make_task(tmp, "t2")], [make_task(tmp, "h2")],
+            propose_fn=lambda b, h: b, out_dir=tmp / "out2",
+            final_test_tasks=[make_task(tmp, "f2")],
+        )
+        rep2 = loop2.final_report()  # no steps => best == genesis
+        assert rep2["final_test_margin"] == 0.0 and rep2["confirmed"] is False
+
+
 # === self-runner (CI style) =============================================
 if __name__ == "__main__":
     tests = [
@@ -577,6 +619,7 @@ if __name__ == "__main__":
         test_generation_loop_history_leak_is_semantic_not_key_named,
         test_generation_loop_rejects_empty_splits,
         test_final_report_uses_untouched_split_and_reports_overfit_gap,
+        test_final_report_computes_paired_margin_and_confirm_bit,
         test_generation_loop_rejects_final_overlap,
     ]
     failed = 0

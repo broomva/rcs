@@ -13,18 +13,20 @@ Pre-registration is enforced upstream: this driver refuses to run unless a
 never sees holdout/final scores (guarded in GenerationLoop).
 
 Billing: inner + proposer both bill subscription OAuth via cli_plant.filter_env
-(ANTHROPIC_API_KEY is stripped). Verify with a bogus-key dogfood before a run
-(see --dogfood-check). Scoring is local pytest ($0).
+(ANTHROPIC_API_KEY is stripped; confirm with a bogus-key smoke before a run).
+Scoring is local pytest ($0). Spending is opt-in: WITHOUT `--run` the driver
+defaults to the $0 wiring check — a bare invocation never bills.
 
 Usage:
-    # $0 wiring check (no LLM): construct loop + provision task workspaces
-    python3 -m scripts.aide2_run --check-only
+    # $0 wiring check (no LLM) — the default when --run is absent:
+    python3 -m scripts.aide2_run --check-only        # (or bare: safety-defaults here too)
 
-    # one paced batch of generations, then checkpoint + yield to the rate window
-    python3 -m scripts.aide2_run --batch 2
+    # one paced batch of generations (subscription-billed), then checkpoint + yield:
+    python3 -m scripts.aide2_run --run --batch 2
 
-    # resume picks up from run_state.json automatically; when n_steps reaches
-    # max_generations the driver writes final_report.json (unbiased final_test).
+    # resume: re-run `--run` — picks up from run_state.json automatically; when
+    # n_steps reaches max_generations it writes final_report.json ONCE (idempotent:
+    # a completed run's final_report is not re-scored / re-billed).
 """
 from __future__ import annotations
 
@@ -131,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--timeout-s", type=float, default=900.0, help="Per inner episode.")
     p.add_argument("--proposer-timeout-s", type=float, default=120.0)
     p.add_argument("--check-only", action="store_true", help="$0: build loop + provision workspaces, then exit (no LLM).")
+    p.add_argument("--run", action="store_true", help="Opt in to the subscription-billed run. Without it (or with --check-only) the driver only does the $0 wiring check — a bare invocation never bills.")
     args = p.parse_args(argv)
 
     # Pre-registration integrity: the curated/validated list must exist BEFORE
@@ -156,8 +159,11 @@ def main(argv: list[str] | None = None) -> int:
         f"proposer={args.proposer_model}",
         flush=True,
     )
-    if args.check_only:
-        print("[aide2] --check-only: wiring OK (disjoint splits enforced, workspaces provisioned). No LLM called.", flush=True)
+    # Spend is opt-in: --check-only OR the absence of --run both stop here at
+    # $0 (a bare `aide2_run` must never silently bill the subscription).
+    if args.check_only or not args.run:
+        why = "--check-only" if args.check_only else "no --run flag (safety default)"
+        print(f"[aide2] {why}: wiring OK (disjoint splits enforced, workspaces provisioned). No LLM called. Pass --run to spend.", flush=True)
         return 0
 
     # Resume from checkpoint if present.
@@ -181,7 +187,16 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if loop.n_steps >= max_gen:
-        report = loop.final_report()
+        # Idempotency guard (commitment #2/#6 "scored once"): pacing is
+        # "re-run to resume", so a re-invocation after completion must NOT
+        # re-score / re-bill the final_test split. If final_report.json already
+        # exists, load and report it instead of recomputing.
+        report_path = args.out / "final_report.json"
+        if report_path.exists():
+            report = json.loads(report_path.read_text())
+            print("[aide2] final_report.json already present — run complete; not re-scoring (idempotent, no re-bill).", flush=True)
+        else:
+            report = loop.final_report()
         print(f"[aide2] DONE — final_report: {json.dumps(report, indent=2)}", flush=True)
         print("[aide2] next: fill the THESIS_VALIDATION.md ledger row (commitment #6).", flush=True)
     else:

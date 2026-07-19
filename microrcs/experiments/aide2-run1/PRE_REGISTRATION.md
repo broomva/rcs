@@ -36,6 +36,13 @@ An AIDE²-shape (Weco AI, 2026) bi-level loop on our own stack:
 > `overfit_gap = holdout_score(best) − final_test_score(best)` is reported **regardless of
 > sign**. `max_generations = 5` bounds the accept-bit adaptive-overfitting of the holdout.
 
+The criterion is **computed mechanically** by `GenerationLoop.final_report()`, which scores
+BOTH the evolved `best` and the frozen `genesis` config on `final_test` and emits
+`final_test_margin` (evolved − genesis) + the `confirmed` boolean — there is no post-hoc analyst
+scoring pass. `final_report()` is called once and its `final_report.json` is not re-scored on a
+resume (`aide2_run` guards idempotency), so "scored once" holds under the "re-run to resume"
+pacing.
+
 **Statistical honesty (pre-committed):** n = 3 is a **directional** paired signal,
 not a high-powered significance test — a sign/McNemar test at this n cannot reach significance,
 and that is stated up front, not discovered after. What Run 1 establishes: (a) the full AIDE²
@@ -104,8 +111,8 @@ python3 -m scripts.curate_instances --candidates experiments/aide2-run1/candidat
     --out experiments/aide2-run1/validated_instances.json --need 12
 # $0 — wiring proof (constructs the loop, provisions workspaces, no LLM):
 python3 -m scripts.aide2_run --check-only
-# the paced run (subscription-billed, resumable):
-python3 -m scripts.aide2_run --batch 2      # then re-run to resume; final_report at gen 5
+# the paced run (subscription-billed, resumable) — spend is opt-in via --run:
+python3 -m scripts.aide2_run --run --batch 2   # then re-run --run to resume; final_report ONCE at gen 5
 ```
 
 ## Commitments checklist
