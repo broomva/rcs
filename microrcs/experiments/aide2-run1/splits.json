@@ -1,0 +1,41 @@
+{
+  "experiment": "aide2-run1",
+  "ticket": "BRO-1947",
+  "source": "experiments/aide2-run1/validated_instances.json",
+  "n_validated_pool": 19,
+  "sizes": {
+    "train": 6,
+    "holdout": 3,
+    "final_test": 3
+  },
+  "repo_histogram": {
+    "train": {
+      "sympy__sympy": 6
+    },
+    "holdout": {
+      "sympy__sympy": 3
+    },
+    "final_test": {
+      "pallets__flask": 1,
+      "sympy__sympy": 2
+    }
+  },
+  "train": [
+    "sympy__sympy-13971",
+    "sympy__sympy-14774",
+    "sympy__sympy-14817",
+    "sympy__sympy-15346",
+    "sympy__sympy-15609",
+    "sympy__sympy-18057"
+  ],
+  "holdout": [
+    "sympy__sympy-13480",
+    "sympy__sympy-13647",
+    "sympy__sympy-13915"
+  ],
+  "final_test": [
+    "pallets__flask-4992",
+    "sympy__sympy-12171",
+    "sympy__sympy-13471"
+  ]
+}
