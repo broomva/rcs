@@ -25,14 +25,18 @@ least-squares estimator recovers the true parameters; a rank-deficient (non-PE)
 probe leaves them unidentifiable.
 
 Concrete identification model (2 hidden parameters θ*=[r₀, ν], so PE of order 2 is
-required — a single frequency or a constant is NOT enough):
+required — a constant, or two COLLINEAR regressor channels w₁=w₂, is NOT enough.
+A single sinusoid is not inherently non-PE: sampled into two DISTINCT lagged
+regressors it is already persistently exciting of order 2 (Åström–Wittenmark). The
+witness's non-PE cases fail by DESIGNED channel collinearity w₁=w₂, not by having
+too few frequencies):
 
     y(t) = φ(t)·θ*  =  w₁(t)·r₀ + w₂(t)·ν       (dithered, measured response)
     θ̂    = (Σ φφᵀ)⁻¹ (Σ φ y)                     (least squares)
 
   * PE probe (w₁,w₂ at DISTINCT frequencies) ⟹ Σφφᵀ full rank ⟹ θ̂ = θ* exactly.
-  * non-PE probe (constant, or w₁=w₂ single frequency) ⟹ Σφφᵀ singular ⟹ r₀ not
-    separable from ν ⟹ unidentifiable.
+  * COLLINEAR channels (w₁=w₂: a shared constant OR a shared sinusoid) ⟹ Σφφᵀ
+    singular (rank 1) ⟹ r₀ not separable from ν ⟹ unidentifiable.
 
 Restored coupling, given the corrector `ẋ = −k(x−g(x)) − k_c(x − r̂₀)`:
 
@@ -157,6 +161,44 @@ def correction_fraction():
     return KC / (K * (1 - A) + KC)
 
 
+def corrector_steady_state(r_hat, x0=0.0, t_end=200.0, dt=1e-2):
+    """RK4-integrate the CORRECTED loop ẋ = −k(x−g(x)) − k_c(x−r̂₀), g(x)=ax+b,
+    to its fixed point. Pure numerical integration of the ODE — it does NOT read
+    the closed-form fixed point, so comparing its result against
+    (k·b + k_c·r̂₀)/(k(1−a)+k_c) is a genuine DYNAMICAL witness (a wrong ODE, e.g.
+    a dropped k_c term, diverges from the algebra), not a formula-self-consistency
+    check. Effective rate k(1−a)+k_c = 1.2 > 0 ⟹ stable attractor, integral
+    converges to the fixed point to machine precision (RK4's discrete fixed point
+    equals the ODE's for a linear system)."""
+    def f(x):
+        return -K * (x - (A * x + B)) - KC * (x - r_hat)
+    x, n = x0, int(t_end / dt)
+    for _ in range(n):
+        k1 = f(x); k2 = f(x + dt/2 * k1); k3 = f(x + dt/2 * k2); k4 = f(x + dt * k3)
+        x += dt/6 * (k1 + 2 * k2 + 2 * k3 + k4)
+    return x
+
+
+def integrated_world_sensitivity(kind, which):
+    """End-to-end ∂x*/∂θ*[which] finite-differenced THROUGH the integrated
+    corrector fixed point: perturb the TRUE parameter, re-run the least-squares
+    estimator under `kind` to get r̂₀, RK-integrate the corrector ODE to x*, and
+    measure the slope of the *integrated* x*. which=0 → ∂x*/∂r₀ (world steering),
+    which=1 → ∂x*/∂ν (nuisance contamination). This composes the REAL estimator
+    with the REAL integrated fixed point — the witness the 0.583 / 0.292 table
+    entries were missing (before, only the estimator Jacobian was differenced and
+    the corrector gain was a bare closed-form constant)."""
+    eps = 1e-3
+
+    def x_star_of(theta):
+        r_hat = identify(kind, theta=theta)[0][0]     # estimator's r̂₀ under the probe
+        return corrector_steady_state(r_hat)          # integrated corrected fixed point
+
+    hi = list(THETA_TRUE); hi[which] += eps
+    lo = list(THETA_TRUE); lo[which] -= eps
+    return (x_star_of(tuple(hi)) - x_star_of(tuple(lo))) / (2 * eps)
+
+
 def estimator_jacobian(kind):
     """Finite-difference ∂θ̂/∂θ*: how the LS estimate of [r₀, ν] responds to each
     TRUE parameter. Returns [[∂r̂₀/∂r₀, ∂r̂₀/∂ν], [∂ν̂/∂r₀, ∂ν̂/∂ν]].
@@ -197,7 +239,17 @@ def coupling_integrate(sigma2, h0=0.0, t_end=200.0, dt=1e-2):
 
 
 def excitation_threshold(h_min):
-    """σ*² = ρ·h_min/(β(h_max−h_min)) — min excitation for h*≥h_min."""
+    """σ*² = ρ·h_min/(β(h_max−h_min)) — min excitation for h*≥h_min.
+
+    Well-posed only for 0 < h_min < h_max and β, ρ > 0. Since
+    h* = βσ²h_max/(ρ+βσ²) < h_max for every finite σ², a target h_min ≥ h_max is
+    unreachable at ANY excitation and the formula divides by ≤0 — undefined. The
+    precondition was implicit in §5; BRO-1937 states it and enforces it here.
+    Raised as ValueError (not assert) so the guard survives `python -O`."""
+    if not (RHO > 0 and BETA > 0):
+        raise ValueError(f"threshold requires β, ρ > 0, got ρ={RHO}, β={BETA}")
+    if not (0 < h_min < H_MAX):
+        raise ValueError(f"threshold requires 0 < h_min < h_max={H_MAX}, got {h_min}")
     return RHO * h_min / (BETA * (H_MAX - h_min))
 
 
@@ -245,11 +297,17 @@ def test_no_probe_leaves_world_fully_hidden():
 
 
 def test_pe_bound_governs_estimation_error():
-    """Under observation noise, estimator VARIANCE ∝ 1/α, so error MAGNITUDE ∝
-    1/√α ∝ 1/amp (α∝amp²): doubling the probe amplitude halves the error. A
-    higher-excitation probe gives a smaller error; the abstract PE bound α is the
-    concrete conditioning that controls accuracy. (This pins the exponent — a
-    genuine 1/√α, refuting a naive 1/α reading.)"""
+    """A DETERMINISTIC off-frequency disturbance (a fixed 1.3 rad/s sinusoid, not
+    RNG — see identify()) projects onto the regressors and induces an estimation
+    BIAS whose MAGNITUDE ∝ 1/amp ∝ 1/√α (α∝amp²): doubling the probe amplitude
+    halves the error. Honest labelling (BRO-1937): the *classical* PE result is
+    that estimator **variance** ∝ 1/α under STOCHASTIC noise ⟹ error magnitude ∝
+    1/√α; here we witness the same 1/√α *exponent* deterministically, so what we
+    measure is a projection **bias**, not a variance (the code injects a fixed
+    sinusoid, not a random one — same conditioning story, correct name). A
+    higher-excitation probe gives a smaller error; the PE bound α is the concrete
+    conditioning that controls accuracy. This pins the exponent — a genuine 1/√α,
+    refuting a naive 1/α reading."""
     rows = []
     for amp in (0.5, 1.0, 2.0):
         theta_hat, alpha = identify("pe", amp=amp, noise_amp=0.05)
@@ -285,12 +343,61 @@ def test_pe_gives_separable_world_steering():
     # restored coupling to r₀ is NONZERO in BOTH ("0 without PE" was wrong)
     coup_pe, coup_const = frac * J_pe[0][0], frac * J_const[0][0]
     assert coup_pe > 0 and coup_const > 0, (coup_pe, coup_const)
+    # pin the MAGNITUDES to the doc §4 table (0.583 / 0.292) so frac's VALUE is
+    # load-bearing here, not just its sign (BRO-1937 anti-vacuity); the INTEGRATED
+    # witness lives in test_integrated_corrector_pins_correction_fraction below
+    assert abs(coup_pe - 0.583) < 1e-2, coup_pe
+    assert abs(coup_const - 0.292) < 1e-2, coup_const
     # the SWITCH is contamination = coupling to the nuisance ν
     contam_pe, contam_const = frac * J_pe[0][1], frac * J_const[0][1]
     assert abs(contam_pe) < 1e-2, contam_pe                        # PE: clean steering
     assert abs(contam_const - coup_const) < 1e-2, (contam_const, coup_const)  # non-PE: fully contaminated
     print(f"  PASS  PE gives SEPARABLE steering (∂x*/∂ν={contam_pe:.3f}≈0); non-PE "
           f"contaminates (∂x*/∂ν={contam_const:.3f} = ∂x*/∂r₀={coup_const:.3f})")
+
+
+def test_integrated_corrector_pins_correction_fraction():
+    """MAJOR witness (BRO-1937): validate correction_fraction() and the 0.583 /
+    0.292 world-coupling sensitivities against an INTEGRATED corrector ODE, not
+    just the closed form. Before this, correction_fraction() was a bare algebraic
+    constant that no assertion depended on (every use pinned only the SIGN), so
+    the doc §4 table's 0.583/0.292 were asserted, not witnessed. Three checks:
+
+      (1) the RK-integrated fixed point of ẋ=−k(x−g(x))−k_c(x−r̂₀) equals the
+          closed form (k·b+k_c·r̂₀)/(k(1−a)+k_c) across several r̂₀ — a dynamical
+          witness that the ODE's attractor matches the algebra;
+      (2) ∂x*/∂r̂₀ finite-differenced THROUGH that integration equals
+          correction_fraction() (=0.583) — pins the gain fraction to the ODE, so
+          a wrong correction_fraction() now fails a test;
+      (3) the end-to-end world sensitivities, composing the REAL least-squares
+          estimator with the integrated fixed point, reproduce the §4 table:
+          ∂x*/∂r₀ = 0.583 (PE) vs 0.292 (non-PE), and the contamination
+          ∂x*/∂ν = 0 (PE) vs 0.292 (non-PE). Now computed, not assumed."""
+    denom = K * (1 - A) + KC
+    # (1) integrated fixed point == closed form (genuine ODE attractor)
+    for r_hat in (-2.0, 0.5, 2.0, 5.0):
+        x_int = corrector_steady_state(r_hat)
+        x_cf = (K * B + KC * r_hat) / denom
+        assert abs(x_int - x_cf) < 1e-9, (r_hat, x_int, x_cf)
+    # (2) ∂x*/∂r̂₀ through integration == correction_fraction() (== 0.583)
+    eps = 1e-3
+    dxdr_hat = (corrector_steady_state(1.0 + eps)
+                - corrector_steady_state(1.0 - eps)) / (2 * eps)
+    frac = correction_fraction()
+    assert abs(frac - 0.583) < 1e-3, frac                       # the doc §4 value
+    assert abs(dxdr_hat - frac) < 1e-6, (dxdr_hat, frac)        # integrated == closed form
+    # (3) end-to-end world coupling through estimator + integrated fixed point
+    coup_pe = integrated_world_sensitivity("pe", 0)             # ∂x*/∂r₀ under PE
+    coup_np = integrated_world_sensitivity("constant", 0)       # ∂x*/∂r₀ under non-PE
+    contam_pe = integrated_world_sensitivity("pe", 1)           # ∂x*/∂ν under PE
+    contam_np = integrated_world_sensitivity("constant", 1)     # ∂x*/∂ν under non-PE
+    assert abs(coup_pe - 0.583) < 1e-2, coup_pe                 # PE steers r₀ at frac·1
+    assert abs(coup_np - 0.292) < 5e-3, coup_np                 # non-PE at frac·0.5
+    assert abs(contam_pe) < 1e-2, contam_pe                     # PE: clean (∂x*/∂ν≈0)
+    assert abs(contam_np - 0.292) < 5e-3, contam_np             # non-PE: fully contaminated
+    print(f"  PASS  integrated corrector pins correction_fraction={frac:.4f} "
+          f"(∂x*/∂r̂₀_int={dxdr_hat:.4f}); world coupling PE={coup_pe:.3f}/"
+          f"non-PE={coup_np:.3f}, contamination PE={contam_pe:.3f}/non-PE={contam_np:.3f}")
 
 
 def test_threshold_macro_dynamics():
@@ -309,8 +416,17 @@ def test_threshold_macro_dynamics():
     assert abs(coupling_steady_state(s_star) - h_min) < 1e-9
     assert coupling_steady_state(0.99 * s_star) < h_min
     assert coupling_steady_state(1.01 * s_star) > h_min
+    # well-posedness precondition (BRO-1937): h* < h_max at every finite σ², so a
+    # target h_min ≥ h_max is unreachable and the threshold formula is undefined
+    assert coupling_steady_state(1e6) < H_MAX                   # h*→h_max⁻, never reaches
+    for bad in (H_MAX, 1.5 * H_MAX):
+        try:
+            excitation_threshold(bad)
+            raise AssertionError(f"expected precondition failure for h_min={bad}")
+        except ValueError as e:
+            assert "threshold requires" in str(e), e            # our guard fired
     print(f"  PASS  threshold σ*²={s_star:.3f} for h_min={h_min} "
-          f"(σ²=0→h*=0 recovers BRO-1924; analytic==integrated)")
+          f"(σ²=0→h*=0 recovers BRO-1924; analytic==integrated; h_min<h_max enforced)")
 
 
 def test_dither_absorbed_below_threshold():
@@ -339,6 +455,7 @@ if __name__ == "__main__":
         test_no_probe_leaves_world_fully_hidden,
         test_pe_bound_governs_estimation_error,
         test_pe_gives_separable_world_steering,
+        test_integrated_corrector_pins_correction_fraction,
         test_threshold_macro_dynamics,
         test_dither_absorbed_below_threshold,
     ]
