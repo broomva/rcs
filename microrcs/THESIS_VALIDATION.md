@@ -46,6 +46,7 @@ The RCS thesis exists in three forms; current evidence by form:
 | **Path 2: Sonnet × max_steps=50 SWE** | 4 instances × 4 conditions × 1 seed × Sonnet L0/L1 + Opus L2/L3 × max_steps=50 | flat partial only | n/a (incomplete) | invalid (credit balance + connectivity) | inconclusive — API credits ran out mid-flat condition, all recursion conditions aborted on the next call | ~$3 | flat got 2/4 instances run (flask: 0.00 in 10 steps, pylint: 0.00 in 43 steps); requests-3362 + sphinx not run; +autonomic/+meta/full all aborted with API errors. **Re-run pending budget refresh.** |
 | **gemma4 bench (PR #36)** | REFERENCE_SUITE × 4 conditions × 3 epochs × 3 repeats × gemma4:8b local L0+L2 × max_steps=20 = 180 episodes | **full** | flat=0.054 | +autonomic=0.054 (Δ=0.000), +meta=0.045 (Δ=−0.009), full=0.064 (Δ=+0.010) | recursion **directionally HELPS** at full, neutral at +autonomic, slightly hurts at +meta — but CIs heavily overlap; not significant at n=1 seed | $0 (local) | First end-to-end run via OllamaReasoner (PR #36). Validates that the Reasoner Protocol is provider-agnostic; confirms gemma4-8B can tool-call against the bash+submit interface. Per-task pass-rate pattern: math=0% (all no_action — modality mismatch), logic-zebra ~100%, code-bugfix ~50%, qa partial only, planning-hanoi mixed. **3 of 5 tasks are modality-mismatched** — motivates the Eywa flag (PR #37) for follow-up. |
 | **Eywa A/B mechanism (post-PR #37)** | --quick × REFERENCE × flat+full × gemma4 + `--eywa-python` flag | n/a (mechanism check) | flat=0.000 (control parity) | full=0.125 (parity with smoke) | scores unchanged but **mechanism confirmed**: agent now invokes `python -c` for arithmetic instead of rambling | $0 (local) | **Eywa hypothesis empirically validated at the mechanistic level.** Without the flag, gemma4 hit `no_action` after 1 step on math-multi-step. With `--eywa-python`, gemma4 took 4 bash steps including `python -c 'print(73 * 1.6)'` and `python -c 'print(295.2 / 154)'` — modality-native compute exactly as Eywa (arXiv:2604.27351) predicts. Score still 0 because `--quick` capped max_steps=10, too few for the multi-step time calculation to complete. **Binding constraint shifted from modality-mismatch to step-budget.** Magnitude follow-up: same A/B at max_steps=50+. |
+| **AIDE²-run1 (BRO-1947 / PR #70 pre-reg)** | 12 oracle-curated SWE-Lite (11 sympy + 1 flask; train 6 / holdout 3 / final 3) × sonnet-4-6 inner × opus-4-7 proposer × N=5 gens, subscription CLI | n/a (halted gen 1/5) | genesis holdout = **1.000** (3/3 solved) | gen-1 candidate holdout = 1.000, **rejected** (`1.000 <= 1.000`); all 12 episodes (genesis-holdout + cand-train + cand-holdout) = 1.0 | **private gate unsatisfiable — DISCONFIRM-by-ceiling** (best ≡ genesis ⟹ final_test paired margin ≡ 0 analytically) | ~$0 marginal (subscription OAuth, bogus-key-verified) | **A closed benchmark + a frontier-capable inner erases the selection headroom the private gate needs.** Genesis sonnet solves every curated instance, so strict-improvement selection has nothing to select on. Recipe is substrate-limited to open-ended objectives (AIDE² used leaderboard metrics AND a weak Flash inner — both now legible as headroom engineering; weak-inner is transient as frontiers improve). Pivot: measure loop stability/ignition, not score-delta — three-arm design (fixed / blind-meta / extended-observable-meta) in workspace entity `recursion-relocates-guarantees`. |
 | **gemma4 multi-seed bench (post-PR #40)** | REFERENCE × 3 seeds × 4 conditions × 3 epochs × 3 repeats × gemma4:8b × max_steps=20 = 540 episodes | **flat ≈ +meta ≈ full** | flat=0.061 ± 0.013 | +meta=0.065 (Δ=+0.004), full=0.065 (Δ=+0.004), +autonomic=0.057 (Δ=−0.004) | recursion **NOISE-LEVEL** at gemma4 — all Δ within 2σ_flat=0.026 | $0 (local) | **The PR #38 directional signal does NOT survive at n=3 seeds.** +0.01 Δ shrunk to +0.004, smaller than within-condition std. Confirms the gemma4 weak-L0 result is empirically null. Combined with PR #31 capacity sweep at n=3, only Sonnet × HARDER shows statistically significant effect (negative). **The bitter-lesson is dead at proper power on every tier we've tested except Sonnet (where it inverts).** |
 | **Swarm-RCS-L0 first live run (post-PR #40)** | REFERENCE × 1 seed × swarm_flat × N=3 peers × k=2 majority × gemma4 × max_steps=20 = 5 tasks × 3 peers = 15 reasoner calls | logic-zebra ✓ | n/a (different aggregation than single) | swarm_flat: pass^k=0.008 (strict majority), pass@k=0.600 (any-peer success) | **strict majority quorum HURTS, but best-of-N would HELP 10x at gemma4** | $0 (local) | Single live invocation revealed a deep finding: strict-majority answer-hash voting (k=2 of 3) requires peers to converge on the SAME answer, not just succeed independently. With gemma4 at ~33% per-peer submit rate on most tasks, majority quorum almost never reaches. BUT `pass@k=0.60` shows that at least 1 peer often succeeds — so a different aggregation (best-of-N, verifier-weighted, score-driven) would yield 10× over single_flat. **Strict-majority quorum is brittle on free-form outputs; the swarm has latent capability that the chosen aggregation throws away.** Follow-up: run with k=1 (any-peer-submits), then implement verifier-weighted aggregation. |
 | **CliPlant subscription runner + AIDE² loop (PR #68 / BRO-1943, re-scope of BRO-1071)** | flask-4992 × claude-haiku-4-5 × `claude -p` × max_turns=30 (pipeline smoke) | n/a (infra) | score=0.0 (is_error: hit max_turns; verifier ran, no passing patch) | n/a — pipeline validation, not signal | ~$0.23 subscription-billed (reported; **bogus-key dogfood confirms subscription OAuth, not API**) | **Subscription-compute experiment infra shipped.** `claude -p` runs SWE episodes end-to-end in COW workspaces on subscription OAuth (deny-by-default env filter strips ANTHROPIC_API_KEY; bogus-key run still succeeds → proof). AIDE²-shape `GenerationLoop` with held-out **private-split gate** (accept iff holdout improves; proposer sees train scores only). Collapses BRO-1071's $5.4–6K API cost → ~$0 marginal; binding budget shifts to Max-plan rate windows. Haiku × 30 turns hits the SWE floor (consistent with PR #32/#34). Next: paced multi-day run at Sonnet/Opus L0 with real harness evolution; codex cross-vendor arm. |
@@ -1116,6 +1117,54 @@ python3 microrcs.py bench --suite harder --conditions flat,+autonomic,full --n-s
 ```
 
 Each command is fully deterministic given the same seed (modulo Anthropic API stochasticity, which is bounded by temperature=1.0 sampling).
+
+## AIDE²-run1 result (BRO-1947 / PR #70) — DISCONFIRM-by-ceiling
+
+**Filed 2026-07-19, one day after the run (commitment #6: within 1 week ✓).**
+
+**Pre-registration (merged before any LLM call, PR #70 `0bbf92c`):** CONFIRM iff
+the evolved best HarnessConfig beats genesis on the untouched `final_test` split
+by a paired positive margin (n=3); `overfit_gap` reported regardless of sign;
+`max_generations=5`. Splits frozen (train 6 / holdout 3 / final 3, oracle-curated
+per the BRO-1948 fidelity fix, PR #69 `15f2161` — every instance gold-patch
+verified so source edits are genuinely exercised).
+
+**Result (generation 1 of 5):** genesis `claude-sonnet-4-6` scored **1.0 on all
+12 episodes** — 3/3 genesis-holdout, then the gen-1 candidate 6/6 train + 3/3
+holdout. `best_holdout = 1.000` ⟹ the private gate (strict `>` on holdout) is
+**mathematically unsatisfiable**; no candidate can ever be accepted; `best`
+remains genesis; the pre-registered paired margin on `final_test` is therefore
+**identically 0** (evolved ≡ genesis) without spending the final-test episodes.
+**Verdict: DISCONFIRM — by ceiling, not by measured inferiority.** Run halted
+after gen 1/5; generations 2–5 would re-confirm a certainty at ~42 additional
+subscription episodes.
+
+**What the null establishes (beyond the verdict):**
+1. **Substrate limitation of the private-gate recipe.** A closed benchmark
+   (fixed ground truth, score ceiling 1.0) combined with a frontier-capable
+   inner model leaves the held-out gate no selection headroom. AIDE²'s own
+   design choices — leaderboard-style unbounded metrics AND a deliberately weak
+   inner (Gemini-Flash) — are retroactively legible as headroom engineering.
+   The weak-inner variant is transient (evaporates as frontiers improve);
+   **open-ended substrate is the durable fix**.
+2. **The infra is validated, not wasted.** The runner + gate behaved exactly to
+   spec (episodes independent, holdout guarded, proposer blind, checkpoint
+   resumable); the fidelity verifier scored a live agent correctly (bogus-key
+   smoke: sonnet solved sympy-24213 with a real `equivalent_dims` fix,
+   score 1.0, subscription-billed). The instrument works; it was pointed at a
+   substrate that measures capability, which the frontier donates.
+3. **Successor experiment:** the three-arm ignition design (A fixed-schedule /
+   B blind-meta / C extended-observable-meta) on an open-ended substrate,
+   measuring rate vs asymptote — pre-registration to follow as its own PR
+   (workspace entities: `recursion-relocates-guarantees`,
+   `agentic-engine-nonconvex-optimizer`, `robust-harness-stability`,
+   `capability-two-thresholds`).
+
+**Evidence:** `experiments/aide2-run1/{episodes.jsonl,lineage.jsonl,run_state.json}`
+(12 episode rows, all `score=1.0`; lineage row 1 `accepted=false,
+reason="holdout 1.000 <= best 1.000"`; checkpoint `n_steps=1, best_holdout=1.0,
+best_gen=0`). Reproduce the wiring at $0: `python3 -m scripts.aide2_run
+--check-only`; the run driver requires `--run` to spend.
 
 ## Document maintenance
 
