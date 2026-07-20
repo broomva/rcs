@@ -61,7 +61,11 @@ def venv_support(instance) -> tuple[bool, str]:
     """Is this instance supported by the uv-venv backend (no Docker/conda)?
 
     Excludes conda-`environment.yml` instances (need conda, e.g. matplotlib,
-    scikit-learn, xarray) and tox-driven test commands (deferred: sphinx).
+    scikit-learn, xarray). `tox --current-env` repos (sphinx) ARE supported
+    (BRO-1949) — the spec pins tox + tox-current-env in `pip_packages` and its
+    `pre_install` seds are already applied by `_install_from_spec`, so the
+    tox env's commands run in this venv. Bare `tox` (isolated env management)
+    stays deferred.
     """
     if not HAS_SWEBENCH:
         return False, "swebench not installed"
@@ -75,8 +79,12 @@ def venv_support(instance) -> tuple[bool, str]:
     # `"tox" in test_cmd` and `test_cmd + directives` both assume a string.
     if not isinstance(test_cmd, str) or not test_cmd:
         return False, "spec has no string test_cmd (list-form / full-SWE-bench — unsupported)"
-    if "tox" in test_cmd:
-        return False, "tox-based test_cmd (deferred — needs tox + pre_install seds)"
+    if "tox" in test_cmd and "--current-env" not in test_cmd:
+        # Bare `tox` provisions its own isolated environments and needs tox to
+        # manage interpreters — the venv sandbox can't provide that. Only the
+        # `tox --current-env` form (tox-current-env plugin, run in THIS venv)
+        # is supported; sphinx's specs use exactly that.
+        return False, "bare tox test_cmd (deferred — needs tox-managed isolated envs)"
     # Parser-existence gate (P20): without a repo log parser the status map is
     # empty and EVERY episode scores 0 — the exact silent-zero class this fix
     # exists to kill. All 12 SWE-bench-Lite repos have one; guard anyway.

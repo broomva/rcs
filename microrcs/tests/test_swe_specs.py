@@ -79,14 +79,32 @@ def test_venv_support_env_yml_excluded(monkeypatch):
     assert ok is False and "conda" in why
 
 
-def test_venv_support_tox_excluded(monkeypatch):
+def test_venv_support_bare_tox_excluded(monkeypatch):
+    # Bare `tox` (no --current-env) still needs tox-managed isolated envs.
     monkeypatch.setattr(swe_specs, "HAS_SWEBENCH", True)
     monkeypatch.setattr(
         swe_specs, "MAP_REPO_VERSION_TO_SPECS",
-        {"s/s": {"1": {"test_cmd": "tox --current-env -epy39 -v --"}}},
+        {"s/s": {"1": {"test_cmd": "tox -epy39 -v"}}},
     )
+    monkeypatch.setattr(swe_specs, "MAP_REPO_TO_PARSER", {"s/s": lambda log, ts=None: {}})
     ok, why = swe_specs.venv_support(_stub(repo="s/s", version="1"))
-    assert ok is False and "tox" in why
+    assert ok is False and "bare tox" in why
+
+
+def test_venv_support_tox_current_env_supported(monkeypatch):
+    # `tox --current-env` runs in THIS venv (tox-current-env plugin) — the
+    # sphinx form. Supported now (BRO-1949).
+    monkeypatch.setattr(swe_specs, "HAS_SWEBENCH", True)
+    monkeypatch.setattr(
+        swe_specs, "MAP_REPO_VERSION_TO_SPECS",
+        {"s/s": {"1": {
+            "test_cmd": "tox --current-env -epy39 -v --",
+            "pip_packages": ["tox==4.16.0", "tox-current-env==0.0.11"],
+        }}},
+    )
+    monkeypatch.setattr(swe_specs, "MAP_REPO_TO_PARSER", {"s/s": lambda log, ts=None: {}})
+    ok, why = swe_specs.venv_support(_stub(repo="s/s", version="1"))
+    assert ok is True and why == "supported"
 
 
 def test_venv_support_no_spec(monkeypatch):
@@ -139,9 +157,14 @@ def test_real_flask_supported():
 
 
 @pytest.mark.skipif(not swe_specs.HAS_SWEBENCH, reason="swebench not installed")
-def test_real_sphinx_tox_excluded():
+def test_real_sphinx_tox_current_env_supported():
+    # BRO-1949: sphinx uses `tox --current-env` with tox + tox-current-env
+    # pinned in the spec's pip_packages, so the venv backend supports it.
     ok, why = swe_specs.venv_support(_stub(repo="sphinx-doc/sphinx", version="3.5"))
-    assert ok is False and "tox" in why
+    assert ok is True, why
+    assert "--current-env" in swe_specs.test_command(
+        _stub(repo="sphinx-doc/sphinx", version="3.5")
+    )
 
 
 @pytest.mark.skipif(not swe_specs.HAS_SWEBENCH, reason="swebench not installed")
