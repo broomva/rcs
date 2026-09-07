@@ -30,7 +30,7 @@ related:
 7-tuple slot by slot, the factory onto Paper 6's horizontal composition, and the planned
 training loop onto the EGRI 9-tuple; state where the code diverges from the formalism and
 what the formalism then forces. Companion to [[life-rcs-mapping]], which does the same for
-Life. Human-read narrative with the figure: `docs/specs/2026-09-06-holon-system-map.html` §8.
+Life. Human-read narrative with the figure: [[2026-09-06-holon-system-map|the holon system map]] §8 (`broomva/workspace` `docs/specs/2026-09-06-holon-system-map.html`).
 
 **Status, stated first.** RCS is *not represented in holon's code today.* Nothing in the crate
 implements `RecursiveControlledSystem<L>` from
@@ -140,9 +140,11 @@ product plant, not a fleet. It becomes a fleet, and λ_H becomes live, only when
 their own weights and their own training loops.
 
 **Lemma (aggregation consistency) obligation.** P6 requires (h_H, d_H) to form a lens on the
-composed system. For the factory: h_H is the position-keyed result vector (surjective onto the
-result space by construction — every task has exactly one row); d_H right-inverts it on its
-range because a dispatched task's result lands at that task's position. The commuting square
+composed system. For the factory, define the codomain first: the result space is the set of
+*reachable* position-keyed result vectors, one row per dispatched task. On that codomain h_H is
+total and onto by construction (every task has exactly one row, and every reachable vector is
+some run's collector output); nothing stronger is claimed. d_H right-inverts h_H on its range
+because a dispatched task's result lands at that task's position. The commuting square
 holds for the star; it is *not* established for a general graph runner with routing by
 envelope kind, and must be re-checked there.
 
@@ -178,7 +180,7 @@ column exists yet; the file names are where each piece would land.
 | U₃ | an invariant added or removed; a seam bound to a standard | `CLAUDE.md` |
 | f₃ | the workspace self-evolution protocol (pattern → log → doc → invariant) | workspace `CLAUDE.md` |
 | S₃ | the workspace G1–G4 gates via the real `control-gate-hook.sh`, which holon's gate itself consults | `tests/fixtures/real-gate/` |
-| Π₃ | `CLAUDE.md` + the seam registry + the system map (closure: a model of the hierarchy inside the controller) | `docs/specs/2026-09-06-holon-system-map.html` |
+| Π₃ | `CLAUDE.md` + the seam registry + the system map (closure: a model of the hierarchy inside the controller) | [[2026-09-06-holon-system-map|the holon system map]] |
 
 ## Where the code disagrees with the formalism (deliberate)
 
@@ -197,10 +199,13 @@ column exists yet; the file names are where each piece would land.
 ## What the stability budget forces
 
 - **H6 time-scale dilation.** τ_a(i+1) ≥ c·τ_a(i), c ≈ 10. Weight acceptance must be at least
-  an order of magnitude rarer than forward passes. A ~90 % rejection rate *is* that ratio —
-  the figure AIDE² reported ([[aide2-recursive-self-improvement]]) and the reason the loop
-  design expects most proposals to fail. Updates apply only at run boundaries because
-  weights are gathered once per run.
+  an order of magnitude rarer than forward passes. A ~90 % rejection rate gives an acceptance
+  probability of about 0.1 per proposal; that implies τ_a ≈ 10 × τ_trial **only if** trial
+  duration and proposal cadence are stable — an assumption, not a measurement. The figure is
+  the one AIDE² reported ([[aide2-recursive-self-improvement]]) and the reason the loop design
+  expects most proposals to fail; the budget should use *measured* accepted-update intervals
+  once the loop runs. Updates apply only at run boundaries because weights are gathered once
+  per run.
 - **C3 for the backward pass.** Critique envelopes on reversed edges introduce a cycle;
   without decay or a hop budget they are a standing wave. Any graph runner that routes
   critiques must carry δ.
@@ -222,12 +227,12 @@ Implementors (holon): `src/unit.rs` (L0 and thin L1), `src/factory.rs` (the comp
 level is the missing observer — the same shape as `core/life/crates/arcan/arcand/src/rcs_observer.rs`.
 
 Downstream: `research/rcs/tests/test_stability_budget.py` (would gain holon rows),
-`docs/specs/2026-09-06-holon-system-map.html` §8 (the figure), this document. The
+[[2026-09-06-holon-system-map|the holon system map]] §8 (the figure), this document. The
 conformance files do not move: the wire is untouched.
 
 ## Cross-level data flow (holon)
 
-```
+```text
 tool result  ──h₀──▶  one user message ──▶ model call (Π₀ = Σ₁)
                                             │ ToolCall (U₀)
                                             ▼
