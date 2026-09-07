@@ -180,7 +180,7 @@ column exists yet; the file names are where each piece would land.
 | U₃ | an invariant added or removed; a seam bound to a standard | `CLAUDE.md` |
 | f₃ | the workspace self-evolution protocol (pattern → log → doc → invariant) | workspace `CLAUDE.md` |
 | S₃ | the workspace G1–G4 gates via the real `control-gate-hook.sh`, which holon's gate itself consults | `tests/fixtures/real-gate/` |
-| Π₃ | `CLAUDE.md` + the seam registry + the system map (closure: a model of the hierarchy inside the controller) | [[2026-09-06-holon-system-map|the holon system map]] |
+| Π₃ | `CLAUDE.md` + the seam registry + the system map (closure: a model of the hierarchy inside the controller) | [[2026-09-06-holon-system-map]] (the holon system map) |
 
 ## Where the code disagrees with the formalism (deliberate)
 
