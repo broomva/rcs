@@ -10,7 +10,7 @@ aliases:
   - Recursive Controlled Systems
   - RCS
 created: "2026-04-16"
-updated: "2026-04-23"
+updated: "2026-09-06"
 ---
 
 # RCS — Recursive Controlled Systems
@@ -24,6 +24,7 @@ Formal control-theoretic foundation for autonomous AI agents, where the agent it
 ## Working Documents
 
 - [[life-rcs-mapping]] — Life Agent OS → RCS mapping table with Rust types, file paths, line numbers (BRO-704)
+- [[holon-rcs-mapping]] — holon → RCS mapping: the unit slot by slot (L0 full, L1 thin, weights = X₂), the factory as P6 horizontal composition at L0 only, the training loop as the EGRI 9-tuple; three deliberate divergences (BRO-2441)
 - [[framework-unification]] — Framework unification: Eslami/Ashby/Beer/Active Inference → RCS (BRO-705)
 - [[self-referential-closure]] — Self-referential closure: the RCS paper IS a Level 3 artifact (Proposition 4)
 
