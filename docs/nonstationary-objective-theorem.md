@@ -64,11 +64,16 @@ has **zero** causal influence on the terminal goal (`h = 0`).
 In the **contraction regime `a < 1`** (`1 − μa > 0` for all `μ ∈ [0,1]`, so the
 fixed point stays stable across the whole sweep), internalizing the verifier
 drains world-coupling to zero *smoothly* — a knob, not a discrete catastrophe.
-**For `a ≥ 1` the smoothness fails:** `h(μ)` has a pole at `μ = 1/a` — exactly
+**For `a > 1` the smoothness fails:** `h(μ)` has a pole at `μ = 1/a` — exactly
 where the fixed point loses stability (`1 − μa = 0`) — rising toward `+∞` and
-flipping sign before returning to `0` at `μ = 1`. The smooth-knob reading is
-specific to the regime that stays stable; the endpoints (`h : 1 → 0`) survive,
-the path between them does not (witnessed by `test_a_gt_1_sweep_is_not_a_smooth_collapse`).
+flipping sign before returning to `0` at `μ = 1`. (At *exactly* `a = 1` there is
+**no interior pole**: `h(μ) = (1−μ)/(1−μ) ≡ 1` for all `μ ∈ [0,1)`, and the only
+degeneracy is the endpoint `μ = 1` — the incoherent-drift case where `1−μa`
+vanishes at the boundary, not inside the sweep. So the caveat is `a > 1`, not
+`a ≥ 1`.) The smooth-knob reading is specific to the regime that stays stable; the
+endpoints (`h : 1 → 0`) survive, the path between them does not — witnessed by
+`test_a_gt_1_sweep_is_not_a_smooth_collapse`, whose pre-pole rise on the stable
+side `μ < 1/a` is now pinned to RK integration, not only the analytic formula.
 
 ## 4. The theorem (μ = 1 — verifier fully internalized)
 
@@ -80,9 +85,13 @@ the path between them does not (witnessed by `test_a_gt_1_sweep_is_not_a_smooth_
 > 2. **Decoupling.** At any fixed point, `∂x*/∂r₀ = 0`: the terminal objective is
 >    **causally independent of the exogenous task**. This is the reward-hack /
 >    wirehead fixed point — a goal defined entirely by the system's own map.
-> 3. **Non-stationary transient.** The tracked target `g(x(t))` co-moves with the
->    state: `d/dt[g(x)] = a·ẋ ≠ 0` whenever `ẋ ≠ 0`. The reference is a function
->    of the tracked variable — the defining non-stationarity of the objective.
+> 3. **Non-stationary transient (`a ≠ 0`).** The tracked target `g(x(t))` co-moves
+>    with the state: `d/dt[g(x)] = a·ẋ ≠ 0` whenever `ẋ ≠ 0` **and** `a ≠ 0`. The
+>    reference is a function of the tracked variable — the defining non-stationarity
+>    of the objective. At the boundary `a = 0` the map `g(x) = b` is constant, so
+>    the target never moves (`d/dt[g(x)] = 0·ẋ = 0`) and the fixed point `x* = b`
+>    is decoupled from `r₀`: `a = 0` is decoupled **and** stationary — the transient
+>    non-stationarity is strictly an `a ≠ 0` phenomenon.
 > 4. **Stability.** The fixed point is stable iff `1 − μa > 0`. For `a > 1` a
 >    fixed point exists *formally* (`x* = b/(1−a)`) but is a **repeller** —
 >    divergence, not convergence.
@@ -133,9 +142,13 @@ homeostatic** — *and its goal is world-decoupled* (`∂x*/∂r₀ = 0`).
   `h(μ)=(1−μ)/(1−μa)` collapse (analytic == integrated), exogenous stationarity +
   world-coupling (`h=1`), endogenous convergence to `b/(1−a)`, decoupling
   (`∂x*/∂r₀=0` across `r₀∈{−50,0,50}`), the no-fixed-point drift (`ẋ=kc`), the
-  `a>1` repeller (deviation grows `e^{k(a−1)t}`, ~22026× at `t=20`), the `a>1`
-  non-smooth pole at `μ=1/a`, the non-stationary transient, and the
-  stable-but-decoupled cross-link.
+  `a>1` repeller — the exponential **rate** `k(a−1)` now *asserted* (fitted from the
+  trajectory between `t=10` and `t=20` to ~1% and matched to `init·e^{k(a−1)t}`,
+  ~22026× at `t=20`), not merely printed; a half-exponent `e^{½k(a−1)t}` model is
+  excluded — the `a>1` non-smooth pole at `μ=1/a` (pre-pole rise on the stable side
+  `μ<1/a` pinned to RK integration, not only the analytic formula), the
+  non-stationary transient (with the `a=0` boundary pinned as *stationary* — the
+  `a≠0` precondition of part 3), and the stable-but-decoupled cross-link.
 - **Nature of the claim** (the honest core — read this before the corollary): the
   decoupling `∂x*/∂r₀=0` at `μ=1` is *true by construction* — once the reference is
   `r=g(x)` with a verifier carrying no residual `r₀`, the world cannot appear in the
