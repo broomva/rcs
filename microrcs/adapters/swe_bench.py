@@ -31,8 +31,47 @@ if str(_MICROCRS_DIR) not in sys.path:
     sys.path.insert(0, str(_MICROCRS_DIR))
 import microrcs as m  # noqa: E402
 
+from . import swe_specs  # noqa: E402
 from .sandbox import SandboxBackend, SetupError, UvVenvBackend  # noqa: E402
 from .swe_types import SweInstance, SweScore  # noqa: E402
+
+
+def _score_via_swebench(
+    backend: SandboxBackend,
+    instance: SweInstance,
+    verify_ws: Path,
+    timeout_s: float,
+) -> tuple[int, int, int, int, str]:
+    """Canonical scoring (BRO-1948): repoint the editable install at the
+    patched workspace so source edits are live, run the repo's real test
+    command over its test directives, and parse per-test status with the
+    repo-specific swebench log parser. Returns
+    (f2p_pass, f2p_total, p2p_pass, p2p_total, error_tail).
+
+    Unlike the legacy path this scores the FULL PASS_TO_PASS set (not a
+    `[:10]` sample) and handles non-pytest runners (sympy `bin/test`)."""
+    backend.repoint_editable(verify_ws)  # type: ignore[attr-defined]
+    cmd = swe_specs.test_command(instance) + " " + " ".join(
+        swe_specs.test_directives(instance)
+    )
+    try:
+        proc = backend.run_test_command(verify_ws, cmd, timeout_s)  # type: ignore[attr-defined]
+    except subprocess.TimeoutExpired as exc:
+        return (
+            0, len(instance.fail_to_pass), 0, len(instance.pass_to_pass),
+            f"test command timeout after {timeout_s}s: {exc}",
+        )
+    log = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    status = swe_specs.parse_test_log(instance, log)
+
+    def _count(names: tuple[str, ...]) -> tuple[int, int]:
+        items = list(names)
+        return sum(1 for t in items if status.get(t) == "PASSED"), len(items)
+
+    f2p_pass, f2p_total = _count(instance.fail_to_pass)
+    p2p_pass, p2p_total = _count(instance.pass_to_pass)
+    err_tail = "" if status else f"no tests parsed; stderr: {(proc.stderr or '')[-500:]}"
+    return f2p_pass, f2p_total, p2p_pass, p2p_total, err_tail
 
 
 # === Curated pilot instances ============================================
@@ -298,12 +337,31 @@ def _make_swe_verifier(
                 )
                 return 0.0
             t0 = time.monotonic()
-            f2p_pass, f2p_total, f2p_err = _count_pytest_passes(
-                backend, verify_ws, instance.fail_to_pass, pytest_timeout_s
+            use_swebench = (
+                swe_specs.HAS_SWEBENCH and swe_specs.venv_support(instance)[0]
             )
-            p2p_pass, p2p_total, p2p_err = _count_pytest_passes(
-                backend, verify_ws, instance.pass_to_pass[:10], pytest_timeout_s
-            )
+            if use_swebench:
+                try:
+                    (
+                        f2p_pass, f2p_total, p2p_pass, p2p_total, err_tail
+                    ) = _score_via_swebench(
+                        backend, instance, verify_ws, pytest_timeout_s
+                    )
+                except (SetupError, swe_specs.SwebenchUnavailable) as exc:
+                    _record_score(
+                        agent_workspace, instance, score=0.0,
+                        error=f"swebench scoring failed: {exc}",
+                    )
+                    return 0.0
+            else:
+                # Legacy path: per-node-ID pytest counting (P2P sampled).
+                f2p_pass, f2p_total, f2p_err = _count_pytest_passes(
+                    backend, verify_ws, instance.fail_to_pass, pytest_timeout_s
+                )
+                p2p_pass, p2p_total, p2p_err = _count_pytest_passes(
+                    backend, verify_ws, instance.pass_to_pass[:10], pytest_timeout_s
+                )
+                err_tail = f2p_err or p2p_err
             duration = time.monotonic() - t0
             score_value = (
                 1.0
@@ -322,7 +380,7 @@ def _make_swe_verifier(
                 p2p_total=p2p_total,
                 duration_s=duration,
                 error=None,
-                pytest_stderr_tail=(f2p_err or p2p_err)[-1000:],
+                pytest_stderr_tail=err_tail[-1000:],
             )
             return score_value
         finally:

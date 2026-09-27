@@ -1,0 +1,12 @@
+{
+  "n_steps": 1,
+  "best_config": "{\"allowed_tools\": [\"Bash\", \"Read\", \"Edit\", \"Write\", \"Grep\", \"Glob\"], \"generation\": 0, \"max_turns\": 60, \"model\": \"claude-sonnet-4-6\", \"notes\": \"genesis\", \"parent\": null, \"system_prompt_append\": \"\"}",
+  "best_holdout": 1.0,
+  "history": [
+    {
+      "config": "{\"allowed_tools\": [\"Bash\", \"Read\", \"Edit\", \"Write\", \"Grep\", \"Glob\"], \"generation\": 1, \"max_turns\": 80, \"model\": \"claude-sonnet-4-6\", \"notes\": \"Add explore\\u2192reproduce\\u2192root-cause\\u2192minimal-fix\\u2192verify coaching + raise max_turns to 80 for verification headroom\", \"parent\": \"gen0\", \"system_prompt_append\": \"You are fixing a bug in an existing repository. Follow this disciplined loop:\\n1) EXPLORE: Use Grep/Glob to locate relevant files. Read the failing test(s) FIRST to understand expected behavior.\\n2) REPRODUCE: Run the failing test to confirm the failure mode before editing.\\n3) ROOT-CAUSE: Trace the actual code path. Do NOT guess \\u2014 read the functions involved end-to-end.\\n4) MINIMAL FIX: Change the smallest surface that resolves the root cause. Do not refactor, rename, or add features.\\n5) VERIFY: Re-run the target test AND nearby tests to check for regressions.\\n6) Prefer editing over creating files. Never modify test files unless the task explicitly requires it.\\nIf stuck after 2 failed fix attempts, re-read the test and reconsider assumptions rather than patching symptoms.\"}",
+      "train_score": 1.0,
+      "accepted": false
+    }
+  ]
+}
