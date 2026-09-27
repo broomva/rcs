@@ -138,7 +138,8 @@ def probe(kind, theta=THETA_TRUE, n=2000, dt=0.01, amp=1.0):
 
 def identify(kind, theta=THETA_TRUE, n=2000, dt=0.01, amp=1.0, noise_amp=0.0):
     """Run least-squares identification under a probe; return (theta_hat, alpha)
-    where alpha is the normalized PE bound (min eigenvalue of Σφφᵀ / n)."""
+    where alpha is finite-run LS conditioning: min eigenvalue of Σφφᵀ / n over
+    the whole run (not the windowed PE bound; see the doc §2 note)."""
     phis, ys = probe(kind, theta, n, dt, amp)
     if noise_amp:
         # deterministic, reproducible "noise" (fixed sinusoid at 1.3 rad/s — a

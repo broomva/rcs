@@ -61,10 +61,16 @@ theorem; we do not reprove it.
 
 *What the witness measures.* §2 states the **windowed** bound `∫_t^{t+T} φφᵀ ≥ αI`;
 the runnable witness (§3) instead computes the **full-run averaged** Gram
-`(1/n)Σφφᵀ`. For the stationary, periodic probes used here the two agree up to
-constants — over an integer number of periods the time-average equals the windowed
-integral divided by the window length — so the reported `α` is the windowed PE
-bound up to that normalization, not a different quantity.
+`(1/n)Σφφᵀ`. These are **not** the same quantity here. `identify()` runs
+`n=2000, dt=0.01` — a 20 s horizon — while `sin t, sin 2t` share a common period of
+`2π ≈ 6.28 s`, so the run is not an integer number of periods, and no minimum over
+window starts is taken. The reported `α` (the smallest eigenvalue of the full-run
+averaged Gram) is therefore **finite-run least-squares conditioning**, which is what
+the estimator's error actually depends on in this run. It is evidence consistent with
+PE, not a measurement of the uniform windowed bound. Wherever this note writes "the
+PE bound `α`" of the witness, read "the finite-run conditioning `α`". Measuring the
+windowed bound itself would take the minimum of `λ_min(∫_t^{t+2π} φφᵀ)` over window
+starts `t`; that is not computed here.
 
 ## 3. The identification model
 
