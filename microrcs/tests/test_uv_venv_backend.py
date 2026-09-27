@@ -21,6 +21,8 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+import os  # noqa: E402
+
 import pytest  # noqa: E402
 
 from adapters import swe_specs  # noqa: E402
@@ -96,6 +98,61 @@ def test_ensure_venv_rebuilds_when_sentinel_absent(tmp_path, monkeypatch):
     assert installs == [1], "install path must run on rebuild"
     assert (venv_dir / _SENTINEL_NAME).exists(), "sentinel written after build"
     assert not (venv_dir / "stale-artifact").exists(), "stale venv was removed"
+
+
+def test_ensure_venv_rebuilds_partial_install_with_dist_info(tmp_path, monkeypatch):
+    # The exact half-init shape the sentinel replaced: deps from steps 1-2 left
+    # a *.dist-info behind, then the target install failed. The old
+    # `any *.dist-info` heuristic REUSED this venv; the sentinel must rebuild it.
+    monkeypatch.setattr(swe_specs, "HAS_SWEBENCH", False)
+    monkeypatch.setattr(swe_specs, "MAP_REPO_VERSION_TO_SPECS", {})
+    backend = UvVenvBackend(cache_root=tmp_path)
+    inst = _inst()
+    venv_dir = backend.venv_dir(inst)
+    _fake_bin_python(venv_dir)
+    dist = venv_dir / "lib" / "python3.11" / "site-packages" / "werkzeug-2.3.7.dist-info"
+    dist.mkdir(parents=True)
+
+    def _fake_run(cmd, *a, **k):
+        _fake_bin_python(venv_dir)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    installs: list = []
+    monkeypatch.setattr("adapters.sandbox.uv_venv.subprocess.run", _fake_run)
+    monkeypatch.setattr(backend, "_install_floating", lambda *a, **k: installs.append(1))
+
+    backend._ensure_venv(inst)
+
+    assert installs == [1], "a dist-info without the sentinel is half-init: rebuild"
+    assert not dist.exists(), "the partial venv was removed before rebuilding"
+
+
+def test_pre_install_is_idempotent_across_rebuilds(tmp_path, monkeypatch):
+    # A rebuild re-runs pre_install on the same canonical clone. A
+    # non-idempotent edit must still be applied exactly once.
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / "setup.cfg").write_text("dep\n")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
+         "commit", "-qm", "base"], check=True,
+    )
+    backend = UvVenvBackend(cache_root=tmp_path)
+    monkeypatch.setattr(backend, "_uv_pip", lambda *a, **k: None)
+    spec = {
+        # Non-idempotent on purpose: applied twice it would read "dep<=1<=1".
+        "pre_install": [
+            "python3 -c \"import pathlib; p = pathlib.Path('setup.cfg'); "
+            "p.write_text(p.read_text().replace('dep', 'dep<=1'))\""
+        ],
+        "install": "true",
+    }
+    env = {"PATH": os.environ["PATH"]}
+    for _ in range(2):
+        backend._install_from_spec(_inst(), spec, repo, tmp_path / "venv", env)
+    assert (repo / "setup.cfg").read_text() == "dep<=1\n"
 
 
 def test_sentinel_not_written_when_install_fails(tmp_path, monkeypatch):

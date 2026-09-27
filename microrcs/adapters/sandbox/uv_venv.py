@@ -32,9 +32,9 @@ from .backend import SetupError
 _SENTINEL_NAME = ".microrcs_spec_ok"
 
 # Written at the venv root by `repoint_editable`, recording which workspace the
-# shared venv's single editable pointer currently aims at. Lets the scoring
-# path detect a parallel same-instance repoint race and fail loudly instead of
-# scoring against cross-contaminated imports (BRO-1949).
+# shared venv's single editable pointer was last aimed at through this backend.
+# Lets the scoring path catch SOME parallel same-instance repoint races
+# (BRO-1949); see `_assert_editable_pointer` for exactly which.
 _EDITABLE_MARKER = ".microrcs_editable_at"
 
 
@@ -171,8 +171,8 @@ class UvVenvBackend:
         (e.g. P5 multi-seed) would race on this single pointer — give each
         parallel worker its own venv/workspace first. As a backstop (BRO-1949)
         the repoint records the target workspace in the venv and
-        `run_test_command` asserts the pointer is still ours before scoring, so
-        a race fails loudly instead of scoring against the wrong workspace."""
+        `run_test_command` checks that record before scoring, which catches
+        some — not all — such races (see `_assert_editable_pointer`)."""
         env = self._venv_env(workspace_path)
         r = subprocess.run(
             [self.uv_path, "pip", "install", "-e", ".", "--no-deps"],
@@ -213,7 +213,7 @@ class UvVenvBackend:
         return self._venv_bin_from_workspace(workspace_path).parent / _EDITABLE_MARKER
 
     def _assert_editable_pointer(self, workspace_path: Path) -> None:
-        """Fail loudly on a parallel same-instance repoint race (BRO-1949).
+        """Fail on a recorded parallel same-instance repoint mismatch (BRO-1949).
 
         The venv (keyed by repo+commit+py) is shared across the agent + verify
         workspaces and carries a SINGLE editable pointer, repointed immediately
@@ -221,6 +221,15 @@ class UvVenvBackend:
         If a parallel worker for the same instance repoints between our repoint
         and our test run, the pointer now aims at THEIR workspace and our scores
         would be silently cross-contaminated. Convert that into a clear error.
+
+        The check reads a marker, not the live pointer, so its reach is
+        narrower than "detects any race": it trips only when another repoint
+        THROUGH THIS BACKEND recorded a different workspace before our check. It
+        does not see the agent-side repoint in `cli_plant._repoint_editable`
+        (best-effort, unrecorded), an interleaving where the other worker's
+        marker write lands after our check, or a repoint during the test run.
+        Serial execution, with the verifier repointing immediately before it
+        runs, remains what keeps scoring correct; this is a partial backstop.
 
         An absent marker means no repoint happened through this backend (older
         venv / a non-repoint code path); stay silent then, for backward
@@ -353,6 +362,13 @@ class UvVenvBackend:
             self._uv_pip(["install", *spec["pip_packages"]], repo_dir, env)
         # 3. pre_install source edits (sed on setup.py etc.). Deferred repos
         #    (tox-based, e.g. sphinx) are excluded upstream by venv_support.
+        #    Restore the canonical clone's tracked files first: a rebuild of a
+        #    half-init venv (BRO-1949) re-enters here on an already-edited
+        #    clone, and a non-idempotent sed applied twice corrupts the source.
+        subprocess.run(
+            [self.git_path, "-C", str(repo_dir), "checkout", "--quiet", "--", "."],
+            check=True, capture_output=True, text=True,
+        )
         for pre in spec.get("pre_install") or []:
             subprocess.run(
                 pre, cwd=repo_dir, env=env, shell=True,
