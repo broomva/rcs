@@ -62,6 +62,11 @@ def venv_support(instance) -> tuple[bool, str]:
 
     Excludes conda-`environment.yml` instances (need conda, e.g. matplotlib,
     scikit-learn, xarray) and tox-driven test commands (deferred: sphinx).
+    Sphinx stays deferred even in its `tox --current-env` form (P20 on rcs#71):
+    its spec's `pre_install` seds (e.g. adding `-rA` to tox.ini) run on the
+    canonical clone, and `_materialize_workspace`'s reset + clean undoes them in
+    the workspace, so every episode would parse zero PASSED lines and score 0
+    silently. Enabling it needs pre_install re-applied after materialization.
     """
     if not HAS_SWEBENCH:
         return False, "swebench not installed"
