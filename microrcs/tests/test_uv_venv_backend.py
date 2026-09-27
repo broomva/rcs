@@ -1,6 +1,7 @@
 """Unit tests for UvVenvBackend robustness fixes (BRO-1949).
 
-Two deferred-robustness follow-ups from the BRO-1948 P20 review:
+Deferred-robustness follow-ups from the BRO-1948 P20 review (plus one found in
+the BRO-1949 P20 rounds: pre_install must stay idempotent across rebuilds):
 - Half-init completion sentinel: a venv is reused only if it carries the
   `.microrcs_spec_ok` marker written at the very end of construction, so a
   build that failed mid-install is rebuilt instead of silently reused.
@@ -29,6 +30,7 @@ from adapters import swe_specs  # noqa: E402
 from adapters.sandbox.backend import SetupError  # noqa: E402
 from adapters.sandbox.uv_venv import (  # noqa: E402
     _EDITABLE_MARKER,
+    _git_env,
     _SENTINEL_NAME,
     UvVenvBackend,
 )
@@ -132,12 +134,12 @@ def test_pre_install_is_idempotent_across_rebuilds(tmp_path, monkeypatch):
     # non-idempotent edit must still be applied exactly once.
     repo = tmp_path / "repo"
     repo.mkdir()
-    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, env=_git_env())
     (repo / "setup.cfg").write_text("dep\n")
-    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True, env=_git_env())
     subprocess.run(
         ["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t",
-         "commit", "-qm", "base"], check=True,
+         "commit", "-qm", "base"], check=True, env=_git_env(),
     )
     backend = UvVenvBackend(cache_root=tmp_path)
     monkeypatch.setattr(backend, "_uv_pip", lambda *a, **k: None)

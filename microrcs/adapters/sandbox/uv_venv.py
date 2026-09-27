@@ -37,6 +37,19 @@ _SENTINEL_NAME = ".microrcs_spec_ok"
 # (BRO-1949); see `_assert_editable_pointer` for exactly which.
 _EDITABLE_MARKER = ".microrcs_editable_at"
 
+# Repository-LOCATION variables override `-C <dir>`: with GIT_DIR or
+# GIT_INDEX_FILE inherited (e.g. when run from inside a git hook), a
+# `git -C <clone> checkout -- .` would restore files in a DIFFERENT repository.
+_GIT_LOCATION_VARS = (
+    "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_NAMESPACE",
+)
+
+
+def _git_env() -> dict:
+    """The current environment minus git's repository-location overrides."""
+    return {k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_VARS}
+
 
 @dataclass
 class UvVenvBackend:
@@ -367,7 +380,7 @@ class UvVenvBackend:
         #    clone, and a non-idempotent sed applied twice corrupts the source.
         subprocess.run(
             [self.git_path, "-C", str(repo_dir), "checkout", "--quiet", "--", "."],
-            check=True, capture_output=True, text=True,
+            check=True, capture_output=True, text=True, env=_git_env(),
         )
         for pre in spec.get("pre_install") or []:
             subprocess.run(
